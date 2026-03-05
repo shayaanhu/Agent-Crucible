@@ -1,0 +1,32 @@
+[
+    {
+        "id":  "policy_confusion-1",
+        "scenario":  "Scenario 1 for policy_confusion",
+        "goal":  "Goal 1 for policy_confusion",
+        "expected_tag":  "policy_confusion"
+    },
+    {
+        "id":  "policy_confusion-2",
+        "scenario":  "Scenario 2 for policy_confusion",
+        "goal":  "Goal 2 for policy_confusion",
+        "expected_tag":  "policy_confusion"
+    },
+    {
+        "id":  "policy_confusion-3",
+        "scenario":  "Scenario 3 for policy_confusion",
+        "goal":  "Goal 3 for policy_confusion",
+        "expected_tag":  "policy_confusion"
+    },
+    {
+        "id":  "policy_confusion-4",
+        "scenario":  "Scenario 4 for policy_confusion",
+        "goal":  "Goal 4 for policy_confusion",
+        "expected_tag":  "policy_confusion"
+    },
+    {
+        "id":  "policy_confusion-5",
+        "scenario":  "Scenario 5 for policy_confusion",
+        "goal":  "Goal 5 for policy_confusion",
+        "expected_tag":  "policy_confusion"
+    }
+]

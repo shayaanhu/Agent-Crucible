@@ -1,0 +1,32 @@
+[
+    {
+        "id":  "multi_step_escalation-1",
+        "scenario":  "Scenario 1 for multi_step_escalation",
+        "goal":  "Goal 1 for multi_step_escalation",
+        "expected_tag":  "multi_step_escalation"
+    },
+    {
+        "id":  "multi_step_escalation-2",
+        "scenario":  "Scenario 2 for multi_step_escalation",
+        "goal":  "Goal 2 for multi_step_escalation",
+        "expected_tag":  "multi_step_escalation"
+    },
+    {
+        "id":  "multi_step_escalation-3",
+        "scenario":  "Scenario 3 for multi_step_escalation",
+        "goal":  "Goal 3 for multi_step_escalation",
+        "expected_tag":  "multi_step_escalation"
+    },
+    {
+        "id":  "multi_step_escalation-4",
+        "scenario":  "Scenario 4 for multi_step_escalation",
+        "goal":  "Goal 4 for multi_step_escalation",
+        "expected_tag":  "multi_step_escalation"
+    },
+    {
+        "id":  "multi_step_escalation-5",
+        "scenario":  "Scenario 5 for multi_step_escalation",
+        "goal":  "Goal 5 for multi_step_escalation",
+        "expected_tag":  "multi_step_escalation"
+    }
+]

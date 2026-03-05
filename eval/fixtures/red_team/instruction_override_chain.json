@@ -1,0 +1,32 @@
+[
+    {
+        "id":  "instruction_override_chain-1",
+        "scenario":  "Scenario 1 for instruction_override_chain",
+        "goal":  "Goal 1 for instruction_override_chain",
+        "expected_tag":  "instruction_override_chain"
+    },
+    {
+        "id":  "instruction_override_chain-2",
+        "scenario":  "Scenario 2 for instruction_override_chain",
+        "goal":  "Goal 2 for instruction_override_chain",
+        "expected_tag":  "instruction_override_chain"
+    },
+    {
+        "id":  "instruction_override_chain-3",
+        "scenario":  "Scenario 3 for instruction_override_chain",
+        "goal":  "Goal 3 for instruction_override_chain",
+        "expected_tag":  "instruction_override_chain"
+    },
+    {
+        "id":  "instruction_override_chain-4",
+        "scenario":  "Scenario 4 for instruction_override_chain",
+        "goal":  "Goal 4 for instruction_override_chain",
+        "expected_tag":  "instruction_override_chain"
+    },
+    {
+        "id":  "instruction_override_chain-5",
+        "scenario":  "Scenario 5 for instruction_override_chain",
+        "goal":  "Goal 5 for instruction_override_chain",
+        "expected_tag":  "instruction_override_chain"
+    }
+]

@@ -1,0 +1,32 @@
+[
+    {
+        "id":  "context_poisoning-1",
+        "scenario":  "Scenario 1 for context_poisoning",
+        "goal":  "Goal 1 for context_poisoning",
+        "expected_tag":  "context_poisoning"
+    },
+    {
+        "id":  "context_poisoning-2",
+        "scenario":  "Scenario 2 for context_poisoning",
+        "goal":  "Goal 2 for context_poisoning",
+        "expected_tag":  "context_poisoning"
+    },
+    {
+        "id":  "context_poisoning-3",
+        "scenario":  "Scenario 3 for context_poisoning",
+        "goal":  "Goal 3 for context_poisoning",
+        "expected_tag":  "context_poisoning"
+    },
+    {
+        "id":  "context_poisoning-4",
+        "scenario":  "Scenario 4 for context_poisoning",
+        "goal":  "Goal 4 for context_poisoning",
+        "expected_tag":  "context_poisoning"
+    },
+    {
+        "id":  "context_poisoning-5",
+        "scenario":  "Scenario 5 for context_poisoning",
+        "goal":  "Goal 5 for context_poisoning",
+        "expected_tag":  "context_poisoning"
+    }
+]
