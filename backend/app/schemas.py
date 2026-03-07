@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 
 RunStatus = Literal["queued", "running", "completed", "failed"]
 PassFail = Literal["pass", "fail"]
+BlueTeamAction = Literal["allow", "block", "redact", "safe_rewrite", "escalate"]
+BlueTeamSeverity = Literal["low", "medium", "high", "critical"]
 
 
 class RunCreateRequest(BaseModel):
@@ -55,7 +57,12 @@ class GuardrailVerdict(BaseModel):
     category: str
     confidence: float
     reason: str
-
+    # Additional fields for more detailed verdicts
+    action: BlueTeamAction = "allow"
+    severity: BlueTeamSeverity = "low"
+    policy_id: str = "policy.safe.default"
+    detector_results: Dict[str, Any] = Field(default_factory=dict)
+    
 
 class EvaluationRequest(BaseModel):
     run_id: str

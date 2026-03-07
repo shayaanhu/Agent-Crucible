@@ -23,3 +23,8 @@ def test_red_blue_contract_integration() -> None:
     assert isinstance(verdict.category, str)
     assert 0.0 <= verdict.confidence <= 1.0
     assert isinstance(verdict.reason, str) and len(verdict.reason) > 0
+    assert verdict.action in {"allow", "block", "redact", "safe_rewrite", "escalate"}
+    assert verdict.severity in {"low", "medium", "high", "critical"}
+    assert isinstance(verdict.policy_id, str) and len(verdict.policy_id) > 0
+    assert isinstance(verdict.detector_results, dict)
+

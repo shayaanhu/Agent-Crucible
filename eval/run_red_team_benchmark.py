@@ -8,10 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agents.red_team import get_red_team_agent, trace_to_dict
-
 
 def main() -> None:
+    from agents.red_team import get_red_team_agent, trace_to_dict
+
     fixtures_dir = Path("eval/fixtures/red_team")
     output_dir = Path("eval/results")
     output_dir.mkdir(parents=True, exist_ok=True)

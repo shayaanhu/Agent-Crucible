@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Protocol
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Literal, Protocol
+
+BlueTeamAction = Literal["allow", "block", "redact", "safe_rewrite", "escalate"]
+BlueTeamSeverity = Literal["low", "medium", "high", "critical"]
 
 
 @dataclass(frozen=True)
@@ -10,6 +13,10 @@ class BlueTeamVerdict:
     category: str
     confidence: float
     reason: str
+    action: BlueTeamAction = "allow"
+    severity: BlueTeamSeverity = "low"
+    policy_id: str = "policy.safe.default"
+    detector_results: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
