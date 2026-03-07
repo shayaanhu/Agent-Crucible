@@ -85,7 +85,7 @@
 ## Core Types
 1. `AttackPrompt`: `id`, `scenario`, `goal`, `payload`, `metadata`
 2. `AttackTurn`: `turn_index`, `input`, `model_output`, `timestamp`
-3. `GuardrailVerdict`: `allowed`, `category`, `confidence`, `reason`
+3. `GuardrailVerdict`: `allowed`, `category`, `confidence`, `reason`, `action`, `severity`, `policy_id`, `detector_results`
 4. `RunRecord`: `run_id`, `provider`, `status`, `created_at`, `summary`
 5. `EvalMetric`: `metric_name`, `value`, `threshold`, `pass_fail`
 

@@ -47,22 +47,28 @@ class AttackTurn(BaseModel):
     timestamp: str
 
 
-class RunEventsResponse(BaseModel):
-    run_id: str
-    events: List[AttackTurn]
-
-
 class GuardrailVerdict(BaseModel):
     allowed: bool
     category: str
     confidence: float
     reason: str
-    # Additional fields for more detailed verdicts
     action: BlueTeamAction = "allow"
     severity: BlueTeamSeverity = "low"
     policy_id: str = "policy.safe.default"
     detector_results: Dict[str, Any] = Field(default_factory=dict)
-    
+
+
+class RunEventWithVerdict(BaseModel):
+    event: AttackTurn
+    verdict: GuardrailVerdict
+
+
+class RunEventsResponse(BaseModel):
+    run_id: str
+    events: List[AttackTurn]
+    verdicts: List[GuardrailVerdict] = Field(default_factory=list)
+    timeline: List[RunEventWithVerdict] = Field(default_factory=list)
+
 
 class EvaluationRequest(BaseModel):
     run_id: str

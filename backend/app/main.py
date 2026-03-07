@@ -13,6 +13,7 @@ from backend.app.schemas import (
     EvaluationResponse,
     RunCreateRequest,
     RunCreateResponse,
+    RunEventWithVerdict,
     RunEventsResponse,
     RunRecord,
     RunStatusResponse,
@@ -69,7 +70,12 @@ def get_run_events(run_id: str) -> RunEventsResponse:
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
     events = store.list_events(run_id)
-    return RunEventsResponse(run_id=run_id, events=events)
+    verdicts = store.list_verdicts(run_id)
+    timeline = [
+        RunEventWithVerdict(event=event, verdict=verdict)
+        for event, verdict in zip(events, verdicts)
+    ]
+    return RunEventsResponse(run_id=run_id, events=events, verdicts=verdicts, timeline=timeline)
 
 
 @app.post("/api/v1/evaluations", response_model=EvaluationResponse)

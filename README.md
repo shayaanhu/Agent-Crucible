@@ -11,6 +11,7 @@ Week 1 is focused on planning, architecture, contracts, and local setup.
 3. `docs/dev-setup.md`
 4. `docs/testing-strategy.md`
 5. `docs/implementation-notes.md`
+6. `BLUE_TEAM_README.md`
 
 ## Repository Layout
 1. `backend/`

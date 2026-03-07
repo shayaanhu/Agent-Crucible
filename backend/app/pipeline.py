@@ -38,6 +38,10 @@ def execute_run(run_id: str) -> None:
                 category=provider_verdict.category,
                 confidence=provider_verdict.confidence,
                 reason=provider_verdict.reason,
+                action=provider_verdict.action,
+                severity=provider_verdict.severity,
+                policy_id=provider_verdict.policy_id,
+                detector_results=provider_verdict.detector_results,
             )
             event = AttackTurn(
                 turn_index=turn.turn_index,

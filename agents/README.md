@@ -8,12 +8,13 @@ Contains:
 Current modules:
 1. `red_team.py`
 2. `blue_team.py`
-3. `provider_adapter.py`
-4. `mock_provider.py`
-5. `contracts.py`
-6. `red_team_models.py`
-7. `red_team_strategies.py`
-8. `red_team_runtime.py`
+3. `blue_team_policies.py`
+4. `provider_adapter.py`
+5. `mock_provider.py`
+6. `contracts.py`
+7. `red_team_models.py`
+8. `red_team_strategies.py`
+9. `red_team_runtime.py`
 
 Parallel ownership model:
 1. Red-team: owns `red_team.py`
@@ -35,3 +36,8 @@ How to add a new red-team strategy:
 2. Add it to `build_strategy_registry()`.
 3. Add fixture file in `eval/fixtures/red_team/<strategy_id>.json`.
 4. Add/extend tests in `backend/tests/test_red_team_engine.py`.
+
+How to add a new blue-team policy:
+1. Add policy entry in `blue_team_policies.py`.
+2. Use policy ID in `blue_team.py` evaluation logic.
+3. Add or extend tests in `backend/tests/test_blue_team_policy_engine.py`.

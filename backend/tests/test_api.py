@@ -60,10 +60,21 @@ def test_events_endpoint() -> None:
 
     response = client.get(f"/api/v1/runs/{run_id}/events")
     assert response.status_code == 200
-    events = response.json()["events"]
+    body = response.json()
+    events = body["events"]
+    verdicts = body["verdicts"]
+    timeline = body["timeline"]
     assert len(events) >= 1
+    assert len(verdicts) == len(events)
+    assert len(timeline) == len(events)
     assert "input" in events[0]
     assert "model_output" in events[0]
+    assert verdicts[0]["action"] in {"allow", "block", "redact", "safe_rewrite", "escalate"}
+    assert verdicts[0]["severity"] in {"low", "medium", "high", "critical"}
+    assert "policy_id" in verdicts[0]
+    assert "detector_results" in verdicts[0]
+    assert "event" in timeline[0]
+    assert "verdict" in timeline[0]
 
 
 def test_evaluation_endpoint() -> None:
