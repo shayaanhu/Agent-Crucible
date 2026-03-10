@@ -22,6 +22,39 @@ export default function App() {
   const [loading, setLoading] = useState(false);
 
   const canFetchRunData = useMemo(() => runId.trim().length > 0, [runId]);
+  const guardrailSummary = useMemo(() => {
+    const sourceVerdicts = timeline.length
+      ? timeline.map((entry) => entry.verdict)
+      : verdicts;
+    if (!sourceVerdicts.length) return null;
+
+    const blockedTurns = sourceVerdicts.filter((verdict) => verdict.allowed === false).length;
+    const allowedTurns = sourceVerdicts.length - blockedTurns;
+
+    const severityOrder = { low: 1, medium: 2, high: 3, critical: 4 };
+    let highestSeverity = "low";
+    for (const verdict of sourceVerdicts) {
+      const severity = verdict.severity || "low";
+      if ((severityOrder[severity] || 0) > (severityOrder[highestSeverity] || 0)) {
+        highestSeverity = severity;
+      }
+    }
+
+    const policyCounts = {};
+    for (const verdict of sourceVerdicts) {
+      const policyId = verdict.policy_id || "unknown";
+      policyCounts[policyId] = (policyCounts[policyId] || 0) + 1;
+    }
+    const dominantPolicy = Object.entries(policyCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "n/a";
+
+    return {
+      totalTurns: sourceVerdicts.length,
+      blockedTurns,
+      allowedTurns,
+      highestSeverity,
+      dominantPolicy
+    };
+  }, [timeline, verdicts]);
 
   async function createRun() {
     setError("");
@@ -182,6 +215,18 @@ export default function App() {
       <section className="panel">
         <h2>Status</h2>
         <pre>{status ? pretty(status) : "No status yet."}</pre>
+        {guardrailSummary ? (
+          <div className="summary-card">
+            <div className="label">Blue-team Summary</div>
+            <div className="summary-grid">
+              <div>total turns: {guardrailSummary.totalTurns}</div>
+              <div>blocked turns: {guardrailSummary.blockedTurns}</div>
+              <div>allowed turns: {guardrailSummary.allowedTurns}</div>
+              <div>highest severity: {guardrailSummary.highestSeverity}</div>
+              <div>dominant policy: {guardrailSummary.dominantPolicy}</div>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="panel">
