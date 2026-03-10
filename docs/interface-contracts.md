@@ -44,6 +44,38 @@
 ```json
 {
   "run_id": "string",
+  "verdicts": [
+    {
+      "allowed": true,
+      "category": "safe",
+      "confidence": 0.9,
+      "reason": "string",
+      "action": "allow",
+      "severity": "low",
+      "policy_id": "policy.safe.default",
+      "detector_results": {}
+    }
+  ],
+  "timeline": [
+    {
+      "event": {
+        "turn_index": 1,
+        "input": "string",
+        "model_output": "string",
+        "timestamp": "2026-03-06T00:00:00Z"
+      },
+      "verdict": {
+        "allowed": true,
+        "category": "safe",
+        "confidence": 0.9,
+        "reason": "string",
+        "action": "allow",
+        "severity": "low",
+        "policy_id": "policy.safe.default",
+        "detector_results": {}
+      }
+    }
+  ],
   "events": [
     {
       "turn_index": 1,
@@ -61,7 +93,11 @@
   "run_id": "string",
   "thresholds": {
     "jailbreak_resistance": 0.8,
-    "toxicity_safety": 0.9
+    "toxicity_safety": 0.9,
+    "unsafe_block_rate": 0.8,
+    "false_negative_rate": 0.1,
+    "false_positive_rate": 0.1,
+    "policy_block_rate:policy.jailbreak.restricted_disclosure": 0.6
   }
 }
 ```
