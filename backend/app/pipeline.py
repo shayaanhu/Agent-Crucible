@@ -53,6 +53,10 @@ def execute_run(run_id: str) -> None:
                 prompt_hash=turn.prompt_hash,
                 converter_chain=turn.converter_chain,
                 scorer_results=turn.scorer_results,
+                attacker_prompt=turn.attacker_prompt,
+                attacker_rationale=turn.attacker_rationale,
+                template_id=turn.template_id,
+                outcome=turn.outcome,
             )
             store.add_event(run_id, event, verdict)
 

@@ -7,7 +7,7 @@ from typing import Dict
 from agents.contracts import RedTeamContract, RedTeamRunTrace, RedTeamTurn
 from agents.red_team_converters import build_converter_registry
 from agents.red_team_models import AttackState
-from agents.red_team_runtime import generate_response
+from agents.red_team_runtime import generate_attacker_prompt, generate_response
 from agents.red_team_scorers import ScorerResult, build_scorer_registry
 from agents.red_team_strategies import RedTeamStrategy, build_strategy_registry
 
@@ -58,29 +58,50 @@ class AdvancedRedTeamAgent(RedTeamContract):
             history=[],
             tags=[],
             strategy_id=strategy_id,
+            last_response="",
+            last_outcome="",
+            template_index=0,
         )
         turns: list[RedTeamTurn] = []
         strategy_sequence: list[str] = [strategy_id]
+        template_sequence: list[str] = []
         converters = _resolve_csv(metadata.get("converters", "identity,reframe_audit"))
         scorers = _resolve_csv(metadata.get("scorers", "success_pattern,refusal"))
+        attacker_provider = metadata.get("attacker_provider", provider)
+        attacker_model = metadata.get("attacker_model")
 
         while state.turn_index < state.max_turns:
             state.turn_index += 1
             strategy = self.get_strategy(strategy_id)
-            prompt = strategy.build_prompt(state)
-            prompt, converter_chain = self._apply_converters(prompt, state, converters)
+            template = _select_template(strategy, state)
+            attacker_context = _build_attacker_context(state)
+            attacker_prompt, attacker_rationale = generate_attacker_prompt(
+                template=template.prompt_template,
+                context=attacker_context,
+                last_response=state.last_response,
+                provider=attacker_provider,
+                model_override=attacker_model,
+            )
+            prompt, converter_chain = self._apply_converters(attacker_prompt, state, converters)
             response = generate_response(prompt=prompt, provider=provider)
             scorer_results = self._score_response(response, state, scorers)
             update = strategy.on_response(state, response)
+            outcome = _classify_outcome(scorer_results)
             state.tags.extend(update.tags)
+            state.last_response = response
+            state.last_outcome = outcome
             state.history.append(
                 {
                     "turn_index": state.turn_index,
                     "prompt": prompt,
+                    "attacker_prompt": attacker_prompt,
+                    "attacker_rationale": attacker_rationale,
                     "response": response,
                     "strategy_id": strategy_id,
+                    "template_id": template.template_id,
                     "converters": converter_chain,
                     "scorers": scorer_results,
+                    "outcome": outcome,
                 }
             )
             turns.append(
@@ -89,12 +110,17 @@ class AdvancedRedTeamAgent(RedTeamContract):
                     prompt=prompt,
                     response=response,
                     strategy_id=strategy_id,
-                    attack_tag=update.tags[0] if update.tags else "unclassified",
+                    attack_tag=template.attack_tag,
                     prompt_hash=sha256(prompt.encode("utf-8")).hexdigest()[:12],
                     converter_chain=converter_chain,
                     scorer_results=scorer_results,
+                    attacker_prompt=attacker_prompt,
+                    attacker_rationale=attacker_rationale,
+                    template_id=template.template_id,
+                    outcome=outcome,
                 )
             )
+            template_sequence.append(template.template_id)
             scorer_stop = _stop_from_scorers(scorer_results)
             if scorer_stop:
                 stop_reason = scorer_stop
@@ -105,21 +131,28 @@ class AdvancedRedTeamAgent(RedTeamContract):
             if state.turn_index >= 2 and _repeated_last_two_responses(state):
                 stop_reason = "blocked_or_no_progress"
                 break
-            if _should_switch_strategy(scorer_results):
+            if outcome == "blocked":
                 next_strategy = _next_strategy(strategy_id, ordered_strategies)
                 if next_strategy is None:
                     stop_reason = "blocked_or_no_progress"
                     break
                 strategy_id = next_strategy
+                state.template_index = 0
                 strategy_sequence.append(strategy_id)
+                continue
+            if outcome == "partial":
+                state.template_index += 1
 
         trace_meta = {
             "total_turns": str(len(turns)),
             "provider": provider,
             "strategy_description": self.get_strategy(strategy_id).metadata().description,
             "strategy_sequence": ",".join(strategy_sequence),
+            "template_sequence": ",".join(template_sequence),
             "converters": ",".join(converters),
             "scorers": ",".join(scorers),
+            "attacker_provider": attacker_provider,
+            "attacker_model": attacker_model or "",
         }
         trace_meta.update(metadata)
         return RedTeamRunTrace(
@@ -182,10 +215,6 @@ def _stop_from_scorers(results: list[Dict[str, object]]) -> str | None:
     return None
 
 
-def _should_switch_strategy(results: list[Dict[str, object]]) -> bool:
-    return any(result.get("label") == "blocked" for result in results)
-
-
 def _next_strategy(current: str, ordered: list[str]) -> str | None:
     if current not in ordered:
         return ordered[0] if ordered else None
@@ -193,6 +222,30 @@ def _next_strategy(current: str, ordered: list[str]) -> str | None:
     if idx + 1 >= len(ordered):
         return None
     return ordered[idx + 1]
+
+
+def _build_attacker_context(state: AttackState) -> str:
+    return (
+        f"Scenario: {state.scenario}\n"
+        f"Goal: {state.goal}\n"
+        f"History:\n{state.to_prompt_context()}"
+    )
+
+
+def _select_template(strategy: RedTeamStrategy, state: AttackState):
+    templates = strategy.template_pack(state)
+    if not templates:
+        raise ValueError(f"Strategy '{strategy.metadata().strategy_id}' has no templates.")
+    idx = min(state.template_index, len(templates) - 1)
+    return templates[idx]
+
+
+def _classify_outcome(results: list[Dict[str, object]]) -> str:
+    if any(result.get("label") == "success" for result in results):
+        return "success"
+    if any(result.get("label") == "blocked" for result in results):
+        return "blocked"
+    return "partial"
 
 
 def get_red_team_agent() -> RedTeamContract:

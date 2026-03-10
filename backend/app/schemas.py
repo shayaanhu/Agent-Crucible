@@ -50,6 +50,10 @@ class AttackTurn(BaseModel):
     prompt_hash: str | None = None
     converter_chain: List[str] = Field(default_factory=list)
     scorer_results: List[Dict[str, Any]] = Field(default_factory=list)
+    attacker_prompt: str | None = None
+    attacker_rationale: str | None = None
+    template_id: str | None = None
+    outcome: str | None = None
 
 
 class GuardrailVerdict(BaseModel):

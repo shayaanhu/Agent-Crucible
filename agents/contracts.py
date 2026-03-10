@@ -29,6 +29,10 @@ class RedTeamTurn:
     prompt_hash: str
     converter_chain: List[str]
     scorer_results: List[Dict[str, Any]]
+    attacker_prompt: str
+    attacker_rationale: str
+    template_id: str
+    outcome: str
 
 
 @dataclass(frozen=True)

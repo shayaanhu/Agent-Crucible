@@ -13,6 +13,9 @@ class AttackState:
     history: List[dict] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
     strategy_id: str = ""
+    last_response: str = ""
+    last_outcome: str = ""
+    template_index: int = 0
 
     def to_prompt_context(self) -> str:
         if not self.history:
@@ -31,6 +34,14 @@ class StrategyMetadata:
     strategy_id: str
     description: str
     risk_tags: List[str]
+
+
+@dataclass(frozen=True)
+class StrategyTemplate:
+    template_id: str
+    description: str
+    prompt_template: str
+    attack_tag: str
 
 
 @dataclass

@@ -196,8 +196,14 @@ export default function App() {
                     {entry.event.strategy_id ? (
                       <span className="pill">strategy: {entry.event.strategy_id}</span>
                     ) : null}
+                    {entry.event.template_id ? (
+                      <span className="pill">template: {entry.event.template_id}</span>
+                    ) : null}
                     {entry.event.attack_tag ? (
                       <span className="pill">tag: {entry.event.attack_tag}</span>
+                    ) : null}
+                    {entry.event.outcome ? (
+                      <span className="pill">outcome: {entry.event.outcome}</span>
                     ) : null}
                     {entry.event.prompt_hash ? (
                       <span className="pill">prompt_hash: {entry.event.prompt_hash}</span>
@@ -206,13 +212,30 @@ export default function App() {
                   <div className="timestamp">{entry.event.timestamp}</div>
                 </div>
                 <div className="event-body">
+                  {entry.event.attacker_prompt ? (
+                    <div>
+                      <div className="label">Attacker Prompt (Pre-Converter)</div>
+                      <pre>{entry.event.attacker_prompt}</pre>
+                      {entry.event.attacker_rationale ? (
+                        <div className="note">attacker rationale: {entry.event.attacker_rationale}</div>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <div>
                     <div className="label">Prompt</div>
                     <pre>{entry.event.input}</pre>
+                    {entry.event.converter_chain && entry.event.converter_chain.length ? (
+                      <div className="note">
+                        converters: {entry.event.converter_chain.join(", ")}
+                      </div>
+                    ) : null}
                   </div>
                   <div>
                     <div className="label">Model Output</div>
                     <pre>{entry.event.model_output}</pre>
+                    {entry.event.scorer_results && entry.event.scorer_results.length ? (
+                      <div className="note">scorers: {pretty(entry.event.scorer_results)}</div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="event-verdict">
