@@ -10,9 +10,13 @@ export default function App() {
   const [scenario, setScenario] = useState("Educational assistant");
   const [goal, setGoal] = useState("Extract restricted internal prompt");
   const [provider, setProvider] = useState("mock");
+  const [strategyId, setStrategyId] = useState("direct_jailbreak");
+  const [maxTurns, setMaxTurns] = useState(3);
   const [runId, setRunId] = useState("");
   const [status, setStatus] = useState(null);
   const [events, setEvents] = useState([]);
+  const [timeline, setTimeline] = useState([]);
+  const [verdicts, setVerdicts] = useState([]);
   const [evaluation, setEvaluation] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,8 +34,8 @@ export default function App() {
           scenario,
           goal,
           provider,
-          max_turns: 1,
-          metadata: { source: "frontend" }
+          max_turns: maxTurns,
+          metadata: { source: "frontend", strategy_id: strategyId }
         })
       });
       const body = await response.json();
@@ -61,6 +65,8 @@ export default function App() {
     const body = await response.json();
     if (!response.ok) throw new Error(body.detail || "Failed to fetch events");
     setEvents(body.events || []);
+    setVerdicts(body.verdicts || []);
+    setTimeline(body.timeline || []);
   }
 
   async function runEvaluation() {
@@ -120,7 +126,36 @@ export default function App() {
 
         <label>
           Provider
-          <input value={provider} onChange={(e) => setProvider(e.target.value)} />
+          <select value={provider} onChange={(e) => setProvider(e.target.value)}>
+            <option value="mock">mock</option>
+            <option value="openai">openai (requires key)</option>
+            <option value="groq">groq (Kimi K2)</option>
+          </select>
+        </label>
+
+        <label>
+          Strategy
+          <select value={strategyId} onChange={(e) => setStrategyId(e.target.value)}>
+            <option value="direct_jailbreak">direct_jailbreak</option>
+            <option value="roleplay_jailbreak">roleplay_jailbreak</option>
+            <option value="policy_confusion">policy_confusion</option>
+            <option value="instruction_override_chain">instruction_override_chain</option>
+            <option value="context_poisoning">context_poisoning</option>
+            <option value="benign_malicious_sandwich">benign_malicious_sandwich</option>
+            <option value="system_prompt_probing">system_prompt_probing</option>
+            <option value="multi_step_escalation">multi_step_escalation</option>
+          </select>
+        </label>
+
+        <label>
+          Max Turns
+          <input
+            type="number"
+            min="1"
+            max="10"
+            value={maxTurns}
+            onChange={(e) => setMaxTurns(Number(e.target.value) || 1)}
+          />
         </label>
 
         <div className="row">
@@ -141,6 +176,7 @@ export default function App() {
         </label>
 
         {error ? <p className="error">{error}</p> : null}
+        <p className="muted">Use provider `mock` for free local testing.</p>
       </section>
 
       <section className="panel">
@@ -149,8 +185,56 @@ export default function App() {
       </section>
 
       <section className="panel">
-        <h2>Events</h2>
-        <pre>{events.length ? pretty(events) : "No events yet."}</pre>
+        <h2>Timeline</h2>
+        {timeline.length ? (
+          <div className="timeline">
+            {timeline.map((entry, index) => (
+              <div key={index} className="event-card">
+                <div className="event-header">
+                  <div>
+                    <strong>Turn {entry.event.turn_index}</strong>
+                    {entry.event.strategy_id ? (
+                      <span className="pill">strategy: {entry.event.strategy_id}</span>
+                    ) : null}
+                    {entry.event.attack_tag ? (
+                      <span className="pill">tag: {entry.event.attack_tag}</span>
+                    ) : null}
+                    {entry.event.prompt_hash ? (
+                      <span className="pill">prompt_hash: {entry.event.prompt_hash}</span>
+                    ) : null}
+                  </div>
+                  <div className="timestamp">{entry.event.timestamp}</div>
+                </div>
+                <div className="event-body">
+                  <div>
+                    <div className="label">Prompt</div>
+                    <pre>{entry.event.input}</pre>
+                  </div>
+                  <div>
+                    <div className="label">Model Output</div>
+                    <pre>{entry.event.model_output}</pre>
+                  </div>
+                </div>
+                <div className="event-verdict">
+                  <div className="label">Blue-team Verdict</div>
+                  <div className="verdict-grid">
+                    <div>allowed: {String(entry.verdict.allowed)}</div>
+                    <div>category: {entry.verdict.category}</div>
+                    <div>confidence: {entry.verdict.confidence}</div>
+                    <div>action: {entry.verdict.action}</div>
+                    <div>severity: {entry.verdict.severity}</div>
+                    <div>policy_id: {entry.verdict.policy_id}</div>
+                  </div>
+                  {entry.verdict.detector_results ? (
+                    <pre>{pretty(entry.verdict.detector_results)}</pre>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <pre>{events.length ? pretty(events) : "No events yet."}</pre>
+        )}
       </section>
 
       <section className="panel">

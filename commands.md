@@ -22,6 +22,9 @@ cd ..
 # Optional for OpenAI provider:
 # $env:OPENAI_API_KEY="your_key_here"
 # $env:OPENAI_MODEL="gpt-4o-mini"
+# Optional for Groq provider (Kimi K2):
+# $env:GROQ_API_KEY="your_key_here"
+# $env:GROQ_MODEL="moonshotai/kimi-k2-instruct-0905"
 python -m uvicorn backend.app.main:app --reload
 ```
 

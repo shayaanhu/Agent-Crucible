@@ -50,6 +50,15 @@ input {
   border-radius: 6px;
 }
 
+select {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid #b9b9b9;
+  border-radius: 6px;
+  background: #fff;
+}
+
 .row {
   display: flex;
   gap: 8px;
@@ -80,4 +89,60 @@ pre {
   padding: 12px;
   border-radius: 8px;
   overflow: auto;
+}
+
+.timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.event-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f9fafb;
+}
+
+.event-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e7f0ff;
+  font-size: 12px;
+}
+
+.timestamp {
+  color: #666;
+  font-size: 12px;
+}
+
+.event-body {
+  display: grid;
+  gap: 10px;
+}
+
+.label {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.event-verdict {
+  margin-top: 8px;
+}
+
+.verdict-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px;
+  font-size: 13px;
+  color: #222;
 }

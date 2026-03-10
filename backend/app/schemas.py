@@ -45,6 +45,11 @@ class AttackTurn(BaseModel):
     input: str
     model_output: str
     timestamp: str
+    strategy_id: str | None = None
+    attack_tag: str | None = None
+    prompt_hash: str | None = None
+    converter_chain: List[str] = Field(default_factory=list)
+    scorer_results: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class GuardrailVerdict(BaseModel):

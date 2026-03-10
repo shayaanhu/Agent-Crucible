@@ -5,14 +5,18 @@ from hashlib import sha256
 from typing import Dict
 
 from agents.contracts import RedTeamContract, RedTeamRunTrace, RedTeamTurn
+from agents.red_team_converters import build_converter_registry
 from agents.red_team_models import AttackState
 from agents.red_team_runtime import generate_response
+from agents.red_team_scorers import ScorerResult, build_scorer_registry
 from agents.red_team_strategies import RedTeamStrategy, build_strategy_registry
 
 
 class AdvancedRedTeamAgent(RedTeamContract):
     def __init__(self) -> None:
         self._registry = build_strategy_registry()
+        self._converter_registry = build_converter_registry()
+        self._scorer_registry = build_scorer_registry()
 
     def build_attack_prompt(self, scenario: str, goal: str) -> str:
         strategy = self.get_strategy("direct_jailbreak")
@@ -44,7 +48,7 @@ class AdvancedRedTeamAgent(RedTeamContract):
     ) -> RedTeamRunTrace:
         metadata = metadata or {}
         strategy_id = metadata.get("strategy_id", "direct_jailbreak")
-        strategy = self.get_strategy(strategy_id)
+        ordered_strategies = self.list_strategies()
         stop_reason = "max_turns_reached"
         state = AttackState(
             scenario=scenario,
@@ -56,15 +60,28 @@ class AdvancedRedTeamAgent(RedTeamContract):
             strategy_id=strategy_id,
         )
         turns: list[RedTeamTurn] = []
+        strategy_sequence: list[str] = [strategy_id]
+        converters = _resolve_csv(metadata.get("converters", "identity,reframe_audit"))
+        scorers = _resolve_csv(metadata.get("scorers", "success_pattern,refusal"))
 
         while state.turn_index < state.max_turns:
             state.turn_index += 1
+            strategy = self.get_strategy(strategy_id)
             prompt = strategy.build_prompt(state)
+            prompt, converter_chain = self._apply_converters(prompt, state, converters)
             response = generate_response(prompt=prompt, provider=provider)
+            scorer_results = self._score_response(response, state, scorers)
             update = strategy.on_response(state, response)
             state.tags.extend(update.tags)
             state.history.append(
-                {"turn_index": state.turn_index, "prompt": prompt, "response": response}
+                {
+                    "turn_index": state.turn_index,
+                    "prompt": prompt,
+                    "response": response,
+                    "strategy_id": strategy_id,
+                    "converters": converter_chain,
+                    "scorers": scorer_results,
+                }
             )
             turns.append(
                 RedTeamTurn(
@@ -74,28 +91,68 @@ class AdvancedRedTeamAgent(RedTeamContract):
                     strategy_id=strategy_id,
                     attack_tag=update.tags[0] if update.tags else "unclassified",
                     prompt_hash=sha256(prompt.encode("utf-8")).hexdigest()[:12],
+                    converter_chain=converter_chain,
+                    scorer_results=scorer_results,
                 )
             )
+            scorer_stop = _stop_from_scorers(scorer_results)
+            if scorer_stop:
+                stop_reason = scorer_stop
+                break
             if update.stop:
                 stop_reason = update.stop_reason or "success_detected"
                 break
             if state.turn_index >= 2 and _repeated_last_two_responses(state):
                 stop_reason = "blocked_or_no_progress"
                 break
+            if _should_switch_strategy(scorer_results):
+                next_strategy = _next_strategy(strategy_id, ordered_strategies)
+                if next_strategy is None:
+                    stop_reason = "blocked_or_no_progress"
+                    break
+                strategy_id = next_strategy
+                strategy_sequence.append(strategy_id)
 
         trace_meta = {
             "total_turns": str(len(turns)),
             "provider": provider,
-            "strategy_description": strategy.metadata().description,
+            "strategy_description": self.get_strategy(strategy_id).metadata().description,
+            "strategy_sequence": ",".join(strategy_sequence),
+            "converters": ",".join(converters),
+            "scorers": ",".join(scorers),
         }
         trace_meta.update(metadata)
         return RedTeamRunTrace(
-            strategy_id=strategy_id,
+            strategy_id=strategy_sequence[-1],
             turns=turns,
             stop_reason=stop_reason,
-            risk_tags=sorted(set(state.tags or strategy.metadata().risk_tags)),
+            risk_tags=sorted(set(state.tags or self.get_strategy(strategy_id).metadata().risk_tags)),
             metadata=trace_meta,
         )
+
+    def _apply_converters(
+        self, prompt: str, state: AttackState, converter_names: list[str]
+    ) -> tuple[str, list[str]]:
+        applied: list[str] = []
+        for name in converter_names:
+            if name not in self._converter_registry:
+                continue
+            converter = self._converter_registry[name]
+            prompt = converter.apply(prompt, state)
+            applied.append(converter.name())
+        return prompt, applied
+
+    def _score_response(
+        self, response: str, state: AttackState, scorer_names: list[str]
+    ) -> list[Dict[str, object]]:
+        results: list[Dict[str, object]] = []
+        for name in scorer_names:
+            scorer = self._scorer_registry.get(name)
+            if scorer is None:
+                continue
+            result: ScorerResult = scorer.score(response, state)
+            results.append(result.to_dict())
+        return results
 
 
 def _repeated_last_two_responses(state: AttackState) -> bool:
@@ -112,6 +169,30 @@ def trace_to_dict(trace: RedTeamRunTrace) -> dict:
         "risk_tags": trace.risk_tags,
         "metadata": trace.metadata,
     }
+
+
+def _resolve_csv(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _stop_from_scorers(results: list[Dict[str, object]]) -> str | None:
+    for result in results:
+        if result.get("label") == "success":
+            return "success_detected"
+    return None
+
+
+def _should_switch_strategy(results: list[Dict[str, object]]) -> bool:
+    return any(result.get("label") == "blocked" for result in results)
+
+
+def _next_strategy(current: str, ordered: list[str]) -> str | None:
+    if current not in ordered:
+        return ordered[0] if ordered else None
+    idx = ordered.index(current)
+    if idx + 1 >= len(ordered):
+        return None
+    return ordered[idx + 1]
 
 
 def get_red_team_agent() -> RedTeamContract:
