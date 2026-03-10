@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from importlib.util import find_spec
 from typing import Protocol
 
 from agents.blue_team_policies import POLICIES, PolicyConfig
@@ -13,6 +14,7 @@ class DetectorSignal:
     confidence: float
     matched_patterns: list[str]
     flagged: bool
+    metadata: dict[str, str] = field(default_factory=dict)
 
 
 class BlueTeamDetector(Protocol):
@@ -61,5 +63,76 @@ class RuleDetector:
                 confidence=safe_policy["confidence"],
                 matched_patterns=[],
                 flagged=False,
+                metadata={"source": "rules"},
+            )
+        ]
+
+
+class LlamaGuardDetector:
+    detector_id = "llamaguard_detector"
+
+    def detect(self, model_output: str) -> list[DetectorSignal]:
+        if find_spec("llama_guard") is None:
+            safe_policy = POLICIES["policy.safe.default"]
+            return [
+                DetectorSignal(
+                    detector_id=self.detector_id,
+                    policy_id="policy.safe.default",
+                    confidence=safe_policy["confidence"],
+                    matched_patterns=[],
+                    flagged=False,
+                    metadata={
+                        "source": "llamaguard",
+                        "status": "unavailable",
+                        "reason": "llamaguard dependency not installed",
+                    },
+                )
+            ]
+
+        _ = model_output
+        safe_policy = POLICIES["policy.safe.default"]
+        return [
+            DetectorSignal(
+                detector_id=self.detector_id,
+                policy_id="policy.safe.default",
+                confidence=safe_policy["confidence"],
+                matched_patterns=[],
+                flagged=False,
+                metadata={"source": "llamaguard", "status": "stubbed"},
+            )
+        ]
+
+
+class NeMoGuardrailsDetector:
+    detector_id = "nemo_guardrails_detector"
+
+    def detect(self, model_output: str) -> list[DetectorSignal]:
+        if find_spec("nemoguardrails") is None:
+            safe_policy = POLICIES["policy.safe.default"]
+            return [
+                DetectorSignal(
+                    detector_id=self.detector_id,
+                    policy_id="policy.safe.default",
+                    confidence=safe_policy["confidence"],
+                    matched_patterns=[],
+                    flagged=False,
+                    metadata={
+                        "source": "nemo_guardrails",
+                        "status": "unavailable",
+                        "reason": "nemoguardrails dependency not installed",
+                    },
+                )
+            ]
+
+        _ = model_output
+        safe_policy = POLICIES["policy.safe.default"]
+        return [
+            DetectorSignal(
+                detector_id=self.detector_id,
+                policy_id="policy.safe.default",
+                confidence=safe_policy["confidence"],
+                matched_patterns=[],
+                flagged=False,
+                metadata={"source": "nemo_guardrails", "status": "stubbed"},
             )
         ]

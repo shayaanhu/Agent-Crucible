@@ -2,6 +2,15 @@
 
 Dedicated implementation plan for Blue Team in Agent Crucible.
 
+## Implementation Status Snapshot
+
+1. Phase 1 complete: verdict contract and schema fields are in place.
+2. Phase 2 complete: rule-based detector pipeline and policy-config workflow are active.
+3. Phase 3 in progress: adapter stubs for LlamaGuard and NeMo are wired with rules-only fallback.
+4. Current fallback behavior: if adapter dependencies are unavailable, detectors return non-blocking safe signals and RuleDetector continues as the primary enforcement path.
+5. Adapter toggles:
+   `BLUE_TEAM_ENABLE_LLAMA_GUARD=1` and `BLUE_TEAM_ENABLE_NEMO_GUARDRAILS=1`.
+
 ## Purpose
 
 Blue Team is responsible for detecting unsafe model outputs, enforcing guardrail actions, and producing explainable verdicts that feed evaluation and dashboard views.

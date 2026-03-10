@@ -6,7 +6,10 @@ from uuid import uuid4
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
 
 from backend.app.pipeline import execute_run
 from backend.app.schemas import (
@@ -23,7 +26,8 @@ from backend.app.schemas import (
 from backend.app.store import store
 from eval.scorer import calculate_metrics
 
-load_dotenv()
+if load_dotenv is not None:
+    load_dotenv()
 
 app = FastAPI(title="Agent Crucible API", version="0.1.0")
 app.add_middleware(
