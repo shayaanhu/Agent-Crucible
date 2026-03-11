@@ -77,3 +77,8 @@ curl -X POST http://localhost:8000/api/v1/evaluations `
 ```powershell
 .venv\Scripts\python.exe eval/run_red_team_benchmark.py
 ```
+
+## 7) Red-Team Dataset Runner
+```powershell
+.venv\Scripts\python.exe eval/run_red_team_dataset.py --provider mock
+```

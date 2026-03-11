@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List
 
+from agents.red_team_objective import Objective
+
 
 @dataclass
 class AttackState:
@@ -16,6 +18,7 @@ class AttackState:
     last_response: str = ""
     last_outcome: str = ""
     template_index: int = 0
+    objective: Objective | None = None
 
     def to_prompt_context(self) -> str:
         if not self.history:

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -149,6 +149,39 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    if (!runId) return;
+    let stopped = false;
+    const interval = setInterval(async () => {
+      if (stopped) return;
+      try {
+        const statusResponse = await fetch(`${API_BASE}/api/v1/runs/${runId}`);
+        const statusBody = await statusResponse.json();
+        if (statusResponse.ok) {
+          setStatus(statusBody);
+        }
+        const eventsResponse = await fetch(`${API_BASE}/api/v1/runs/${runId}/events`);
+        const eventsBody = await eventsResponse.json();
+        if (eventsResponse.ok) {
+          setEvents(eventsBody.events || []);
+          setVerdicts(eventsBody.verdicts || []);
+          setTimeline(eventsBody.timeline || []);
+        }
+        if (statusBody?.status === "completed" || statusBody?.status === "failed") {
+          stopped = true;
+          clearInterval(interval);
+        }
+      } catch (err) {
+        // Ignore polling errors; user can refresh manually.
+      }
+    }, 1000);
+
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+    };
+  }, [runId]);
+
   return (
     <main className="page">
       <section className="panel">
@@ -269,6 +302,12 @@ export default function App() {
                     {entry.event.outcome ? (
                       <span className="pill">outcome: {entry.event.outcome}</span>
                     ) : null}
+                    {entry.event.attacker_provider ? (
+                      <span className="pill">attacker: {entry.event.attacker_provider}</span>
+                    ) : null}
+                    {entry.event.target_provider ? (
+                      <span className="pill">target: {entry.event.target_provider}</span>
+                    ) : null}
                     {entry.event.prompt_hash ? (
                       <span className="pill">prompt_hash: {entry.event.prompt_hash}</span>
                     ) : null}
@@ -292,6 +331,9 @@ export default function App() {
                       <div className="note">
                         converters: {entry.event.converter_chain.join(", ")}
                       </div>
+                    ) : null}
+                    {entry.event.objective_goal ? (
+                      <div className="note">objective: {entry.event.objective_goal}</div>
                     ) : null}
                   </div>
                   <div>

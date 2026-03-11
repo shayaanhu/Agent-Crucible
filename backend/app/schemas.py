@@ -55,6 +55,9 @@ class AttackTurn(BaseModel):
     attacker_rationale: str | None = None
     template_id: str | None = None
     outcome: str | None = None
+    attacker_provider: str | None = None
+    target_provider: str | None = None
+    objective_goal: str | None = None
 
 
 class GuardrailVerdict(BaseModel):

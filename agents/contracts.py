@@ -34,6 +34,9 @@ class RedTeamTurn:
     attacker_rationale: str
     template_id: str
     outcome: str
+    attacker_provider: str
+    target_provider: str
+    objective_goal: str
 
 
 @dataclass(frozen=True)

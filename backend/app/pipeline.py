@@ -79,6 +79,9 @@ def execute_run(run_id: str) -> None:
                 attacker_rationale=turn.attacker_rationale,
                 template_id=turn.template_id,
                 outcome=turn.outcome,
+                attacker_provider=turn.attacker_provider,
+                target_provider=turn.target_provider,
+                objective_goal=turn.objective_goal,
             )
             store.add_event(run_id, event, verdict)
 
