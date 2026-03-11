@@ -12,6 +12,7 @@ export default function App() {
   const [provider, setProvider] = useState("mock");
   const [strategyId, setStrategyId] = useState("direct_jailbreak");
   const [maxTurns, setMaxTurns] = useState(3);
+  const [dryRun, setDryRun] = useState(false);
   const [runId, setRunId] = useState("");
   const [status, setStatus] = useState(null);
   const [events, setEvents] = useState([]);
@@ -33,11 +34,15 @@ export default function App() {
 
     const severityOrder = { low: 1, medium: 2, high: 3, critical: 4 };
     let highestSeverity = "low";
+    let dryRunTurns = 0;
+    let wouldBlockTurns = 0;
     for (const verdict of sourceVerdicts) {
       const severity = verdict.severity || "low";
       if ((severityOrder[severity] || 0) > (severityOrder[highestSeverity] || 0)) {
         highestSeverity = severity;
       }
+      if (verdict.dry_run) dryRunTurns += 1;
+      if (verdict.detector_results?.dry_run?.would_block) wouldBlockTurns += 1;
     }
 
     const policyCounts = {};
@@ -52,7 +57,9 @@ export default function App() {
       blockedTurns,
       allowedTurns,
       highestSeverity,
-      dominantPolicy
+      dominantPolicy,
+      dryRunTurns,
+      wouldBlockTurns
     };
   }, [timeline, verdicts]);
 
@@ -68,6 +75,7 @@ export default function App() {
           goal,
           provider,
           max_turns: maxTurns,
+          dry_run: dryRun,
           metadata: { source: "frontend", strategy_id: strategyId }
         })
       });
@@ -191,6 +199,15 @@ export default function App() {
           />
         </label>
 
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={dryRun}
+            onChange={(e) => setDryRun(e.target.checked)}
+          />
+          Dry-run mode (detect and log unsafe output without enforcing block)
+        </label>
+
         <div className="row">
           <button onClick={createRun} disabled={loading}>
             Create Run
@@ -224,6 +241,8 @@ export default function App() {
               <div>allowed turns: {guardrailSummary.allowedTurns}</div>
               <div>highest severity: {guardrailSummary.highestSeverity}</div>
               <div>dominant policy: {guardrailSummary.dominantPolicy}</div>
+              <div>dry-run turns: {guardrailSummary.dryRunTurns}</div>
+              <div>would-block turns: {guardrailSummary.wouldBlockTurns}</div>
             </div>
           </div>
         ) : null}
@@ -292,7 +311,11 @@ export default function App() {
                     <div>action: {entry.verdict.action}</div>
                     <div>severity: {entry.verdict.severity}</div>
                     <div>policy_id: {entry.verdict.policy_id}</div>
+                    <div>dry_run: {String(entry.verdict.dry_run)}</div>
                   </div>
+                  {entry.verdict.detector_results?.dry_run?.would_block ? (
+                    <div className="warning-badge">dry-run: would block</div>
+                  ) : null}
                   {entry.verdict.detector_results ? (
                     <pre>{pretty(entry.verdict.detector_results)}</pre>
                   ) : null}
