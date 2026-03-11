@@ -16,6 +16,7 @@ class RunCreateRequest(BaseModel):
     provider: str = "mock"
     max_turns: int = Field(default=1, ge=1, le=10)
     metadata: Dict[str, str] = Field(default_factory=dict)
+    dry_run: bool = False
 
 
 class RunCreateResponse(BaseModel):
@@ -65,6 +66,7 @@ class GuardrailVerdict(BaseModel):
     severity: BlueTeamSeverity = "low"
     policy_id: str = "policy.safe.default"
     detector_results: Dict[str, Any] = Field(default_factory=dict)
+    dry_run: bool = False
 
 
 class RunEventWithVerdict(BaseModel):

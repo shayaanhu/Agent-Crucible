@@ -17,6 +17,7 @@ class BlueTeamVerdict:
     severity: BlueTeamSeverity = "low"
     policy_id: str = "policy.safe.default"
     detector_results: Dict[str, Any] = field(default_factory=dict)
+    dry_run: bool = False
 
 
 @dataclass(frozen=True)

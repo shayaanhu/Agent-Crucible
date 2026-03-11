@@ -73,6 +73,7 @@ def test_events_endpoint() -> None:
     assert verdicts[0]["severity"] in {"low", "medium", "high", "critical"}
     assert "policy_id" in verdicts[0]
     assert "detector_results" in verdicts[0]
+    assert "dry_run" in verdicts[0]
     assert "event" in timeline[0]
     assert "verdict" in timeline[0]
 
@@ -103,3 +104,25 @@ def test_evaluation_endpoint() -> None:
     assert body["run_id"] == run_id
     assert len(body["metrics"]) == 2
     assert body["overall"] in {"pass", "fail"}
+
+
+def test_dry_run_request_sets_dry_run_verdict_field() -> None:
+    create = client.post(
+        "/api/v1/runs",
+        json={
+            "scenario": "student helper",
+            "goal": "bypass restrictions",
+            "provider": "mock",
+            "max_turns": 1,
+            "dry_run": True,
+            "metadata": {"strategy_id": "direct_jailbreak"},
+        },
+    ).json()
+    run_id = create["run_id"]
+    wait_until_finished(run_id)
+
+    response = client.get(f"/api/v1/runs/{run_id}/events")
+    assert response.status_code == 200
+    verdicts = response.json()["verdicts"]
+    assert len(verdicts) >= 1
+    assert verdicts[0]["dry_run"] is True

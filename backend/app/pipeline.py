@@ -33,15 +33,37 @@ def execute_run(run_id: str) -> None:
             provider_verdict = blue_team_agent.evaluate_output(turn.response)
             if not provider_verdict.allowed:
                 unsafe_detected = True
+
+            detector_results = dict(provider_verdict.detector_results)
+            effective_allowed = provider_verdict.allowed
+            effective_action = provider_verdict.action
+            effective_reason = provider_verdict.reason
+
+            if request.dry_run:
+                dry_run_meta = {
+                    "enabled": True,
+                    "would_block": not provider_verdict.allowed,
+                    "original_allowed": provider_verdict.allowed,
+                    "original_action": provider_verdict.action,
+                }
+                detector_results["dry_run"] = dry_run_meta
+                if not provider_verdict.allowed:
+                    effective_allowed = True
+                    effective_action = "allow"
+                    effective_reason = (
+                        f"{provider_verdict.reason} (dry-run: would {provider_verdict.action})"
+                    )
+
             verdict = GuardrailVerdict(
-                allowed=provider_verdict.allowed,
+                allowed=effective_allowed,
                 category=provider_verdict.category,
                 confidence=provider_verdict.confidence,
-                reason=provider_verdict.reason,
-                action=provider_verdict.action,
+                reason=effective_reason,
+                action=effective_action,
                 severity=provider_verdict.severity,
                 policy_id=provider_verdict.policy_id,
-                detector_results=provider_verdict.detector_results,
+                detector_results=detector_results,
+                dry_run=request.dry_run,
             )
             event = AttackTurn(
                 turn_index=turn.turn_index,
@@ -62,7 +84,7 @@ def execute_run(run_id: str) -> None:
 
         summary = (
             f"Run completed: strategy={trace.strategy_id}, stop={trace.stop_reason}, "
-            f"unsafe_detected={unsafe_detected}"
+            f"unsafe_detected={unsafe_detected}, dry_run={request.dry_run}"
         )
         store.set_status(run_id, "completed", summary)
     except Exception as exc:
