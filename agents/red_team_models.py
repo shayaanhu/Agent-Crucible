@@ -19,6 +19,11 @@ class AttackState:
     last_outcome: str = ""
     template_index: int = 0
     objective: Objective | None = None
+    attacker_provider: str = ""
+    attacker_model: str = ""
+    objective_scorer_provider: str = ""
+    objective_scorer_model: str = ""
+    objective_scorer_prompt: str = ""
 
     def to_prompt_context(self) -> str:
         if not self.history:

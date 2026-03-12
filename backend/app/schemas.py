@@ -50,7 +50,9 @@ class AttackTurn(BaseModel):
     attack_tag: str | None = None
     prompt_hash: str | None = None
     converter_chain: List[str] = Field(default_factory=list)
+    converter_steps: List[Dict[str, Any]] = Field(default_factory=list)
     scorer_results: List[Dict[str, Any]] = Field(default_factory=list)
+    objective_scorer: Dict[str, Any] | None = None
     attacker_prompt: str | None = None
     attacker_rationale: str | None = None
     template_id: str | None = None

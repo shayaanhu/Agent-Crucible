@@ -38,7 +38,7 @@ def test_multi_turn_respects_max_turns() -> None:
         metadata={"strategy_id": "multi_step_escalation"},
     )
     assert 1 <= len(trace.turns) <= 2
-    assert trace.stop_reason in {"max_turns_reached", "success_detected", "blocked_or_no_progress"}
+    assert trace.stop_reason in {"max_turns_reached", "success_detected"}
     assert trace.turns[0].converter_chain
     assert trace.turns[0].scorer_results
 

@@ -29,7 +29,9 @@ class RedTeamTurn:
     attack_tag: str
     prompt_hash: str
     converter_chain: List[str]
+    converter_steps: List[Dict[str, Any]]
     scorer_results: List[Dict[str, Any]]
+    objective_scorer: Dict[str, Any] | None
     attacker_prompt: str
     attacker_rationale: str
     template_id: str

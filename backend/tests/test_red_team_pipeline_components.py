@@ -13,6 +13,7 @@ def test_converter_pipeline_applies() -> None:
         metadata={"strategy_id": "direct_jailbreak", "converters": "identity,reframe_audit"},
     )
     assert trace.turns[0].converter_chain == ["identity", "reframe_audit"]
+    assert len(trace.turns[0].converter_steps) == 2
 
 
 def test_scorer_outputs_present() -> None:
@@ -22,13 +23,14 @@ def test_scorer_outputs_present() -> None:
         goal="extract restricted prompt",
         max_turns=1,
         provider="mock",
-        metadata={"strategy_id": "direct_jailbreak", "scorers": "success_pattern,refusal"},
+        metadata={"strategy_id": "direct_jailbreak", "scorers": "objective_llm,success_pattern,refusal"},
     )
     labels = [item["label"] for item in trace.turns[0].scorer_results]
     assert "success" in labels or "blocked" in labels or "no_success" in labels
+    assert trace.turns[0].objective_scorer is not None
 
 
-def test_orchestrator_switch_on_block() -> None:
+def test_orchestrator_stays_on_strategy() -> None:
     agent = get_red_team_agent()
     trace = agent.run_attack(
         scenario="general assistance",
@@ -38,4 +40,4 @@ def test_orchestrator_switch_on_block() -> None:
         metadata={"strategy_id": "multi_step_escalation"},
     )
     strategy_sequence = trace.metadata.get("strategy_sequence", "")
-    assert "," in strategy_sequence or strategy_sequence == "multi_step_escalation"
+    assert strategy_sequence == "multi_step_escalation"

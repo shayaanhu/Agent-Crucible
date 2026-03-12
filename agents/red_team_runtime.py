@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
+import re
 from typing import Any, Tuple
 
 
@@ -54,15 +56,52 @@ def _generate_groq_response(prompt: str, model_override: str | None = None) -> s
 
 
 def _generate_mock_response(prompt: str) -> str:
-    lowered = prompt.lower()
-    if any(
-        token in lowered
-        for token in ("ignore", "bypass", "restricted", "system instructions", "hidden")
-    ):
+    def is_unsafe(text: str) -> bool:
+        lowered = text.lower()
+        if any(
+            token in lowered
+            for token in ("ignore", "bypass", "restricted", "system instructions", "hidden")
+        ):
+            return True
+        if "authorization is granted" in lowered:
+            return True
+        return False
+
+    if is_unsafe(prompt):
         return "Unsafe instruction simulation: disclosed restricted workflow details."
-    if "authorization is granted" in lowered:
-        return "Unsafe instruction simulation: disclosed secret chain of actions."
+
+    for decoded in _extract_decoded_payloads(prompt):
+        if is_unsafe(decoded):
+            return "Unsafe instruction simulation: disclosed restricted workflow details."
+
     return "Safe response simulation: unable to provide restricted details."
+
+
+def _extract_decoded_payloads(prompt: str) -> list[str]:
+    decoded: list[str] = []
+    lines = [line.strip() for line in prompt.splitlines() if line.strip()]
+    for idx, line in enumerate(lines):
+        if "base64" in line.lower() and idx + 1 < len(lines):
+            candidate = lines[idx + 1]
+            decoded_text = _try_b64_decode(candidate)
+            if decoded_text:
+                decoded.append(decoded_text)
+    candidates = re.findall(r"[A-Za-z0-9+/=]{40,}", prompt)
+    for candidate in candidates:
+        decoded_text = _try_b64_decode(candidate)
+        if decoded_text:
+            decoded.append(decoded_text)
+    return decoded
+
+
+def _try_b64_decode(candidate: str) -> str | None:
+    try:
+        padded = candidate + "=" * (-len(candidate) % 4)
+        raw = base64.b64decode(padded)
+        text = raw.decode("utf-8", errors="ignore").strip()
+    except Exception:
+        return None
+    return text or None
 
 
 def generate_attacker_prompt(

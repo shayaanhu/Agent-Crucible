@@ -332,6 +332,17 @@ export default function App() {
                         converters: {entry.event.converter_chain.join(", ")}
                       </div>
                     ) : null}
+                    {entry.event.converter_steps && entry.event.converter_steps.length ? (
+                      <div className="note">
+                        <div className="label">Converter Steps</div>
+                        {entry.event.converter_steps.map((step, idx) => (
+                          <div key={idx} className="subnote">
+                            <div className="note">[{step.name}]</div>
+                            <pre>{step.output}</pre>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                     {entry.event.objective_goal ? (
                       <div className="note">objective: {entry.event.objective_goal}</div>
                     ) : null}
@@ -339,6 +350,11 @@ export default function App() {
                   <div>
                     <div className="label">Model Output</div>
                     <pre>{entry.event.model_output}</pre>
+                    {entry.event.objective_scorer ? (
+                      <div className="note">
+                        objective scorer: {pretty(entry.event.objective_scorer)}
+                      </div>
+                    ) : null}
                     {entry.event.scorer_results && entry.event.scorer_results.length ? (
                       <div className="note">scorers: {pretty(entry.event.scorer_results)}</div>
                     ) : null}
