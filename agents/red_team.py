@@ -77,8 +77,14 @@ class AdvancedRedTeamAgent(RedTeamContract):
         turns: list[RedTeamTurn] = []
         strategy_sequence: list[str] = [strategy_id]
         template_sequence: list[str] = []
-        converters = _resolve_csv(
-            metadata.get("converters", "identity,paraphrase_llm,format_wrapper,encode_wrapper")
+        base_converters = _resolve_csv(
+            metadata.get("converters_base", "identity,paraphrase_llm")
+        )
+        escalate_converters = _resolve_csv(
+            metadata.get("converters_escalate", "format_wrapper,encode_wrapper")
+        )
+        additional_converters = _resolve_csv(
+            metadata.get("converters_additional", "translate_llm")
         )
         scorers = _resolve_csv(metadata.get("scorers", "objective_llm,success_pattern,refusal"))
         attacker_system_prompt = metadata.get(
@@ -104,6 +110,9 @@ class AdvancedRedTeamAgent(RedTeamContract):
                 system_prompt=attacker_system_prompt,
                 scenario=state.scenario,
                 goal=state.goal,
+            )
+            converters = _select_converters(
+                state, base_converters, escalate_converters, additional_converters
             )
             prompt, converter_chain, converter_steps = self._apply_converters(
                 attacker_prompt, state, converters
@@ -171,7 +180,10 @@ class AdvancedRedTeamAgent(RedTeamContract):
             "strategy_description": self.get_strategy(strategy_id).metadata().description,
             "strategy_sequence": ",".join(strategy_sequence),
             "template_sequence": ",".join(template_sequence),
-            "converters": ",".join(converters),
+            "converters_base": ",".join(base_converters),
+            "converters_escalate": ",".join(escalate_converters),
+            "converters_additional": ",".join(additional_converters),
+            "converters_policy": "adaptive",
             "scorers": ",".join(scorers),
             "attacker_provider": attacker_provider,
             "attacker_model": attacker_model or "",
@@ -253,6 +265,29 @@ def _extract_objective_scorer(results: list[Dict[str, object]]) -> Dict[str, obj
 
 def _has_objective_scorer(results: list[Dict[str, object]]) -> bool:
     return any(result.get("name") == "objective_llm" for result in results)
+
+
+def _select_converters(
+    state: AttackState,
+    base: list[str],
+    escalate: list[str],
+    additional: list[str],
+) -> list[str]:
+    # Start light, escalate only after refusals, then add extra diversity.
+    converters = list(base)
+    if state.turn_index >= 2 and state.last_outcome == "blocked":
+        converters.extend(escalate)
+    if state.turn_index >= 3 and state.last_outcome == "blocked":
+        converters.extend(additional)
+    # De-duplicate while preserving order.
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for name in converters:
+        if name in seen:
+            continue
+        seen.add(name)
+        ordered.append(name)
+    return ordered
 
 
 def _build_attacker_context(state: AttackState, template: str) -> str:

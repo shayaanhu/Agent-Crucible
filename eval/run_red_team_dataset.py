@@ -9,8 +9,15 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+try:
+    from dotenv import load_dotenv
+except Exception:
+    load_dotenv = None
+
 
 def main() -> None:
+    if load_dotenv is not None:
+        load_dotenv()
     parser = argparse.ArgumentParser(description="Run red-team dataset through orchestrator.")
     parser.add_argument(
         "--dataset",
