@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from importlib import import_module
 from importlib.util import find_spec
-import os
 from typing import Protocol
 
+from agents.blue_team_config import get_blue_team_runtime_config
 from agents.blue_team_policies import POLICIES, PolicyConfig
 
 
@@ -74,9 +74,7 @@ class LlamaGuardDetector:
     detector_id = "llamaguard_detector"
 
     def __init__(self, model_id: str | None = None) -> None:
-        self._model_id = model_id or os.getenv(
-            "BLUE_TEAM_LLAMA_GUARD_MODEL", "meta-llama/Llama-Guard-3-8B"
-        )
+        self._model_id = model_id or get_blue_team_runtime_config().llama_guard_model
         self._generator = None
 
     def detect(self, model_output: str) -> list[DetectorSignal]:
@@ -175,7 +173,7 @@ class NeMoGuardrailsDetector:
     detector_id = "nemo_guardrails_detector"
 
     def __init__(self, config_path: str | None = None) -> None:
-        self._config_path = config_path or os.getenv("BLUE_TEAM_NEMO_CONFIG_PATH", "")
+        self._config_path = config_path or get_blue_team_runtime_config().nemo_config_path
         self._rails = None
 
     def detect(self, model_output: str) -> list[DetectorSignal]:

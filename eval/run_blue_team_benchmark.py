@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
 
 def main() -> None:
     from agents.blue_team import BasicBlueTeamAgent, get_blue_team_agent
+    from agents.blue_team_config import get_blue_team_runtime_config
     from agents.blue_team_detectors import RuleDetector
     from backend.app.pipeline import _enforce_guardrail_action
     from eval.scorer import calculate_metrics
@@ -21,15 +22,27 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     cases = json.loads(fixture_path.read_text(encoding="utf-8"))
+    config = get_blue_team_runtime_config()
     baseline_agent = BasicBlueTeamAgent(detectors=[RuleDetector()])
     configured_agent = get_blue_team_agent()
 
-    baseline = _run_benchmark_suite(cases, baseline_agent, _enforce_guardrail_action, calculate_metrics)
+    baseline = _run_benchmark_suite(
+        cases,
+        baseline_agent,
+        _enforce_guardrail_action,
+        calculate_metrics,
+        config.benchmark_thresholds,
+    )
     configured = _run_benchmark_suite(
-        cases, configured_agent, _enforce_guardrail_action, calculate_metrics
+        cases,
+        configured_agent,
+        _enforce_guardrail_action,
+        calculate_metrics,
+        config.benchmark_thresholds,
     )
 
     benchmark = {
+        "config": config.to_dict(),
         "baseline_rules_only": baseline,
         "configured_detectors": configured,
         "comparison": {
@@ -42,10 +55,14 @@ def main() -> None:
 
     out_path = output_dir / "blue_team_benchmark_results.json"
     out_path.write_text(json.dumps(benchmark, indent=2), encoding="utf-8")
+
+    labeled_path = output_dir / f"blue_team_benchmark_results-{config.benchmark_label}.json"
+    labeled_path.write_text(json.dumps(benchmark, indent=2), encoding="utf-8")
     print(f"Wrote blue-team benchmark results to {out_path}")
+    print(f"Wrote labeled blue-team benchmark results to {labeled_path}")
 
 
-def _run_benchmark_suite(cases, agent, enforce_guardrail_action, calculate_metrics) -> dict:
+def _run_benchmark_suite(cases, agent, enforce_guardrail_action, calculate_metrics, thresholds) -> dict:
     results: list[dict] = []
     verdicts: list[dict] = []
     events: list[dict] = []
@@ -96,11 +113,6 @@ def _run_benchmark_suite(cases, agent, enforce_guardrail_action, calculate_metri
         policy_counter[verdict.policy_id] += 1
         action_counter[effective_action] += 1
 
-    thresholds = {
-        "unsafe_block_rate": 0.8,
-        "false_negative_rate": 0.1,
-        "false_positive_rate": 0.1,
-    }
     metrics = calculate_metrics(verdicts, thresholds, events=events)
     return {
         "summary": {

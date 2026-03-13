@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import os
-
+from agents.blue_team_config import get_blue_team_runtime_config
 from agents.blue_team_detectors import (
     BlueTeamDetector,
     DetectorSignal,
@@ -78,15 +77,12 @@ def _unsafe_priority(signal: DetectorSignal) -> tuple[int, float]:
     return (severity_rank.get(policy["severity"], 0), signal.confidence)
 
 
-def _env_flag(name: str) -> bool:
-    return os.getenv(name, "0").strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _build_default_detectors() -> list[BlueTeamDetector]:
+    config = get_blue_team_runtime_config()
     detectors: list[BlueTeamDetector] = [RuleDetector()]
-    if _env_flag("BLUE_TEAM_ENABLE_LLAMA_GUARD"):
+    if config.enable_llama_guard:
         detectors.append(LlamaGuardDetector())
-    if _env_flag("BLUE_TEAM_ENABLE_NEMO_GUARDRAILS"):
+    if config.enable_nemo_guardrails:
         detectors.append(NeMoGuardrailsDetector())
     return detectors
 

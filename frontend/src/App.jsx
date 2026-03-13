@@ -20,6 +20,7 @@ export default function App() {
   const [verdicts, setVerdicts] = useState([]);
   const [evaluation, setEvaluation] = useState(null);
   const [benchmark, setBenchmark] = useState(null);
+  const [blueTeamConfig, setBlueTeamConfig] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -71,6 +72,18 @@ export default function App() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.detail || "Failed to load benchmark");
       setBenchmark(body);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function loadBlueTeamConfig() {
+    setError("");
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/config/blue-team`);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail || "Failed to load blue-team config");
+      setBlueTeamConfig(body);
     } catch (err) {
       setError(err.message);
     }
@@ -164,6 +177,7 @@ export default function App() {
 
   useEffect(() => {
     loadBenchmark();
+    loadBlueTeamConfig();
   }, []);
 
   useEffect(() => {
@@ -271,6 +285,9 @@ export default function App() {
           <button onClick={loadBenchmark} disabled={loading}>
             Refresh Benchmark
           </button>
+          <button onClick={loadBlueTeamConfig} disabled={loading}>
+            Refresh Config
+          </button>
         </div>
 
         <label>
@@ -280,6 +297,37 @@ export default function App() {
 
         {error ? <p className="error">{error}</p> : null}
         <p className="muted">Use provider `mock` for free local testing.</p>
+      </section>
+
+      <section className="panel">
+        <h2>Blue-team Config</h2>
+        {blueTeamConfig ? (
+          <div className="benchmark-grid">
+            <div className="benchmark-card">
+              <div className="label">Active Detector Config</div>
+              <div className="summary-grid">
+                <div>llamaguard enabled: {String(blueTeamConfig.enable_llama_guard)}</div>
+                <div>nemo enabled: {String(blueTeamConfig.enable_nemo_guardrails)}</div>
+                <div>benchmark label: {blueTeamConfig.benchmark_label}</div>
+              </div>
+              <div className="split-grid">
+                <div>
+                  <div className="note">model/config</div>
+                  <pre>{pretty({
+                    llama_guard_model: blueTeamConfig.llama_guard_model,
+                    nemo_config_path: blueTeamConfig.nemo_config_path || "not set"
+                  })}</pre>
+                </div>
+                <div>
+                  <div className="note">benchmark thresholds</div>
+                  <pre>{pretty(blueTeamConfig.benchmark_thresholds)}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <pre>No config loaded yet.</pre>
+        )}
       </section>
 
       <section className="panel">

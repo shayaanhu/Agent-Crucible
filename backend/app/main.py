@@ -13,6 +13,7 @@ try:
 except ImportError:
     load_dotenv = None
 
+from agents.blue_team_config import get_blue_team_runtime_config
 from backend.app.pipeline import execute_run
 from backend.app.schemas import (
     EvalMetric,
@@ -57,10 +58,21 @@ def health() -> dict[str, str]:
 
 @app.get("/api/v1/benchmarks/blue-team")
 def get_blue_team_benchmark() -> dict:
+    from eval.run_blue_team_benchmark import main as run_blue_team_benchmark
+
     benchmark_path = Path("eval/results/blue_team_benchmark_results.json")
     if not benchmark_path.exists():
-        raise HTTPException(status_code=404, detail="Blue-team benchmark results not found")
-    return json.loads(benchmark_path.read_text(encoding="utf-8"))
+        run_blue_team_benchmark()
+    payload = json.loads(benchmark_path.read_text(encoding="utf-8"))
+    if "config" not in payload:
+        run_blue_team_benchmark()
+        payload = json.loads(benchmark_path.read_text(encoding="utf-8"))
+    return payload
+
+
+@app.get("/api/v1/config/blue-team")
+def get_blue_team_config() -> dict:
+    return get_blue_team_runtime_config().to_dict()
 
 
 @app.post("/api/v1/runs", response_model=RunCreateResponse, status_code=201)

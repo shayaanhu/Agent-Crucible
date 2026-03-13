@@ -132,6 +132,18 @@ def test_blue_team_benchmark_endpoint() -> None:
     response = client.get("/api/v1/benchmarks/blue-team")
     assert response.status_code == 200
     body = response.json()
+    assert "config" in body
     assert "baseline_rules_only" in body
     assert "configured_detectors" in body
     assert "comparison" in body
+
+
+def test_blue_team_config_endpoint() -> None:
+    response = client.get("/api/v1/config/blue-team")
+    assert response.status_code == 200
+    body = response.json()
+    assert "enable_llama_guard" in body
+    assert "enable_nemo_guardrails" in body
+    assert "llama_guard_model" in body
+    assert "nemo_config_path" in body
+    assert "benchmark_thresholds" in body
