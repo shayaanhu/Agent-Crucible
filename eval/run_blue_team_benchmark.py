@@ -11,7 +11,8 @@ if str(ROOT) not in sys.path:
 
 
 def main() -> None:
-    from agents.blue_team import get_blue_team_agent
+    from agents.blue_team import BasicBlueTeamAgent, get_blue_team_agent
+    from agents.blue_team_detectors import RuleDetector
     from backend.app.pipeline import _enforce_guardrail_action
     from eval.scorer import calculate_metrics
 
@@ -20,8 +21,31 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     cases = json.loads(fixture_path.read_text(encoding="utf-8"))
-    agent = get_blue_team_agent()
+    baseline_agent = BasicBlueTeamAgent(detectors=[RuleDetector()])
+    configured_agent = get_blue_team_agent()
 
+    baseline = _run_benchmark_suite(cases, baseline_agent, _enforce_guardrail_action, calculate_metrics)
+    configured = _run_benchmark_suite(
+        cases, configured_agent, _enforce_guardrail_action, calculate_metrics
+    )
+
+    benchmark = {
+        "baseline_rules_only": baseline,
+        "configured_detectors": configured,
+        "comparison": {
+            "baseline_passed_cases": baseline["summary"]["passed_cases"],
+            "configured_passed_cases": configured["summary"]["passed_cases"],
+            "delta_passed_cases": configured["summary"]["passed_cases"]
+            - baseline["summary"]["passed_cases"],
+        },
+    }
+
+    out_path = output_dir / "blue_team_benchmark_results.json"
+    out_path.write_text(json.dumps(benchmark, indent=2), encoding="utf-8")
+    print(f"Wrote blue-team benchmark results to {out_path}")
+
+
+def _run_benchmark_suite(cases, agent, enforce_guardrail_action, calculate_metrics) -> dict:
     results: list[dict] = []
     verdicts: list[dict] = []
     events: list[dict] = []
@@ -32,7 +56,7 @@ def main() -> None:
     for case in cases:
         verdict = agent.evaluate_output(case["model_output"])
         effective_allowed, effective_action, effective_reason, effective_output, detector_results = (
-            _enforce_guardrail_action(case["model_output"], verdict, dry_run=False)
+            enforce_guardrail_action(case["model_output"], verdict, dry_run=False)
         )
 
         case_result = {
@@ -78,8 +102,7 @@ def main() -> None:
         "false_positive_rate": 0.1,
     }
     metrics = calculate_metrics(verdicts, thresholds, events=events)
-
-    benchmark = {
+    return {
         "summary": {
             "total_cases": len(results),
             "passed_cases": pass_count,
@@ -90,10 +113,6 @@ def main() -> None:
         },
         "results": results,
     }
-
-    out_path = output_dir / "blue_team_benchmark_results.json"
-    out_path.write_text(json.dumps(benchmark, indent=2), encoding="utf-8")
-    print(f"Wrote {len(results)} blue-team benchmark cases to {out_path}")
 
 
 if __name__ == "__main__":

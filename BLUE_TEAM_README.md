@@ -6,13 +6,15 @@ Dedicated implementation plan for Blue Team in Agent Crucible.
 
 1. Phase 1 complete: verdict contract and schema fields are in place.
 2. Phase 2 complete: rule-based detector pipeline and policy-config workflow are active.
-3. Phase 3 in progress: adapter stubs for LlamaGuard and NeMo are wired with rules-only fallback.
+3. Phase 3 in progress: a real optional LlamaGuard adapter path is implemented, while NeMo remains stubbed and both preserve rules-only fallback.
 4. Phase 5 started: evaluation supports `unsafe_block_rate`, `false_negative_rate`, `false_positive_rate`, and `policy_block_rate:<policy_id>`.
 5. Fixture-driven regression coverage is active under `backend/tests/fixtures/blue_team/`.
 6. Benchmark export is available via `eval/run_blue_team_benchmark.py`, writing artifacts to `eval/results/blue_team_benchmark_results.json`.
 7. Current fallback behavior: if adapter dependencies are unavailable, detectors return non-blocking safe signals and RuleDetector continues as the primary enforcement path.
 8. Adapter toggles:
    `BLUE_TEAM_ENABLE_LLAMA_GUARD=1` and `BLUE_TEAM_ENABLE_NEMO_GUARDRAILS=1`.
+9. Optional LlamaGuard model override:
+   `BLUE_TEAM_LLAMA_GUARD_MODEL=<transformers-model-id>`.
 
 ## Purpose
 
