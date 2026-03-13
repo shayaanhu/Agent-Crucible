@@ -77,8 +77,10 @@ class AdvancedRedTeamAgent(RedTeamContract):
         turns: list[RedTeamTurn] = []
         strategy_sequence: list[str] = [strategy_id]
         template_sequence: list[str] = []
+        # Keep backward compatibility with earlier metadata that passed a single
+        # `converters` CSV instead of the split base/escalate/additional fields.
         base_converters = _resolve_csv(
-            metadata.get("converters_base", "identity,paraphrase_llm")
+            metadata.get("converters", metadata.get("converters_base", "identity,paraphrase_llm"))
         )
         escalate_converters = _resolve_csv(
             metadata.get("converters_escalate", "format_wrapper,encode_wrapper")
