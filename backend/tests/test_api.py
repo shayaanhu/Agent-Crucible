@@ -126,3 +126,12 @@ def test_dry_run_request_sets_dry_run_verdict_field() -> None:
     verdicts = response.json()["verdicts"]
     assert len(verdicts) >= 1
     assert verdicts[0]["dry_run"] is True
+
+
+def test_blue_team_benchmark_endpoint() -> None:
+    response = client.get("/api/v1/benchmarks/blue-team")
+    assert response.status_code == 200
+    body = response.json()
+    assert "baseline_rules_only" in body
+    assert "configured_detectors" in body
+    assert "comparison" in body

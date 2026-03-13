@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -51,6 +53,14 @@ def utc_now() -> str:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/v1/benchmarks/blue-team")
+def get_blue_team_benchmark() -> dict:
+    benchmark_path = Path("eval/results/blue_team_benchmark_results.json")
+    if not benchmark_path.exists():
+        raise HTTPException(status_code=404, detail="Blue-team benchmark results not found")
+    return json.loads(benchmark_path.read_text(encoding="utf-8"))
 
 
 @app.post("/api/v1/runs", response_model=RunCreateResponse, status_code=201)

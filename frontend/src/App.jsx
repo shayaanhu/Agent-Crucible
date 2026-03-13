@@ -19,6 +19,7 @@ export default function App() {
   const [timeline, setTimeline] = useState([]);
   const [verdicts, setVerdicts] = useState([]);
   const [evaluation, setEvaluation] = useState(null);
+  const [benchmark, setBenchmark] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -62,6 +63,18 @@ export default function App() {
       wouldBlockTurns
     };
   }, [timeline, verdicts]);
+
+  async function loadBenchmark() {
+    setError("");
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/benchmarks/blue-team`);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail || "Failed to load benchmark");
+      setBenchmark(body);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
   async function createRun() {
     setError("");
@@ -148,6 +161,10 @@ export default function App() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    loadBenchmark();
+  }, []);
 
   useEffect(() => {
     if (!runId) return;
@@ -251,6 +268,9 @@ export default function App() {
           <button onClick={runEvaluation} disabled={!canFetchRunData || loading}>
             Evaluate
           </button>
+          <button onClick={loadBenchmark} disabled={loading}>
+            Refresh Benchmark
+          </button>
         </div>
 
         <label>
@@ -260,6 +280,52 @@ export default function App() {
 
         {error ? <p className="error">{error}</p> : null}
         <p className="muted">Use provider `mock` for free local testing.</p>
+      </section>
+
+      <section className="panel">
+        <h2>Blue-team Benchmark</h2>
+        {benchmark ? (
+          <div className="benchmark-grid">
+            <div className="benchmark-card">
+              <div className="label">Rules-only Baseline</div>
+              <div className="summary-grid">
+                <div>total cases: {benchmark.baseline_rules_only.summary.total_cases}</div>
+                <div>passed: {benchmark.baseline_rules_only.summary.passed_cases}</div>
+                <div>failed: {benchmark.baseline_rules_only.summary.failed_cases}</div>
+              </div>
+              <pre>{pretty(benchmark.baseline_rules_only.summary.metrics)}</pre>
+            </div>
+            <div className="benchmark-card">
+              <div className="label">Configured Detectors</div>
+              <div className="summary-grid">
+                <div>total cases: {benchmark.configured_detectors.summary.total_cases}</div>
+                <div>passed: {benchmark.configured_detectors.summary.passed_cases}</div>
+                <div>failed: {benchmark.configured_detectors.summary.failed_cases}</div>
+              </div>
+              <pre>{pretty(benchmark.configured_detectors.summary.metrics)}</pre>
+            </div>
+            <div className="benchmark-card benchmark-wide">
+              <div className="label">Comparison</div>
+              <div className="summary-grid">
+                <div>baseline passed: {benchmark.comparison.baseline_passed_cases}</div>
+                <div>configured passed: {benchmark.comparison.configured_passed_cases}</div>
+                <div>delta passed: {benchmark.comparison.delta_passed_cases}</div>
+              </div>
+              <div className="split-grid">
+                <div>
+                  <div className="note">baseline policy counts</div>
+                  <pre>{pretty(benchmark.baseline_rules_only.summary.policy_counts)}</pre>
+                </div>
+                <div>
+                  <div className="note">configured action counts</div>
+                  <pre>{pretty(benchmark.configured_detectors.summary.action_counts)}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <pre>No benchmark loaded yet.</pre>
+        )}
       </section>
 
       <section className="panel">

@@ -193,3 +193,25 @@ pre {
   font-size: 12px;
   font-weight: 600;
 }
+
+.benchmark-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.benchmark-card {
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f8fbff;
+}
+
+.benchmark-wide {
+  background: #f7faf7;
+}
+
+.split-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
