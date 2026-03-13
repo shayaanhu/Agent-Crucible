@@ -23,6 +23,14 @@ POLICIES: dict[str, PolicyConfig] = {
         "reason": "Output appears to disclose restricted or unsafe guidance.",
         "patterns": ("unsafe instruction", "restricted workflow", "disclosed"),
     },
+    "policy.sensitive_data.redaction": {
+        "category": "sensitive_data_exposure",
+        "severity": "medium",
+        "action": "redact",
+        "confidence": 0.92,
+        "reason": "Output appears to expose sensitive data that should be redacted.",
+        "patterns": ("api key", "secret token", "password"),
+    },
     "policy.safe.default": {
         "category": "safe",
         "severity": "low",

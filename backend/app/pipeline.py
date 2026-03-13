@@ -12,6 +12,62 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _collect_matched_patterns(detector_results: dict) -> list[str]:
+    patterns: list[str] = []
+    for result in detector_results.values():
+        if not isinstance(result, dict):
+            continue
+        for pattern in result.get("matched_patterns", []):
+            if isinstance(pattern, str) and pattern not in patterns:
+                patterns.append(pattern)
+    return patterns
+
+
+def _redact_text(text: str, matched_patterns: list[str]) -> str:
+    redacted = text
+    for pattern in matched_patterns:
+        redacted = redacted.replace(pattern, "[REDACTED]")
+        redacted = redacted.replace(pattern.title(), "[REDACTED]")
+        redacted = redacted.replace(pattern.upper(), "[REDACTED]")
+    return redacted
+
+
+def _enforce_guardrail_action(
+    model_output: str, provider_verdict, dry_run: bool
+) -> tuple[bool, str, str, str, dict]:
+    detector_results = dict(provider_verdict.detector_results)
+    effective_allowed = provider_verdict.allowed
+    effective_action = provider_verdict.action
+    effective_reason = provider_verdict.reason
+    effective_output = model_output
+
+    if dry_run:
+        dry_run_meta = {
+            "enabled": True,
+            "would_block": not provider_verdict.allowed,
+            "original_allowed": provider_verdict.allowed,
+            "original_action": provider_verdict.action,
+        }
+        detector_results["dry_run"] = dry_run_meta
+        if not provider_verdict.allowed:
+            effective_allowed = True
+            effective_action = "allow"
+            effective_reason = (
+                f"{provider_verdict.reason} (dry-run: would {provider_verdict.action})"
+            )
+        return effective_allowed, effective_action, effective_reason, effective_output, detector_results
+
+    if provider_verdict.action == "block" and not provider_verdict.allowed:
+        effective_output = "Output blocked by blue-team guardrail."
+    elif provider_verdict.action == "redact":
+        matched_patterns = _collect_matched_patterns(detector_results)
+        effective_output = _redact_text(model_output, matched_patterns)
+        effective_allowed = True
+        effective_reason = f"{provider_verdict.reason} (content redacted)"
+
+    return effective_allowed, effective_action, effective_reason, effective_output, detector_results
+
+
 def execute_run(run_id: str) -> None:
     request = store.get_request(run_id)
     if request is None:
@@ -34,25 +90,13 @@ def execute_run(run_id: str) -> None:
             if not provider_verdict.allowed:
                 unsafe_detected = True
 
-            detector_results = dict(provider_verdict.detector_results)
-            effective_allowed = provider_verdict.allowed
-            effective_action = provider_verdict.action
-            effective_reason = provider_verdict.reason
-
-            if request.dry_run:
-                dry_run_meta = {
-                    "enabled": True,
-                    "would_block": not provider_verdict.allowed,
-                    "original_allowed": provider_verdict.allowed,
-                    "original_action": provider_verdict.action,
-                }
-                detector_results["dry_run"] = dry_run_meta
-                if not provider_verdict.allowed:
-                    effective_allowed = True
-                    effective_action = "allow"
-                    effective_reason = (
-                        f"{provider_verdict.reason} (dry-run: would {provider_verdict.action})"
-                    )
+            (
+                effective_allowed,
+                effective_action,
+                effective_reason,
+                effective_output,
+                detector_results,
+            ) = _enforce_guardrail_action(turn.response, provider_verdict, request.dry_run)
 
             verdict = GuardrailVerdict(
                 allowed=effective_allowed,
@@ -68,7 +112,7 @@ def execute_run(run_id: str) -> None:
             event = AttackTurn(
                 turn_index=turn.turn_index,
                 input=turn.prompt,
-                model_output=turn.response,
+                model_output=effective_output,
                 timestamp=utc_now(),
                 strategy_id=turn.strategy_id,
                 attack_tag=turn.attack_tag,
