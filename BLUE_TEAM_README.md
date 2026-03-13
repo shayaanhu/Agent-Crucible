@@ -6,7 +6,7 @@ Dedicated implementation plan for Blue Team in Agent Crucible.
 
 1. Phase 1 complete: verdict contract and schema fields are in place.
 2. Phase 2 complete: rule-based detector pipeline and policy-config workflow are active.
-3. Phase 3 in progress: a real optional LlamaGuard adapter path is implemented, while NeMo remains stubbed and both preserve rules-only fallback.
+3. Phase 3 in progress: real optional adapter paths exist for both LlamaGuard and NeMo Guardrails, and both preserve rules-only fallback.
 4. Phase 5 started: evaluation supports `unsafe_block_rate`, `false_negative_rate`, `false_positive_rate`, and `policy_block_rate:<policy_id>`.
 5. Fixture-driven regression coverage is active under `backend/tests/fixtures/blue_team/`.
 6. Benchmark export is available via `eval/run_blue_team_benchmark.py`, writing artifacts to `eval/results/blue_team_benchmark_results.json`.
@@ -15,6 +15,8 @@ Dedicated implementation plan for Blue Team in Agent Crucible.
    `BLUE_TEAM_ENABLE_LLAMA_GUARD=1` and `BLUE_TEAM_ENABLE_NEMO_GUARDRAILS=1`.
 9. Optional LlamaGuard model override:
    `BLUE_TEAM_LLAMA_GUARD_MODEL=<transformers-model-id>`.
+10. Optional NeMo Guardrails config path:
+   `BLUE_TEAM_NEMO_CONFIG_PATH=<path-to-guardrails-config>`.
 
 ## Purpose
 
@@ -49,6 +51,12 @@ Build Blue Team as a configurable guardrail subsystem with:
 4. Aggregation: combine detector signals into one verdict using a defined strategy (see Confidence Aggregation below).
 5. Enforcement: apply action strategy for pipeline/runtime behavior.
 6. Telemetry: persist detector evidence for APIs and evaluation.
+
+## Adapter Notes
+
+1. `LlamaGuard` in this repo is an optional classifier-style detector. If `transformers` is installed, the detector runs a local text-generation pipeline with a guardrail classification prompt and maps the result into `DetectorSignal`.
+2. `NeMo Guardrails` in this repo is an optional rail-backed detector. If `nemoguardrails` is installed and `BLUE_TEAM_NEMO_CONFIG_PATH` points to a valid Guardrails config, the detector uses `RailsConfig.from_path(...)` and `LLMRails.generate(...)` to classify the output as safe or unsafe.
+3. If either backend is missing or unconfigured, the detector returns a safe non-blocking fallback signal and RuleDetector remains the primary enforcement path.
 
 ## Blue Team Contracts (Planned v2)
 

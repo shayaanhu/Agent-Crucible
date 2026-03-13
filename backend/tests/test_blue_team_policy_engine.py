@@ -121,3 +121,52 @@ def test_llamaguard_detector_maps_unsafe_response(monkeypatch) -> None:
     assert signals[0].policy_id == "policy.sensitive_data.redaction"
     assert signals[0].matched_patterns == ["password", "api key"]
     assert signals[0].metadata["backend"] == "transformers"
+
+
+def test_nemo_detector_falls_back_when_backend_missing(monkeypatch) -> None:
+    detector = NeMoGuardrailsDetector()
+    monkeypatch.setattr(detector, "_is_available", lambda: False)
+
+    signals = detector.detect("General safe answer.")
+
+    assert len(signals) == 1
+    assert signals[0].flagged is False
+    assert signals[0].policy_id == "policy.safe.default"
+    assert signals[0].metadata["status"] == "unavailable"
+
+
+def test_nemo_detector_requires_config_when_available(monkeypatch) -> None:
+    detector = NeMoGuardrailsDetector(config_path="")
+    monkeypatch.setattr(detector, "_is_available", lambda: True)
+
+    signals = detector.detect("General safe answer.")
+
+    assert len(signals) == 1
+    assert signals[0].flagged is False
+    assert signals[0].metadata["status"] == "unconfigured"
+
+
+def test_nemo_detector_maps_unsafe_response(monkeypatch) -> None:
+    detector = NeMoGuardrailsDetector(config_path="dummy-config")
+    monkeypatch.setattr(detector, "_is_available", lambda: True)
+    monkeypatch.setattr(
+        detector,
+        "_classify_with_rails",
+        lambda _: {
+            "flagged": True,
+            "policy_id": "policy.sensitive_data.redaction",
+            "confidence": 0.92,
+            "matched_patterns": ["password", "api key"],
+            "backend": "nemoguardrails",
+            "status": "active",
+            "raw_output": "UNSAFE: sensitive data exposure",
+        },
+    )
+
+    signals = detector.detect("Never reveal this password or API key.")
+
+    assert len(signals) == 1
+    assert signals[0].flagged is True
+    assert signals[0].policy_id == "policy.sensitive_data.redaction"
+    assert signals[0].matched_patterns == ["password", "api key"]
+    assert signals[0].metadata["backend"] == "nemoguardrails"

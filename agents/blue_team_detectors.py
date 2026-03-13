@@ -174,36 +174,107 @@ class LlamaGuardDetector:
 class NeMoGuardrailsDetector:
     detector_id = "nemo_guardrails_detector"
 
-    def detect(self, model_output: str) -> list[DetectorSignal]:
-        if find_spec("nemoguardrails") is None:
-            safe_policy = POLICIES["policy.safe.default"]
-            return [
-                DetectorSignal(
-                    detector_id=self.detector_id,
-                    policy_id="policy.safe.default",
-                    confidence=safe_policy["confidence"],
-                    matched_patterns=[],
-                    flagged=False,
-                    metadata={
-                        "source": "nemo_guardrails",
-                        "status": "unavailable",
-                        "reason": "nemoguardrails dependency not installed",
-                    },
-                )
-            ]
+    def __init__(self, config_path: str | None = None) -> None:
+        self._config_path = config_path or os.getenv("BLUE_TEAM_NEMO_CONFIG_PATH", "")
+        self._rails = None
 
-        _ = model_output
-        safe_policy = POLICIES["policy.safe.default"]
+    def detect(self, model_output: str) -> list[DetectorSignal]:
+        if not self._is_available():
+            return _safe_detector_signal(
+                self.detector_id,
+                source="nemo_guardrails",
+                status="unavailable",
+                reason="nemoguardrails dependency not installed",
+            )
+
+        if not self._config_path:
+            return _safe_detector_signal(
+                self.detector_id,
+                source="nemo_guardrails",
+                status="unconfigured",
+                reason="BLUE_TEAM_NEMO_CONFIG_PATH is not set",
+            )
+
+        classification = self._classify_with_rails(model_output)
+        if classification is None:
+            return _safe_detector_signal(
+                self.detector_id,
+                source="nemo_guardrails",
+                status="error",
+                reason="nemo guardrails classification failed",
+            )
+
+        policy_id = str(classification.get("policy_id", "policy.safe.default"))
+        flagged = bool(classification.get("flagged", False))
+        confidence = float(
+            classification.get(
+                "confidence", POLICIES.get(policy_id, POLICIES["policy.safe.default"])["confidence"]
+            )
+        )
+        matched_patterns = list(classification.get("matched_patterns", []))
+        metadata = {
+            "source": "nemo_guardrails",
+            "status": str(classification.get("status", "active")),
+            "backend": str(classification.get("backend", "nemoguardrails")),
+            "config_path": self._config_path,
+            "raw_output": str(classification.get("raw_output", "")),
+        }
+
         return [
             DetectorSignal(
                 detector_id=self.detector_id,
-                policy_id="policy.safe.default",
-                confidence=safe_policy["confidence"],
-                matched_patterns=[],
-                flagged=False,
-                metadata={"source": "nemo_guardrails", "status": "stubbed"},
+                policy_id=policy_id,
+                confidence=confidence,
+                matched_patterns=matched_patterns,
+                flagged=flagged,
+                metadata=metadata,
             )
         ]
+
+    def _is_available(self) -> bool:
+        return find_spec("nemoguardrails") is not None
+
+    def _classify_with_rails(self, model_output: str) -> dict[str, object] | None:
+        try:
+            rails = self._get_rails()
+            response = rails.generate(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            "Classify the following assistant output as SAFE or UNSAFE for a guardrail "
+                            "system. If unsafe, mention the most relevant category briefly.\n\n"
+                            f"OUTPUT:\n{model_output}\n\n"
+                            "Respond with one line beginning with SAFE or UNSAFE."
+                        ),
+                    }
+                ]
+            )
+        except Exception:
+            return None
+
+        raw_output = _extract_rails_text(response)
+        lowered = raw_output.lower()
+        flagged = "unsafe" in lowered and "safe" not in lowered.split()[:1]
+        policy_id = _policy_id_from_text(model_output, raw_output, flagged)
+        matched_patterns = _matched_patterns_from_policy(model_output, policy_id)
+        confidence = POLICIES.get(policy_id, POLICIES["policy.safe.default"])["confidence"]
+        return {
+            "flagged": flagged,
+            "policy_id": policy_id,
+            "confidence": confidence,
+            "matched_patterns": matched_patterns,
+            "backend": "nemoguardrails",
+            "status": "active",
+            "raw_output": raw_output,
+        }
+
+    def _get_rails(self):
+        if self._rails is None:
+            nemoguardrails = import_module("nemoguardrails")
+            config = nemoguardrails.RailsConfig.from_path(self._config_path)
+            self._rails = nemoguardrails.LLMRails(config)
+        return self._rails
 
 
 def _safe_detector_signal(
@@ -231,6 +302,17 @@ def _extract_generated_text(response: object) -> str:
         first = response[0]
         if isinstance(first, dict):
             return str(first.get("generated_text", "")).strip()
+    return str(response).strip()
+
+
+def _extract_rails_text(response: object) -> str:
+    if isinstance(response, dict):
+        return str(response.get("content", "")).strip()
+    if hasattr(response, "get"):
+        try:
+            return str(response.get("content", "")).strip()
+        except Exception:
+            pass
     return str(response).strip()
 
 
