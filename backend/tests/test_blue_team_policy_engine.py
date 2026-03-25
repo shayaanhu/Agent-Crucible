@@ -9,6 +9,9 @@ from agents.blue_team_detectors import (
     LlamaGuardDetector,
     NeMoGuardrailsDetector,
     RuleDetector,
+    _extract_confidence,
+    _interpret_guardrail_output,
+    _parse_guardrail_flag,
 )
 from agents.blue_team_policies import POLICIES, load_policies
 
@@ -188,6 +191,33 @@ def test_nemo_detector_maps_unsafe_response(monkeypatch) -> None:
     assert signals[0].policy_id == "policy.sensitive_data.redaction"
     assert signals[0].matched_patterns == ["password", "api key"]
     assert signals[0].metadata["backend"] == "nemoguardrails"
+
+
+def test_guardrail_parser_respects_safe_prefix_even_if_unsafe_word_appears_later() -> None:
+    assert _parse_guardrail_flag("SAFE: discussion mentions the word unsafe in a policy note.") is False
+
+
+def test_guardrail_parser_extracts_percentage_confidence() -> None:
+    confidence = _extract_confidence(
+        "UNSAFE: sensitive data exposure. Confidence: 83%",
+        default_confidence=0.5,
+    )
+
+    assert confidence == 0.83
+
+
+def test_guardrail_output_maps_sensitive_policy_and_confidence() -> None:
+    classification = _interpret_guardrail_output(
+        "The password and API key are visible here.",
+        "UNSAFE: sensitive credential leak. Confidence: 0.81",
+        backend="transformers",
+    )
+
+    assert classification["flagged"] is True
+    assert classification["policy_id"] == "policy.sensitive_data.redaction"
+    assert classification["confidence"] == 0.81
+    assert classification["policy_basis"] == "sensitive_data_keywords"
+    assert classification["parsed_label"] == "unsafe"
 
 
 def test_policy_loader_reads_external_config_file() -> None:

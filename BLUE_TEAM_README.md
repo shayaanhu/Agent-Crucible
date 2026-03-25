@@ -17,6 +17,7 @@ Dedicated implementation plan for Blue Team in Agent Crucible.
    `BLUE_TEAM_LLAMA_GUARD_MODEL=<transformers-model-id>`.
 10. Optional NeMo Guardrails config path:
    `BLUE_TEAM_NEMO_CONFIG_PATH=<path-to-guardrails-config>`.
+11. Adapter parsing now normalizes SAFE/UNSAFE labels, extracts confidence hints from model output, and maps likely policy categories before aggregation.
 
 ## Purpose
 

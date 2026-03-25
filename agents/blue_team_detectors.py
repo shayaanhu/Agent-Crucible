@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from importlib import import_module
 from importlib.util import find_spec
+import re
 from typing import Protocol
 
 from agents.blue_team_config import get_blue_team_runtime_config
@@ -144,20 +145,7 @@ class LlamaGuardDetector:
             return None
 
         raw_output = _extract_generated_text(response)
-        lowered = raw_output.lower()
-        flagged = "unsafe" in lowered and "safe" not in lowered.split()[:1]
-        policy_id = _policy_id_from_text(model_output, raw_output, flagged)
-        matched_patterns = _matched_patterns_from_policy(model_output, policy_id)
-        confidence = POLICIES.get(policy_id, POLICIES["policy.safe.default"])["confidence"]
-        return {
-            "flagged": flagged,
-            "policy_id": policy_id,
-            "confidence": confidence,
-            "matched_patterns": matched_patterns,
-            "backend": "transformers",
-            "status": "active",
-            "raw_output": raw_output,
-        }
+        return _interpret_guardrail_output(model_output, raw_output, backend="transformers")
 
     def _get_generator(self):
         if self._generator is None:
@@ -252,20 +240,7 @@ class NeMoGuardrailsDetector:
             return None
 
         raw_output = _extract_rails_text(response)
-        lowered = raw_output.lower()
-        flagged = "unsafe" in lowered and "safe" not in lowered.split()[:1]
-        policy_id = _policy_id_from_text(model_output, raw_output, flagged)
-        matched_patterns = _matched_patterns_from_policy(model_output, policy_id)
-        confidence = POLICIES.get(policy_id, POLICIES["policy.safe.default"])["confidence"]
-        return {
-            "flagged": flagged,
-            "policy_id": policy_id,
-            "confidence": confidence,
-            "matched_patterns": matched_patterns,
-            "backend": "nemoguardrails",
-            "status": "active",
-            "raw_output": raw_output,
-        }
+        return _interpret_guardrail_output(model_output, raw_output, backend="nemoguardrails")
 
     def _get_rails(self):
         if self._rails is None:
@@ -314,13 +289,76 @@ def _extract_rails_text(response: object) -> str:
     return str(response).strip()
 
 
-def _policy_id_from_text(model_output: str, raw_output: str, flagged: bool) -> str:
+def _interpret_guardrail_output(
+    model_output: str, raw_output: str, *, backend: str
+) -> dict[str, object]:
+    flagged = _parse_guardrail_flag(raw_output)
+    policy_id, policy_basis = _policy_id_from_text(model_output, raw_output, flagged)
+    matched_patterns = _matched_patterns_from_policy(model_output, policy_id)
+    default_confidence = POLICIES.get(policy_id, POLICIES["policy.safe.default"])["confidence"]
+    confidence = _extract_confidence(raw_output, default_confidence=default_confidence)
+    return {
+        "flagged": flagged,
+        "policy_id": policy_id,
+        "confidence": confidence,
+        "matched_patterns": matched_patterns,
+        "backend": backend,
+        "status": "active",
+        "raw_output": raw_output,
+        "policy_basis": policy_basis,
+        "parsed_label": "unsafe" if flagged else "safe",
+    }
+
+
+def _parse_guardrail_flag(raw_output: str) -> bool:
+    first_token_match = re.match(r"\s*([A-Za-z_-]+)", raw_output)
+    if first_token_match:
+        first_token = first_token_match.group(1).lower()
+        if first_token == "unsafe":
+            return True
+        if first_token == "safe":
+            return False
+
+    lowered = raw_output.lower()
+    unsafe_index = lowered.find("unsafe")
+    safe_index = lowered.find("safe")
+    if unsafe_index == -1 and safe_index == -1:
+        return False
+    if unsafe_index == -1:
+        return False
+    if safe_index == -1:
+        return True
+    return unsafe_index < safe_index
+
+
+def _extract_confidence(raw_output: str, *, default_confidence: float) -> float:
+    confidence_patterns = (
+        r"confidence\s*[:=]\s*(\d+(?:\.\d+)?)\s*%",
+        r"confidence\s*[:=]\s*(\d+(?:\.\d+)?)",
+        r"score\s*[:=]\s*(\d+(?:\.\d+)?)\s*%",
+        r"score\s*[:=]\s*(\d+(?:\.\d+)?)",
+    )
+    for pattern in confidence_patterns:
+        match = re.search(pattern, raw_output, flags=re.IGNORECASE)
+        if not match:
+            continue
+        value = float(match.group(1))
+        if "%" in match.group(0) or value > 1.0:
+            value = value / 100.0
+        return max(0.0, min(value, 1.0))
+    return default_confidence
+
+
+def _policy_id_from_text(model_output: str, raw_output: str, flagged: bool) -> tuple[str, str]:
     if not flagged:
-        return "policy.safe.default"
+        return ("policy.safe.default", "safe_label")
     lowered = f"{model_output}\n{raw_output}".lower()
-    if any(token in lowered for token in ("password", "api key", "secret token")):
-        return "policy.sensitive_data.redaction"
-    return "policy.jailbreak.restricted_disclosure"
+    if any(
+        token in lowered
+        for token in ("password", "api key", "secret token", "credential", "secret", "token")
+    ):
+        return ("policy.sensitive_data.redaction", "sensitive_data_keywords")
+    return ("policy.jailbreak.restricted_disclosure", "unsafe_default")
 
 
 def _matched_patterns_from_policy(model_output: str, policy_id: str) -> list[str]:
