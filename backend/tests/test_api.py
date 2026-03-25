@@ -138,6 +138,35 @@ def test_blue_team_benchmark_endpoint() -> None:
     assert "comparison" in body
 
 
+def test_blue_team_benchmark_history_endpoint() -> None:
+    response = client.get("/api/v1/benchmarks/blue-team/history")
+    assert response.status_code == 200
+    body = response.json()
+    assert "history" in body
+    assert isinstance(body["history"], list)
+    if body["history"]:
+        entry = body["history"][0]
+        assert "file_name" in entry
+        assert "label" in entry
+        assert "updated_at" in entry
+        assert "configured_passed_cases" in entry
+        assert "metrics" in entry
+
+
+def test_blue_team_benchmark_run_endpoint() -> None:
+    response = client.post(
+        "/api/v1/benchmarks/blue-team/run",
+        json={"label": "ui-tuning-pass"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "config" in body
+    assert body["config"]["benchmark_label"] == "ui-tuning-pass"
+    assert "history" in body
+    assert any(entry["label"] == "ui-tuning-pass" for entry in body["history"])
+    assert "artifacts" in body
+
+
 def test_blue_team_config_endpoint() -> None:
     response = client.get("/api/v1/config/blue-team")
     assert response.status_code == 200

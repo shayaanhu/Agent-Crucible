@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -10,7 +12,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-def main() -> None:
+def _sanitize_label(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value.strip()).strip("-")
+    return cleaned or "default"
+
+
+def generate_benchmark(label_override: str | None = None) -> dict:
     from agents.blue_team import BasicBlueTeamAgent, get_blue_team_agent
     from agents.blue_team_config import get_blue_team_runtime_config
     from agents.blue_team_detectors import RuleDetector
@@ -23,6 +30,8 @@ def main() -> None:
 
     cases = json.loads(fixture_path.read_text(encoding="utf-8"))
     config = get_blue_team_runtime_config()
+    if label_override:
+        config = replace(config, benchmark_label=_sanitize_label(label_override))
     baseline_agent = BasicBlueTeamAgent(detectors=[RuleDetector()])
     configured_agent = get_blue_team_agent()
 
@@ -58,8 +67,17 @@ def main() -> None:
 
     labeled_path = output_dir / f"blue_team_benchmark_results-{config.benchmark_label}.json"
     labeled_path.write_text(json.dumps(benchmark, indent=2), encoding="utf-8")
-    print(f"Wrote blue-team benchmark results to {out_path}")
-    print(f"Wrote labeled blue-team benchmark results to {labeled_path}")
+    benchmark["artifacts"] = {
+        "canonical_path": str(out_path),
+        "labeled_path": str(labeled_path),
+    }
+    return benchmark
+
+
+def main() -> None:
+    benchmark = generate_benchmark()
+    print(f'Wrote blue-team benchmark results to {benchmark["artifacts"]["canonical_path"]}')
+    print(f'Wrote labeled blue-team benchmark results to {benchmark["artifacts"]["labeled_path"]}')
 
 
 def _run_benchmark_suite(cases, agent, enforce_guardrail_action, calculate_metrics, thresholds) -> dict:

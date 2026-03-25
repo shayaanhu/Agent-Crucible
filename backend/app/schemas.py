@@ -109,4 +109,8 @@ class EvaluationResponse(BaseModel):
     overall: PassFail
 
 
+class BlueTeamBenchmarkRunRequest(BaseModel):
+    label: str = Field(default="default", min_length=1, max_length=100)
+
+
 MetricMap = Dict[str, Any]

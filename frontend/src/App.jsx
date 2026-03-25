@@ -13,6 +13,7 @@ export default function App() {
   const [strategyId, setStrategyId] = useState("direct_jailbreak");
   const [maxTurns, setMaxTurns] = useState(3);
   const [dryRun, setDryRun] = useState(false);
+  const [benchmarkLabel, setBenchmarkLabel] = useState("default");
   const [runId, setRunId] = useState("");
   const [status, setStatus] = useState(null);
   const [events, setEvents] = useState([]);
@@ -20,6 +21,7 @@ export default function App() {
   const [verdicts, setVerdicts] = useState([]);
   const [evaluation, setEvaluation] = useState(null);
   const [benchmark, setBenchmark] = useState(null);
+  const [benchmarkHistory, setBenchmarkHistory] = useState([]);
   const [blueTeamConfig, setBlueTeamConfig] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -68,12 +70,42 @@ export default function App() {
   async function loadBenchmark() {
     setError("");
     try {
-      const response = await fetch(`${API_BASE}/api/v1/benchmarks/blue-team`);
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.detail || "Failed to load benchmark");
-      setBenchmark(body);
+      const [benchmarkResponse, historyResponse] = await Promise.all([
+        fetch(`${API_BASE}/api/v1/benchmarks/blue-team`),
+        fetch(`${API_BASE}/api/v1/benchmarks/blue-team/history`)
+      ]);
+      const benchmarkBody = await benchmarkResponse.json();
+      const historyBody = await historyResponse.json();
+      if (!benchmarkResponse.ok) {
+        throw new Error(benchmarkBody.detail || "Failed to load benchmark");
+      }
+      if (!historyResponse.ok) {
+        throw new Error(historyBody.detail || "Failed to load benchmark history");
+      }
+      setBenchmark(benchmarkBody);
+      setBenchmarkHistory(historyBody.history || []);
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  async function runBenchmark() {
+    setError("");
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/benchmarks/blue-team/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: benchmarkLabel || "default" })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail || "Failed to run benchmark");
+      setBenchmark(body);
+      setBenchmarkHistory(body.history || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -272,6 +304,11 @@ export default function App() {
           Dry-run mode (detect and log unsafe output without enforcing block)
         </label>
 
+        <label>
+          Benchmark Label
+          <input value={benchmarkLabel} onChange={(e) => setBenchmarkLabel(e.target.value)} />
+        </label>
+
         <div className="row">
           <button onClick={createRun} disabled={loading}>
             Create Run
@@ -284,6 +321,9 @@ export default function App() {
           </button>
           <button onClick={loadBenchmark} disabled={loading}>
             Refresh Benchmark
+          </button>
+          <button onClick={runBenchmark} disabled={loading}>
+            Run Benchmark
           </button>
           <button onClick={loadBlueTeamConfig} disabled={loading}>
             Refresh Config
@@ -369,6 +409,27 @@ export default function App() {
                   <pre>{pretty(benchmark.configured_detectors.summary.action_counts)}</pre>
                 </div>
               </div>
+            </div>
+            <div className="benchmark-card benchmark-wide">
+              <div className="label">Benchmark History</div>
+              {benchmarkHistory.length ? (
+                <div className="history-list">
+                  {benchmarkHistory.map((entry) => (
+                    <div key={entry.file_name} className="history-item">
+                      <div className="summary-grid">
+                        <div>label: {entry.label}</div>
+                        <div>updated: {entry.updated_at}</div>
+                        <div>passed: {entry.configured_passed_cases}</div>
+                        <div>failed: {entry.configured_failed_cases}</div>
+                        <div>total: {entry.total_cases}</div>
+                      </div>
+                      <pre>{pretty(entry.metrics)}</pre>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <pre>No benchmark history found yet.</pre>
+              )}
             </div>
           </div>
         ) : (

@@ -215,3 +215,15 @@ pre {
   gap: 12px;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
+
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-item {
+  border: 1px solid #d8e2d8;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+}

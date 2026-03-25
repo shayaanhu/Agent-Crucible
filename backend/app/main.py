@@ -16,6 +16,7 @@ except ImportError:
 from agents.blue_team_config import get_blue_team_runtime_config
 from backend.app.pipeline import execute_run
 from backend.app.schemas import (
+    BlueTeamBenchmarkRunRequest,
     EvalMetric,
     EvaluationRequest,
     EvaluationResponse,
@@ -51,6 +52,33 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _benchmark_history_payload() -> list[dict]:
+    results_dir = Path("eval/results")
+    history: list[dict] = []
+    for path in sorted(
+        results_dir.glob("blue_team_benchmark_results-*.json"),
+        key=lambda item: item.stat().st_mtime,
+        reverse=True,
+    ):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        config = payload.get("config", {})
+        summary = payload.get("configured_detectors", {}).get("summary", {})
+        history.append(
+            {
+                "file_name": path.name,
+                "label": config.get("benchmark_label", path.stem),
+                "updated_at": datetime.fromtimestamp(
+                    path.stat().st_mtime, tz=timezone.utc
+                ).isoformat().replace("+00:00", "Z"),
+                "configured_passed_cases": summary.get("passed_cases", 0),
+                "configured_failed_cases": summary.get("failed_cases", 0),
+                "total_cases": summary.get("total_cases", 0),
+                "metrics": summary.get("metrics", []),
+            }
+        )
+    return history
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -58,16 +86,29 @@ def health() -> dict[str, str]:
 
 @app.get("/api/v1/benchmarks/blue-team")
 def get_blue_team_benchmark() -> dict:
-    from eval.run_blue_team_benchmark import main as run_blue_team_benchmark
+    from eval.run_blue_team_benchmark import generate_benchmark
 
     benchmark_path = Path("eval/results/blue_team_benchmark_results.json")
     if not benchmark_path.exists():
-        run_blue_team_benchmark()
+        return generate_benchmark()
     payload = json.loads(benchmark_path.read_text(encoding="utf-8"))
     if "config" not in payload:
-        run_blue_team_benchmark()
-        payload = json.loads(benchmark_path.read_text(encoding="utf-8"))
+        return generate_benchmark()
     return payload
+
+
+@app.post("/api/v1/benchmarks/blue-team/run")
+def run_blue_team_benchmark(payload: BlueTeamBenchmarkRunRequest) -> dict:
+    from eval.run_blue_team_benchmark import generate_benchmark
+
+    benchmark = generate_benchmark(label_override=payload.label)
+    benchmark["history"] = _benchmark_history_payload()
+    return benchmark
+
+
+@app.get("/api/v1/benchmarks/blue-team/history")
+def get_blue_team_benchmark_history() -> dict[str, list[dict]]:
+    return {"history": _benchmark_history_payload()}
 
 
 @app.get("/api/v1/config/blue-team")
