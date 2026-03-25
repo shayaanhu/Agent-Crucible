@@ -107,6 +107,7 @@ def _try_b64_decode(candidate: str) -> str | None:
 def generate_attacker_prompt(
     template: str,
     context: str,
+    feedback: str,
     last_response: str,
     provider: str,
     model_override: str | None = None,
@@ -132,6 +133,7 @@ def generate_attacker_prompt(
     payload = {
         "template": template,
         "context": context,
+        "feedback": feedback,
         "last_response": last_response,
     }
     llm_prompt = f"{instruction}\n\nINPUT_JSON:\n{json.dumps(payload)}"

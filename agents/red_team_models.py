@@ -24,6 +24,9 @@ class AttackState:
     objective_scorer_provider: str = ""
     objective_scorer_model: str = ""
     objective_scorer_prompt: str = ""
+    blocked_streak: int = 0
+    no_success_streak: int = 0
+    last_objective_reason: str = ""
 
     def to_prompt_context(self) -> str:
         if not self.history:
