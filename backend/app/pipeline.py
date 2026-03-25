@@ -45,6 +45,7 @@ def _enforce_guardrail_action(
         dry_run_meta = {
             "enabled": True,
             "would_block": not provider_verdict.allowed,
+            "would_escalate": provider_verdict.action == "escalate",
             "original_allowed": provider_verdict.allowed,
             "original_action": provider_verdict.action,
         }
@@ -59,6 +60,15 @@ def _enforce_guardrail_action(
 
     if provider_verdict.action == "block" and not provider_verdict.allowed:
         effective_output = "Output blocked by blue-team guardrail."
+    elif provider_verdict.action == "escalate":
+        detector_results["escalation"] = {
+            "required": True,
+            "status": "pending_human_review",
+            "interim_action": "block",
+        }
+        effective_allowed = False
+        effective_output = "Output escalated for blue-team review."
+        effective_reason = f"{provider_verdict.reason} (escalated for human review)"
     elif provider_verdict.action == "redact":
         matched_patterns = _collect_matched_patterns(detector_results)
         effective_output = _redact_text(model_output, matched_patterns)
