@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+from tqdm import tqdm
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -38,8 +40,15 @@ def main() -> None:
     objectives = json.loads(dataset_path.read_text(encoding="utf-8"))
     agent = get_red_team_agent()
     results: list[dict] = []
+    total_objectives = len(objectives)
+    progress = tqdm(
+        total=total_objectives,
+        desc="red-team dataset",
+        unit="objective",
+        dynamic_ncols=True,
+    )
 
-    for obj in objectives:
+    for index, obj in enumerate(objectives, start=1):
         metadata = {
             "strategy_id": obj.get("strategy_id", "direct_jailbreak"),
             "objective_goal": obj.get("goal", ""),
@@ -50,6 +59,7 @@ def main() -> None:
         }
         if args.attacker_provider:
             metadata["attacker_provider"] = args.attacker_provider
+        progress.set_postfix_str(f"{obj.get('id', 'unknown')}:{metadata['strategy_id']}")
         trace = agent.run_attack(
             scenario=obj.get("scenario", ""),
             goal=obj.get("goal", ""),
@@ -58,10 +68,13 @@ def main() -> None:
             metadata=metadata,
         )
         results.append(trace_to_dict(trace))
+        progress.update(1)
+
+    progress.close()
 
     out_path = output_dir / "red_team_dataset_results.json"
     out_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
-    print(f"Wrote {len(results)} dataset traces to {out_path}")
+    print(f"Wrote {len(results)} dataset traces to {out_path}", flush=True)
 
 
 if __name__ == "__main__":
