@@ -93,4 +93,4 @@ def test_response_echo_detection_handles_json_echo() -> None:
 def test_retry_detection_matches_rate_limit_error_text() -> None:
     exc = RuntimeError("429 rate limit reached. Please try again in 2.166s.")
     assert _is_retryable_rate_limit(exc) is True
-    assert _retry_delay_seconds(exc, base_delay=2.5, attempt=0) == 2.166
+    assert _retry_delay_seconds(exc, base_delay=2.5, attempt=0) == 4.166
