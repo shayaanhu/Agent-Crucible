@@ -5,7 +5,7 @@ Dedicated implementation plan for Blue Team in Agent Crucible.
 ## Implementation Status Snapshot
 
 1. Phase 1 complete: verdict contract and schema fields are in place.
-2. Phase 2 complete: rule-based detector pipeline and policy-config workflow are active.
+2. Phase 2 complete: rule-based detector pipeline and external policy-config workflow are active.
 3. Phase 3 in progress: real optional adapter paths exist for both LlamaGuard and NeMo Guardrails, and both preserve rules-only fallback.
 4. Phase 5 started: evaluation supports `unsafe_block_rate`, `false_negative_rate`, `false_positive_rate`, and `policy_block_rate:<policy_id>`.
 5. Fixture-driven regression coverage is active under `backend/tests/fixtures/blue_team/`.
@@ -179,7 +179,7 @@ This prevents duplication of effort and ensures Blue Team regression tests refle
 | `eval/scorer.py` | Evaluation scoring |
 | `frontend/src/App.jsx` | Frontend guardrail display |
 | `backend/tests/` | All test suites |
-| `config/policies.yaml` | Policy configuration (new) |
+| `config/policies.json` | Policy configuration |
 
 ## Testing Plan
 

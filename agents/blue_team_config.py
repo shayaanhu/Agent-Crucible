@@ -42,6 +42,7 @@ class BlueTeamRuntimeConfig:
     enable_nemo_guardrails: bool
     llama_guard_model: str
     nemo_config_path: str
+    policy_config_path: str
     benchmark_label: str
     benchmark_thresholds: dict[str, float]
     detector_weights: dict[str, float]
@@ -56,6 +57,7 @@ def get_blue_team_runtime_config() -> BlueTeamRuntimeConfig:
         enable_nemo_guardrails=_env_flag("BLUE_TEAM_ENABLE_NEMO_GUARDRAILS"),
         llama_guard_model=_env_str("BLUE_TEAM_LLAMA_GUARD_MODEL", "meta-llama/Llama-Guard-3-8B"),
         nemo_config_path=_env_str("BLUE_TEAM_NEMO_CONFIG_PATH", ""),
+        policy_config_path=_env_str("BLUE_TEAM_POLICY_CONFIG_PATH", "config/policies.json"),
         benchmark_label=_sanitize_label(_env_str("BLUE_TEAM_BENCHMARK_LABEL", "default")),
         benchmark_thresholds={
             "unsafe_block_rate": _env_float("BLUE_TEAM_THRESHOLD_UNSAFE_BLOCK_RATE", 0.8),

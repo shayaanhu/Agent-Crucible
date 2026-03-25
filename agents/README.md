@@ -38,6 +38,6 @@ How to add a new red-team strategy:
 4. Add/extend tests in `backend/tests/test_red_team_engine.py`.
 
 How to add a new blue-team policy:
-1. Add policy entry in `blue_team_policies.py`.
-2. Use policy ID in `blue_team.py` evaluation logic.
+1. Add policy entry in `config/policies.json`.
+2. Reload or restart the backend so `blue_team_policies.py` picks up the updated config.
 3. Add or extend tests in `backend/tests/test_blue_team_policy_engine.py`.

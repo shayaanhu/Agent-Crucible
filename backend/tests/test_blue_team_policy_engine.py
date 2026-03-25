@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from agents.blue_team import BasicBlueTeamAgent, get_blue_team_agent
 from agents.blue_team_detectors import (
     DetectorSignal,
@@ -7,7 +10,7 @@ from agents.blue_team_detectors import (
     NeMoGuardrailsDetector,
     RuleDetector,
 )
-from agents.blue_team_policies import POLICIES
+from agents.blue_team_policies import POLICIES, load_policies
 
 
 class StubDetector:
@@ -185,6 +188,44 @@ def test_nemo_detector_maps_unsafe_response(monkeypatch) -> None:
     assert signals[0].policy_id == "policy.sensitive_data.redaction"
     assert signals[0].matched_patterns == ["password", "api key"]
     assert signals[0].metadata["backend"] == "nemoguardrails"
+
+
+def test_policy_loader_reads_external_config_file() -> None:
+    config_path = Path("backend/tests/fixtures/blue_team/temp_policies.json")
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_payload = {
+        "policy.test.external": {
+            "category": "external_policy",
+            "severity": "medium",
+            "action": "redact",
+            "confidence": 0.77,
+            "reason": "Loaded from external config.",
+            "patterns": ["external token"],
+            "aggregation_strategy": "majority_vote",
+            "aggregation_threshold": 0.5,
+        },
+        "policy.safe.default": {
+            "category": "safe",
+            "severity": "low",
+            "action": "allow",
+            "confidence": 0.9,
+            "reason": "Safe default.",
+            "patterns": [],
+            "aggregation_strategy": "any_hit_blocks",
+            "aggregation_threshold": 1.0,
+        },
+    }
+    config_path.write_text(json.dumps(config_payload, indent=2), encoding="utf-8")
+
+    try:
+        policies = load_policies(config_path)
+    finally:
+        if config_path.exists():
+            config_path.unlink()
+
+    assert "policy.test.external" in policies
+    assert policies["policy.test.external"]["aggregation_strategy"] == "majority_vote"
+    assert policies["policy.test.external"]["patterns"] == ["external token"]
 
 
 def test_majority_vote_policy_requires_more_than_half_detectors(monkeypatch) -> None:
