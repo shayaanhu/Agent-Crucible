@@ -7,6 +7,7 @@ from agents.red_team import (
     get_red_team_agent,
 )
 from agents.red_team_models import AttackState
+from agents.red_team_runtime import _is_retryable_rate_limit, _retry_delay_seconds
 
 
 def test_converter_pipeline_applies() -> None:
@@ -87,3 +88,9 @@ def test_feedback_mentions_wrapper_failure() -> None:
 
 def test_response_echo_detection_handles_json_echo() -> None:
     assert _response_echoes_wrapped_payload('Decoded JSON:\n```json\n{"format": "red_team"}\n```')
+
+
+def test_retry_detection_matches_rate_limit_error_text() -> None:
+    exc = RuntimeError("429 rate limit reached. Please try again in 2.166s.")
+    assert _is_retryable_rate_limit(exc) is True
+    assert _retry_delay_seconds(exc, base_delay=2.5, attempt=0) == 2.166

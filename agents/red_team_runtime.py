@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import re
+import time
 from typing import Any, Tuple
 
 
@@ -28,7 +29,7 @@ def _generate_openai_response(prompt: str, model_override: str | None = None) ->
         ) from exc
 
     llm = ChatOpenAI(api_key=api_key, model=model_name, temperature=0)
-    response = llm.invoke(prompt)
+    response = _invoke_with_retries(lambda: llm.invoke(prompt))
     content = response.content
     if isinstance(content, list):
         return " ".join(str(part) for part in content)
@@ -48,7 +49,7 @@ def _generate_groq_response(prompt: str, model_override: str | None = None) -> s
         ) from exc
 
     llm = ChatGroq(groq_api_key=api_key, model=model_name, temperature=0)
-    response = llm.invoke(prompt)
+    response = _invoke_with_retries(lambda: llm.invoke(prompt))
     content = response.content
     if isinstance(content, list):
         return " ".join(str(part) for part in content)
@@ -176,3 +177,32 @@ def _safe_placeholder(context: str, key: str) -> str:
             if line.lower().startswith(f"{key}:"):
                 return line.split(":", 1)[1].strip()
     return ""
+
+
+def _invoke_with_retries(fn, retries: int = 4, base_delay: float = 2.5):
+    last_exc: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            last_exc = exc
+            if attempt >= retries or not _is_retryable_rate_limit(exc):
+                raise
+            delay = _retry_delay_seconds(exc, base_delay, attempt)
+            time.sleep(delay)
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Retry wrapper exited without result.")
+
+
+def _is_retryable_rate_limit(exc: Exception) -> bool:
+    text = f"{exc.__class__.__name__}: {exc}".lower()
+    return "ratelimit" in text or "rate limit" in text or "429" in text
+
+
+def _retry_delay_seconds(exc: Exception, base_delay: float, attempt: int) -> float:
+    text = str(exc)
+    match = re.search(r"try again in ([0-9]+(?:\.[0-9]+)?)s", text, re.IGNORECASE)
+    if match:
+        return max(float(match.group(1)), 0.5)
+    return base_delay * (attempt + 1)

@@ -24,7 +24,7 @@ def main() -> None:
         default="eval/fixtures/red_team_objectives.json",
         help="Path to dataset JSON file.",
     )
-    parser.add_argument("--provider", default="mock", help="Target provider.")
+    parser.add_argument("--provider", default="groq", help="Target provider.")
     parser.add_argument("--attacker-provider", default="", help="Attacker provider override.")
     parser.add_argument("--max-turns", type=int, default=3, help="Max turns per objective.")
     args = parser.parse_args()
