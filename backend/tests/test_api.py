@@ -146,4 +146,5 @@ def test_blue_team_config_endpoint() -> None:
     assert "enable_nemo_guardrails" in body
     assert "llama_guard_model" in body
     assert "nemo_config_path" in body
+    assert "policy_config_path" in body
     assert "benchmark_thresholds" in body
