@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 from tqdm import tqdm
@@ -29,6 +30,12 @@ def main() -> None:
     parser.add_argument("--provider", default="groq", help="Target provider.")
     parser.add_argument("--attacker-provider", default="", help="Attacker provider override.")
     parser.add_argument("--max-turns", type=int, default=3, help="Max turns per objective.")
+    parser.add_argument(
+        "--cooldown-seconds",
+        type=float,
+        default=10.0,
+        help="Seconds to wait between dataset objectives to reduce provider rate limits.",
+    )
     args = parser.parse_args()
 
     from agents.red_team import get_red_team_agent, trace_to_dict
@@ -69,6 +76,11 @@ def main() -> None:
         )
         results.append(trace_to_dict(trace))
         progress.update(1)
+        if index < total_objectives:
+            progress.set_postfix_str(
+                f"{obj.get('id', 'unknown')}:{metadata['strategy_id']} cooldown={args.cooldown_seconds:.0f}s"
+            )
+            time.sleep(args.cooldown_seconds)
 
     progress.close()
 

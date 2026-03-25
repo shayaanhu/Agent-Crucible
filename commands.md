@@ -73,11 +73,13 @@ curl -X POST http://localhost:8000/api/v1/evaluations `
 ## 6) Red-Team Benchmark Pack (Groq)
 ```powershell
 .venv\Scripts\Activate.ps1
-.venv\Scripts\python.exe eval/run_red_team_benchmark.py --provider groq --max-turns 3
+.venv\Scripts\python.exe eval/run_red_team_benchmark.py --provider groq --max-turns 3 --cooldown-seconds 10
 ```
+This runner now pauses 10 seconds between cases, and the runtime also retries Groq rate limits with an extra safety buffer.
 
 ## 7) Red-Team Dataset Runner (Groq)
 ```powershell
 .venv\Scripts\Activate.ps1
-.venv\Scripts\python.exe eval/run_red_team_dataset.py --provider groq --max-turns 3
+.venv\Scripts\python.exe eval/run_red_team_dataset.py --provider groq --max-turns 3 --cooldown-seconds 10
 ```
+This runner also pauses 10 seconds between objectives for steadier Groq usage.

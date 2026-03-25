@@ -179,16 +179,20 @@ def _safe_placeholder(context: str, key: str) -> str:
     return ""
 
 
-def _invoke_with_retries(fn, retries: int = 4, base_delay: float = 2.5):
+def _invoke_with_retries(fn, retries: int | None = None, base_delay: float | None = None):
     last_exc: Exception | None = None
-    for attempt in range(retries + 1):
+    resolved_retries = retries if retries is not None else int(os.getenv("RED_TEAM_MAX_RETRIES", "8"))
+    resolved_base_delay = (
+        base_delay if base_delay is not None else float(os.getenv("RED_TEAM_RETRY_BASE_DELAY", "3.0"))
+    )
+    for attempt in range(resolved_retries + 1):
         try:
             return fn()
         except Exception as exc:
             last_exc = exc
-            if attempt >= retries or not _is_retryable_rate_limit(exc):
+            if attempt >= resolved_retries or not _is_retryable_rate_limit(exc):
                 raise
-            delay = _retry_delay_seconds(exc, base_delay, attempt)
+            delay = _retry_delay_seconds(exc, resolved_base_delay, attempt)
             time.sleep(delay)
     if last_exc is not None:
         raise last_exc
@@ -204,5 +208,6 @@ def _retry_delay_seconds(exc: Exception, base_delay: float, attempt: int) -> flo
     text = str(exc)
     match = re.search(r"try again in ([0-9]+(?:\.[0-9]+)?)s", text, re.IGNORECASE)
     if match:
-        return max(float(match.group(1)), 0.5)
+        buffer_seconds = float(os.getenv("RED_TEAM_RATE_LIMIT_BUFFER_SECONDS", "2.0"))
+        return max(float(match.group(1)) + buffer_seconds, 1.0)
     return base_delay * (attempt + 1)
