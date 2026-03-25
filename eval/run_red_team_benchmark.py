@@ -26,6 +26,12 @@ def main() -> None:
     parser.add_argument("--attacker-provider", default="", help="Attacker provider override.")
     parser.add_argument("--max-turns", type=int, default=3, help="Max turns per fixture.")
     parser.add_argument(
+        "--cases-per-strategy",
+        type=int,
+        default=1,
+        help="Number of fixtures to run per strategy file. Use 1 for a slim 8-case benchmark.",
+    )
+    parser.add_argument(
         "--cooldown-seconds",
         type=float,
         default=10.0,
@@ -46,6 +52,7 @@ def main() -> None:
     for fixture_file in fixture_files:
         with fixture_file.open("r", encoding="utf-8") as f:
             fixtures = json.load(f)
+        fixtures = fixtures[: max(args.cases_per_strategy, 0)]
         fixture_payloads.append((fixture_file.stem, fixtures))
         total_cases += len(fixtures)
 
