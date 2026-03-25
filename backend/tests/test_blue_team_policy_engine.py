@@ -1,7 +1,22 @@
 from __future__ import annotations
 
 from agents.blue_team import BasicBlueTeamAgent, get_blue_team_agent
-from agents.blue_team_detectors import LlamaGuardDetector, NeMoGuardrailsDetector, RuleDetector
+from agents.blue_team_detectors import (
+    DetectorSignal,
+    LlamaGuardDetector,
+    NeMoGuardrailsDetector,
+    RuleDetector,
+)
+from agents.blue_team_policies import POLICIES
+
+
+class StubDetector:
+    def __init__(self, detector_id: str, signals: list[DetectorSignal]) -> None:
+        self.detector_id = detector_id
+        self._signals = signals
+
+    def detect(self, model_output: str) -> list[DetectorSignal]:
+        return self._signals
 
 
 def test_unsafe_output_is_blocked_with_policy_evidence() -> None:
@@ -170,3 +185,137 @@ def test_nemo_detector_maps_unsafe_response(monkeypatch) -> None:
     assert signals[0].policy_id == "policy.sensitive_data.redaction"
     assert signals[0].matched_patterns == ["password", "api key"]
     assert signals[0].metadata["backend"] == "nemoguardrails"
+
+
+def test_majority_vote_policy_requires_more_than_half_detectors(monkeypatch) -> None:
+    monkeypatch.setitem(
+        POLICIES,
+        "policy.test.majority_vote",
+        {
+            "category": "test_policy",
+            "severity": "high",
+            "action": "block",
+            "confidence": 0.7,
+            "reason": "Majority vote test policy triggered.",
+            "patterns": ("majority",),
+            "aggregation_strategy": "majority_vote",
+            "aggregation_threshold": 0.5,
+        },
+    )
+    agent = BasicBlueTeamAgent(
+        detectors=[
+            StubDetector(
+                "rule_detector",
+                [
+                    DetectorSignal(
+                        detector_id="rule_detector",
+                        policy_id="policy.test.majority_vote",
+                        confidence=0.7,
+                        matched_patterns=["majority"],
+                        flagged=True,
+                    )
+                ],
+            ),
+            StubDetector(
+                "llamaguard_detector",
+                [
+                    DetectorSignal(
+                        detector_id="llamaguard_detector",
+                        policy_id="policy.test.majority_vote",
+                        confidence=0.82,
+                        matched_patterns=["majority"],
+                        flagged=True,
+                    )
+                ],
+            ),
+            StubDetector(
+                "nemo_guardrails_detector",
+                [
+                    DetectorSignal(
+                        detector_id="nemo_guardrails_detector",
+                        policy_id="policy.safe.default",
+                        confidence=0.9,
+                        matched_patterns=[],
+                        flagged=False,
+                    )
+                ],
+            ),
+        ]
+    )
+
+    verdict = agent.evaluate_output("majority test")
+
+    assert verdict.allowed is False
+    assert verdict.policy_id == "policy.test.majority_vote"
+    aggregation = verdict.detector_results["_aggregation"]["policy_evaluations"][0]
+    assert aggregation["aggregation_strategy"] == "majority_vote"
+    assert aggregation["supporting_count"] == 2
+    assert aggregation["active_detector_count"] == 3
+    assert aggregation["triggered"] is True
+
+
+def test_weighted_average_policy_uses_detector_weights(monkeypatch) -> None:
+    monkeypatch.setitem(
+        POLICIES,
+        "policy.test.weighted_average",
+        {
+            "category": "test_policy",
+            "severity": "medium",
+            "action": "redact",
+            "confidence": 0.65,
+            "reason": "Weighted average test policy triggered.",
+            "patterns": ("weighted",),
+            "aggregation_strategy": "weighted_average",
+            "aggregation_threshold": 0.67,
+        },
+    )
+    agent = BasicBlueTeamAgent(
+        detectors=[
+            StubDetector(
+                "rule_detector",
+                [
+                    DetectorSignal(
+                        detector_id="rule_detector",
+                        policy_id="policy.test.weighted_average",
+                        confidence=0.6,
+                        matched_patterns=["weighted"],
+                        flagged=True,
+                    )
+                ],
+            ),
+            StubDetector(
+                "llamaguard_detector",
+                [
+                    DetectorSignal(
+                        detector_id="llamaguard_detector",
+                        policy_id="policy.safe.default",
+                        confidence=0.9,
+                        matched_patterns=[],
+                        flagged=False,
+                    )
+                ],
+            ),
+            StubDetector(
+                "nemo_guardrails_detector",
+                [
+                    DetectorSignal(
+                        detector_id="nemo_guardrails_detector",
+                        policy_id="policy.test.weighted_average",
+                        confidence=0.72,
+                        matched_patterns=["weighted"],
+                        flagged=True,
+                    )
+                ],
+            ),
+        ]
+    )
+
+    verdict = agent.evaluate_output("weighted test")
+
+    assert verdict.allowed is False
+    assert verdict.policy_id == "policy.test.weighted_average"
+    assert verdict.action == "redact"
+    aggregation = verdict.detector_results["_aggregation"]["policy_evaluations"][0]
+    assert aggregation["aggregation_strategy"] == "weighted_average"
+    assert aggregation["triggered"] is True
+    assert aggregation["aggregated_confidence"] >= 0.65

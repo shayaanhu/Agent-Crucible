@@ -25,10 +25,11 @@ Blue Team is responsible for detecting unsafe model outputs, enforcing guardrail
 ## Current State (From Codebase)
 
 1. Baseline Blue Team agent exists in `agents/blue_team.py`.
-2. Current verdict contract is: `allowed`, `category`, `confidence`, `reason` in `agents/contracts.py`.
+2. Current verdict contract is: `allowed`, `category`, `confidence`, `reason`, `action`, `severity`, `policy_id`, `detector_results`, `dry_run` in `agents/contracts.py`.
 3. Blue Team is invoked during run execution in `backend/app/pipeline.py`.
 4. Verdicts are stored and later scored by `eval/scorer.py`.
 5. Basic integration coverage exists in `backend/tests/test_team_contracts.py`.
+6. Policy-level aggregation strategies are active in `agents/blue_team.py` for `any_hit_blocks`, `majority_vote`, and `weighted_average`.
 
 ## Target State
 
