@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import json
 import sys
 import time
@@ -17,16 +16,6 @@ try:
     from dotenv import load_dotenv
 except Exception:
     load_dotenv = None
-
-
-def _timestamp_fields() -> dict[str, str]:
-    now_utc = datetime.now(timezone.utc)
-    now_local = now_utc.astimezone()
-    return {
-        "generated_at": now_local.strftime("%Y-%m-%d %H:%M:%S %Z"),
-        "generated_at_local": now_local.strftime("%Y-%m-%d %H:%M:%S %Z"),
-        "generated_at_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
-    }
 
 
 def main() -> None:
@@ -50,6 +39,7 @@ def main() -> None:
     args = parser.parse_args()
 
     from agents.red_team import get_red_team_agent, trace_to_dict
+    from eval.red_team_eval_utils import summarize_red_team_results, timestamp_fields
 
     dataset_path = Path(args.dataset)
     output_dir = Path("eval/results")
@@ -97,8 +87,9 @@ def main() -> None:
 
     payload = {
         "run_metadata": {
+            "suite_type": "objective_suite",
             "runner": "red_team_dataset",
-            **_timestamp_fields(),
+            **timestamp_fields(),
             "provider": args.provider,
             "attacker_provider": args.attacker_provider or args.provider,
             "max_turns": args.max_turns,
@@ -107,6 +98,7 @@ def main() -> None:
             "total_objectives": total_objectives,
             "total_results": len(results),
         },
+        "summary": summarize_red_team_results(results),
         "results": results,
     }
 

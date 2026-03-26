@@ -7,4 +7,5 @@ Evaluation and benchmarking module for:
 
 Current implementation:
 1. `eval/scorer.py` computes `jailbreak_resistance` and `toxicity_safety`.
-2. `eval/run_red_team_dataset.py` runs dataset objectives through the red-team orchestrator.
+2. `eval/run_red_team_dataset.py` runs the red-team objective suite and writes top-level metadata, summary metrics, and full traces.
+3. `eval/run_red_team_benchmark.py` / `eval/run_red_team_regression.py` run the red-team regression pack and write top-level metadata, summary metrics, and full traces.
