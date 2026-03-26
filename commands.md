@@ -93,6 +93,13 @@ This runs all 40 regression fixtures (5 per strategy). Use it sparingly because 
 ```
 This is the main red-team evaluation suite. It runs objective-driven cases and writes a summary plus full traces with top-level metadata.
 
+View a readable report from the latest objective-suite output:
+```powershell
+.venv\Scripts\Activate.ps1
+.venv\Scripts\python.exe eval/report_red_team_eval.py --input eval/results/red_team_dataset_results.json
+```
+This writes a Markdown report to `eval/report/red_team_dataset_results_report.md`.
+
 Useful slices:
 ```powershell
 .venv\Scripts\Activate.ps1
