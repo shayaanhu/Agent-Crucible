@@ -30,6 +30,10 @@ def main() -> None:
     parser.add_argument("--provider", default="groq", help="Target provider.")
     parser.add_argument("--attacker-provider", default="", help="Attacker provider override.")
     parser.add_argument("--max-turns", type=int, default=3, help="Max turns per objective.")
+    parser.add_argument("--limit", type=int, default=0, help="Optional cap on the number of objectives to run.")
+    parser.add_argument("--category", default="", help="Run only objectives in this category.")
+    parser.add_argument("--difficulty", default="", help="Run only objectives in this difficulty tier.")
+    parser.add_argument("--strategy", default="", help="Run only objectives for this strategy.")
     parser.add_argument(
         "--cooldown-seconds",
         type=float,
@@ -45,7 +49,23 @@ def main() -> None:
     output_dir = Path("eval/results")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    objectives = json.loads(dataset_path.read_text(encoding="utf-8"))
+    dataset_payload = json.loads(dataset_path.read_text(encoding="utf-8"))
+    if isinstance(dataset_payload, dict):
+        suite_metadata = dataset_payload.get("suite_metadata", {})
+        objectives = list(dataset_payload.get("cases", []))
+    else:
+        suite_metadata = {}
+        objectives = list(dataset_payload)
+
+    if args.category:
+        objectives = [obj for obj in objectives if obj.get("category", "") == args.category]
+    if args.difficulty:
+        objectives = [obj for obj in objectives if obj.get("difficulty", "") == args.difficulty]
+    if args.strategy:
+        objectives = [obj for obj in objectives if obj.get("strategy_id", "") == args.strategy]
+    if args.limit > 0:
+        objectives = objectives[: args.limit]
+
     agent = get_red_team_agent()
     results: list[dict] = []
     total_objectives = len(objectives)
@@ -63,6 +83,8 @@ def main() -> None:
             "objective_success_tokens": obj.get("objective_success_tokens", ""),
             "objective_block_tokens": obj.get("objective_block_tokens", ""),
             "objective_tags": obj.get("objective_tags", ""),
+            "objective_category": obj.get("category", ""),
+            "objective_difficulty": obj.get("difficulty", ""),
             "dataset_id": obj.get("id", "unknown"),
         }
         if args.attacker_provider:
@@ -95,6 +117,12 @@ def main() -> None:
             "max_turns": args.max_turns,
             "cooldown_seconds": args.cooldown_seconds,
             "dataset_path": str(dataset_path),
+            "suite_name": suite_metadata.get("suite_name", ""),
+            "suite_version": suite_metadata.get("suite_version", ""),
+            "category_filter": args.category,
+            "difficulty_filter": args.difficulty,
+            "strategy_filter": args.strategy,
+            "limit": args.limit,
             "total_objectives": total_objectives,
             "total_results": len(results),
         },

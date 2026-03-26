@@ -33,6 +33,13 @@ def summarize_red_team_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     tag_totals: defaultdict[str, dict[str, int]] = defaultdict(
         lambda: {"cases": 0, "successes": 0}
     )
+    category_totals: defaultdict[str, dict[str, int]] = defaultdict(
+        lambda: {"cases": 0, "successes": 0}
+    )
+    difficulty_totals: defaultdict[str, dict[str, int]] = defaultdict(
+        lambda: {"cases": 0, "successes": 0}
+    )
+    case_summaries: list[dict[str, Any]] = []
 
     total_turns = 0
     total_success_turns = 0
@@ -46,6 +53,8 @@ def summarize_red_team_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         stop_reason = str(result.get("stop_reason", "unknown"))
         strategy_id = str(result.get("strategy_id", "unknown"))
         metadata = result.get("metadata", {}) or {}
+        category = str(metadata.get("objective_category", "uncategorized")).strip() or "uncategorized"
+        difficulty = str(metadata.get("objective_difficulty", "unspecified")).strip() or "unspecified"
 
         stop_reason_counts[stop_reason] += 1
         turn_count = len(turns)
@@ -78,6 +87,24 @@ def summarize_red_team_results(results: list[dict[str, Any]]) -> dict[str, Any]:
             if final_label == "success":
                 tag_totals[tag]["successes"] += 1
 
+        category_totals[category]["cases"] += 1
+        difficulty_totals[difficulty]["cases"] += 1
+        if final_label == "success":
+            category_totals[category]["successes"] += 1
+            difficulty_totals[difficulty]["successes"] += 1
+
+        case_summaries.append(
+            {
+                "id": metadata.get("dataset_id") or metadata.get("fixture_id") or "unknown",
+                "strategy_id": strategy_id,
+                "category": category,
+                "difficulty": difficulty,
+                "final_outcome": final_label,
+                "turns": turn_count,
+                "stop_reason": stop_reason,
+            }
+        )
+
     per_strategy: dict[str, dict[str, Any]] = {}
     for strategy_id, entry in sorted(strategy_totals.items()):
         cases = entry["cases"]
@@ -101,6 +128,24 @@ def summarize_red_team_results(results: list[dict[str, Any]]) -> dict[str, Any]:
             "success_rate": round(entry["successes"] / cases, 4) if cases else 0.0,
         }
 
+    per_category: dict[str, dict[str, Any]] = {}
+    for category, entry in sorted(category_totals.items()):
+        cases = entry["cases"]
+        per_category[category] = {
+            "cases": cases,
+            "successes": entry["successes"],
+            "success_rate": round(entry["successes"] / cases, 4) if cases else 0.0,
+        }
+
+    per_difficulty: dict[str, dict[str, Any]] = {}
+    for difficulty, entry in sorted(difficulty_totals.items()):
+        cases = entry["cases"]
+        per_difficulty[difficulty] = {
+            "cases": cases,
+            "successes": entry["successes"],
+            "success_rate": round(entry["successes"] / cases, 4) if cases else 0.0,
+        }
+
     return {
         "total_cases": total_cases,
         "successes": success_count,
@@ -116,6 +161,9 @@ def summarize_red_team_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         "final_outcome_counts": dict(final_outcome_counts),
         "per_strategy": per_strategy,
         "per_tag": per_tag,
+        "per_category": per_category,
+        "per_difficulty": per_difficulty,
+        "case_summaries": case_summaries,
     }
 
 

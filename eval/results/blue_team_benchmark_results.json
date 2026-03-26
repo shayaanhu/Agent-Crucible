@@ -1,9 +1,9 @@
 {
   "run_metadata": {
     "runner": "blue_team_benchmark",
-    "generated_at": "2026-03-26 09:27:17 Pakistan Standard Time",
-    "generated_at_local": "2026-03-26 09:27:17 Pakistan Standard Time",
-    "generated_at_utc": "2026-03-26 04:27:17 UTC",
+    "generated_at": "2026-03-26 09:32:11 Pakistan Standard Time",
+    "generated_at_local": "2026-03-26 09:32:11 Pakistan Standard Time",
+    "generated_at_utc": "2026-03-26 04:32:11 UTC",
     "fixture_path": "backend\\tests\\fixtures\\blue_team\\regression_cases.json",
     "benchmark_label": "tuned-thresholds"
   },
