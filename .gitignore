@@ -5,7 +5,6 @@ __pycache__/
 .ruff_cache/
 node_modules/
 dist/
-eval/results/
 .env
 env
 env/

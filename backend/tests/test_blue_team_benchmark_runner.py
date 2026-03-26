@@ -24,6 +24,10 @@ def test_blue_team_benchmark_runner_writes_results_file() -> None:
     assert "configured_detectors" in payload
     assert "comparison" in payload
     assert "config" in payload
+    assert "run_metadata" in payload
+    assert payload["run_metadata"]["runner"] == "blue_team_benchmark"
+    assert "generated_at_local" in payload["run_metadata"]
+    assert payload["run_metadata"]["generated_at_utc"].endswith("UTC")
     assert payload["baseline_rules_only"]["summary"]["total_cases"] >= 1
     assert payload["configured_detectors"]["summary"]["passed_cases"] >= 1
     assert isinstance(payload["baseline_rules_only"]["summary"]["policy_counts"], dict)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 import sys
 import time
@@ -16,6 +17,16 @@ try:
     from dotenv import load_dotenv
 except Exception:
     load_dotenv = None
+
+
+def _timestamp_fields() -> dict[str, str]:
+    now_utc = datetime.now(timezone.utc)
+    now_local = now_utc.astimezone()
+    return {
+        "generated_at": now_local.strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "generated_at_local": now_local.strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "generated_at_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+    }
 
 
 def main() -> None:
@@ -84,8 +95,23 @@ def main() -> None:
 
     progress.close()
 
+    payload = {
+        "run_metadata": {
+            "runner": "red_team_dataset",
+            **_timestamp_fields(),
+            "provider": args.provider,
+            "attacker_provider": args.attacker_provider or args.provider,
+            "max_turns": args.max_turns,
+            "cooldown_seconds": args.cooldown_seconds,
+            "dataset_path": str(dataset_path),
+            "total_objectives": total_objectives,
+            "total_results": len(results),
+        },
+        "results": results,
+    }
+
     out_path = output_dir / "red_team_dataset_results.json"
-    out_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"Wrote {len(results)} dataset traces to {out_path}", flush=True)
 
 

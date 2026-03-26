@@ -71,12 +71,20 @@ curl -X POST http://localhost:8000/api/v1/evaluations `
 ```
 
 ## 6) Red-Team Benchmark Pack (Groq)
+Recommended slim benchmark:
 ```powershell
 .venv\Scripts\Activate.ps1
 .venv\Scripts\python.exe eval/run_red_team_benchmark.py --provider groq --max-turns 3 --cases-per-strategy 1 --cooldown-seconds 10
 ```
 This is the recommended slim benchmark: 1 representative fixture per strategy = 8 total cases.
 The runner pauses 10 seconds between cases, and the runtime also retries Groq rate limits with an extra safety buffer.
+
+Full benchmark:
+```powershell
+.venv\Scripts\Activate.ps1
+.venv\Scripts\python.exe eval/run_red_team_benchmark.py --provider groq --max-turns 3 --cases-per-strategy 5 --cooldown-seconds 10
+```
+This runs all 40 benchmark fixtures (5 per strategy). Use it sparingly because it is much slower and more likely to hit Groq rate limits.
 
 ## 7) Red-Team Dataset Runner (Groq)
 ```powershell
