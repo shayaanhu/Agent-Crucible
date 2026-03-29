@@ -440,7 +440,8 @@ function DetectorResultsPanel({ detectorResults }) {
       ) : null}
 
       {aggregation.length ? (
-        <DetailBlock title="Policy aggregation">
+        <details className="inspector-section">
+          <summary>Policy aggregation</summary>
           <table className="data-table">
             <thead>
               <tr>
@@ -469,11 +470,12 @@ function DetectorResultsPanel({ detectorResults }) {
               ))}
             </tbody>
           </table>
-        </DetailBlock>
+        </details>
       ) : null}
 
       {detectorEntries.length ? (
-        <DetailBlock title="Detector evidence">
+        <details className="inspector-section">
+          <summary>Detector evidence</summary>
           <table className="data-table">
             <thead>
               <tr>
@@ -503,7 +505,7 @@ function DetectorResultsPanel({ detectorResults }) {
               })}
             </tbody>
           </table>
-        </DetailBlock>
+        </details>
       ) : null}
     </div>
   );
@@ -542,7 +544,7 @@ function TurnList({ timeline, selectedTurnIndex, onSelect }) {
   }
 
   return (
-    <div className="turn-list">
+    <div className="turn-strip">
       {timeline.map((entry, index) => (
         <button
           className={`turn-row ${selectedTurnIndex === index ? "is-selected" : ""}`}
@@ -550,16 +552,14 @@ function TurnList({ timeline, selectedTurnIndex, onSelect }) {
           onClick={() => onSelect(index)}
           type="button"
         >
-          <div className="turn-row-top">
-            <strong>Turn {entry.event.turn_index}</strong>
-            <Badge tone={getActionTone(entry.verdict.action)}>
-              {formatLabel(entry.verdict.action)}
-            </Badge>
+          <div className="turn-row-index">Turn {entry.event.turn_index}</div>
+          <div className="turn-row-meta">{formatTimestamp(entry.event.timestamp)}</div>
+          <div className="turn-row-summary">
+            {formatLabel(entry.verdict.action)} | {formatLabel(entry.verdict.severity)}
           </div>
-          <div className="turn-row-meta">
-            {formatTimestamp(entry.event.timestamp)} | {formatLabel(entry.verdict.severity)}
+          <div className="turn-row-outcome">
+            {entry.event.outcome ? formatLabel(entry.event.outcome) : "No outcome label"}
           </div>
-          <div className="turn-row-summary">{summarizeTurn(entry)}</div>
         </button>
       ))}
     </div>
@@ -570,6 +570,17 @@ function TurnDetail({ entry }) {
   if (!entry) {
     return <p className="empty-copy">Select a turn to inspect its prompt, response, and guardrail decision.</p>;
   }
+
+  const overviewItems = [
+    { label: "Timestamp", value: formatTimestamp(entry.event.timestamp) },
+    { label: "Strategy", value: formatLabel(entry.event.strategy_id) },
+    { label: "Template", value: formatLabel(entry.event.template_id) },
+    { label: "Attack Tag", value: formatLabel(entry.event.attack_tag) },
+    { label: "Attacker", value: entry.event.attacker_provider },
+    { label: "Target", value: entry.event.target_provider },
+    { label: "Prompt Hash", value: truncateMiddle(entry.event.prompt_hash) },
+    { label: "Policy", value: truncateMiddle(entry.verdict.policy_id) }
+  ].filter((item) => !isEmptyValue(item.value) && item.value !== "N/a");
 
   return (
     <div className="detail-stack">
@@ -587,23 +598,20 @@ function TurnDetail({ entry }) {
             </div>
           }
         />
-        <InfoTable
-          items={[
-            { label: "Timestamp", value: formatTimestamp(entry.event.timestamp) },
-            { label: "Strategy", value: formatLabel(entry.event.strategy_id) },
-            { label: "Template", value: formatLabel(entry.event.template_id) },
-            { label: "Attack Tag", value: formatLabel(entry.event.attack_tag) },
-            { label: "Attacker Provider", value: entry.event.attacker_provider },
-            { label: "Target Provider", value: entry.event.target_provider },
-            { label: "Prompt Hash", value: truncateMiddle(entry.event.prompt_hash) }
-          ]}
-        />
+        <div className="summary-grid">
+          {overviewItems.map((item) => (
+            <div className="summary-cell" key={item.label}>
+              <div className="summary-label">{item.label}</div>
+              <div className="summary-value">{formatSimpleValue(item.value)}</div>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="panel">
-        <SectionHeader eyebrow="Content" title="Prompt and response" />
-        <div className="detail-grid">
-          <DetailBlock title="Attacker prompt">
+        <SectionHeader eyebrow="Prompt Flow" title="Attack to response" note="Read this section from top to bottom." />
+        <div className="flow-stack">
+          <DetailBlock title="1. Attacker prompt">
             <p>{entry.event.attacker_prompt || "No attacker prompt captured for this turn."}</p>
             <InfoTable
               items={[
@@ -613,7 +621,7 @@ function TurnDetail({ entry }) {
             />
           </DetailBlock>
 
-          <DetailBlock title="Delivered prompt">
+          <DetailBlock title="2. Delivered prompt">
             <p>{entry.event.input}</p>
             <InfoTable
               items={[
@@ -640,7 +648,7 @@ function TurnDetail({ entry }) {
             ) : null}
           </DetailBlock>
 
-          <DetailBlock title="Model output">
+          <DetailBlock title="3. Model output">
             <p>{entry.event.model_output}</p>
             {entry.event.objective_scorer ? (
               <InfoTable
@@ -653,31 +661,44 @@ function TurnDetail({ entry }) {
             ) : null}
           </DetailBlock>
 
-          <DetailBlock title="Scorer results">
-            <ScorerTable scorerResults={entry.event.scorer_results} />
-          </DetailBlock>
         </div>
+        <JsonDrawer title="Raw scorer payloads" data={entry.event.scorer_results} />
       </section>
 
       <section className="panel">
         <SectionHeader
-          eyebrow="Guardrails"
-          title="Decision and evidence"
+          eyebrow="Safety Decision"
+          title="Verdict summary"
           note={entry.verdict.reason}
         />
-        <InfoTable
-          items={[
-            { label: "Allowed", value: entry.verdict.allowed },
-            { label: "Action", value: formatLabel(entry.verdict.action) },
-            { label: "Category", value: formatLabel(entry.verdict.category) },
-            { label: "Severity", value: formatLabel(entry.verdict.severity) },
-            { label: "Confidence", value: entry.verdict.confidence },
-            { label: "Policy ID", value: entry.verdict.policy_id },
-            { label: "Dry Run", value: entry.verdict.dry_run }
-          ]}
-        />
+        <div className="decision-layout">
+          <div className="decision-hero">
+            <div className="decision-value">{formatLabel(entry.verdict.action)}</div>
+            <div className="decision-subtitle">
+              {entry.verdict.allowed ? "Output was allowed to continue." : "Blue-team intervention changed the response path."}
+            </div>
+          </div>
+          <InfoTable
+            items={[
+              { label: "Allowed", value: entry.verdict.allowed },
+              { label: "Category", value: formatLabel(entry.verdict.category) },
+              { label: "Severity", value: formatLabel(entry.verdict.severity) },
+              { label: "Confidence", value: entry.verdict.confidence },
+              { label: "Dry Run", value: entry.verdict.dry_run }
+            ]}
+          />
+        </div>
+      </section>
+
+      <section className="panel">
+        <SectionHeader eyebrow="Scorers" title="Objective and scorer outputs" />
+        <ScorerTable scorerResults={entry.event.scorer_results} />
+      </section>
+
+      <section className="panel">
+        <SectionHeader eyebrow="Evidence" title="Guardrail evidence and inspectors" note="Secondary details are grouped here to keep the main flow lighter." />
         <DetectorResultsPanel detectorResults={entry.verdict.detector_results} />
-        <div className="detail-grid">
+        <div className="inspector-grid">
           <JsonDrawer title="Raw event payload" data={entry.event} />
           <JsonDrawer title="Raw verdict payload" data={entry.verdict} />
         </div>
@@ -1146,9 +1167,13 @@ export default function App() {
           ) : null}
 
           {activeView === "run" ? (
-            <div className="investigation-layout">
-              <section className="panel turn-list-panel">
-                <SectionHeader eyebrow="Run detail" title="Turns" note="Select one turn at a time." />
+            <div className="run-detail-layout">
+              <section className="panel">
+                <SectionHeader
+                  eyebrow="Run Detail"
+                  title="Turn selector"
+                  note="Browse turns left to right, then read the selected turn top to bottom."
+                />
                 <TurnList
                   timeline={timeline}
                   selectedTurnIndex={selectedTurnIndex}
