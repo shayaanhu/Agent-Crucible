@@ -19,6 +19,13 @@ const STRATEGY_OPTIONS = [
   "multi_step_escalation"
 ];
 
+const VIEW_OPTIONS = [
+  { id: "overview", label: "Overview" },
+  { id: "run", label: "Run Detail" },
+  { id: "benchmarks", label: "Benchmarks" },
+  { id: "config", label: "Config" }
+];
+
 function pretty(value) {
   return JSON.stringify(value, null, 2);
 }
@@ -54,32 +61,39 @@ function formatTimestamp(value) {
   }).format(date);
 }
 
-function formatScalar(value) {
-  if (value === null || value === undefined) return "n/a";
+function formatSimpleValue(value) {
+  if (isEmptyValue(value)) return "n/a";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number") {
+    if (value <= 1 && value >= 0) return `${Math.round(value * 100)}%`;
     if (Number.isInteger(value)) return String(value);
     return value.toFixed(2);
   }
-  if (Array.isArray(value)) return value.length ? value.join(", ") : "n/a";
-  if (typeof value === "object") return pretty(value);
+  if (Array.isArray(value)) {
+    return value.length
+      ? value
+          .map((item) => (typeof item === "string" ? formatLabel(item) : String(item)))
+          .join(", ")
+      : "n/a";
+  }
   return String(value);
 }
 
-function toPercent(value) {
-  if (typeof value !== "number" || Number.isNaN(value)) return 0;
-  if (value <= 1 && value >= 0) return clamp(value * 100, 0, 100);
-  return clamp(value, 0, 100);
-}
-
 function formatMetricValue(value) {
-  if (typeof value !== "number" || Number.isNaN(value)) return formatScalar(value);
+  if (typeof value !== "number" || Number.isNaN(value)) return formatSimpleValue(value);
   if (value <= 1 && value >= 0) return `${Math.round(value * 100)}%`;
   if (Number.isInteger(value)) return String(value);
   return value.toFixed(2);
 }
 
-function truncateMiddle(value, head = 12, tail = 8) {
+function formatDelta(value) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "n/a";
+  if (value === 0) return "0";
+  if (Math.abs(value) <= 1) return `${value > 0 ? "+" : ""}${Math.round(value * 100)} pts`;
+  return `${value > 0 ? "+" : ""}${value}`;
+}
+
+function truncateMiddle(value, head = 10, tail = 6) {
   if (isEmptyValue(value)) return "n/a";
   const text = String(value);
   if (text.length <= head + tail + 3) return text;
@@ -89,7 +103,7 @@ function truncateMiddle(value, head = 12, tail = 8) {
 function suitePassRate(summary) {
   const total = summary?.total_cases || 0;
   if (!total) return 0;
-  return ((summary?.passed_cases || 0) / total) * 100;
+  return (summary.passed_cases || 0) / total;
 }
 
 function getStatusTone(status) {
@@ -107,10 +121,24 @@ function getStatusTone(status) {
   }
 }
 
+function getActionTone(action) {
+  switch (action) {
+    case "block":
+      return "danger";
+    case "escalate":
+      return "warning";
+    case "redact":
+      return "warning";
+    case "allow":
+      return "safe";
+    default:
+      return "neutral";
+  }
+}
+
 function getSeverityTone(severity) {
   switch (severity) {
     case "critical":
-      return "critical";
     case "high":
       return "danger";
     case "medium":
@@ -122,67 +150,35 @@ function getSeverityTone(severity) {
   }
 }
 
-function getActionTone(action) {
-  switch (action) {
-    case "block":
-      return "danger";
-    case "escalate":
-      return "critical";
-    case "redact":
-      return "warning";
-    case "allow":
-      return "safe";
-    default:
-      return "neutral";
-  }
-}
-
 function summarizeTurn(entry) {
-  const action = formatLabel(entry?.verdict?.action || "allow");
-  const severity = formatLabel(entry?.verdict?.severity || "low");
-  const outcome = entry?.event?.outcome ? formatLabel(entry.event.outcome) : null;
-  const provider = entry?.event?.target_provider || entry?.event?.attacker_provider || "model";
-  const fragments = [
-    `${action} decision on ${provider}`,
-    `severity ${severity.toLowerCase()}`
-  ];
-  if (outcome) fragments.push(`red-team outcome ${outcome.toLowerCase()}`);
-  if (entry?.verdict?.detector_results?.escalation?.required) {
-    fragments.push("human review required");
-  }
-  if (entry?.verdict?.detector_results?.dry_run?.enabled) {
-    fragments.push("dry-run telemetry attached");
-  }
-  return fragments.join(" | ");
+  if (!entry) return "No turn selected.";
+  const action = formatLabel(entry.verdict?.action || "allow");
+  const severity = formatLabel(entry.verdict?.severity || "low").toLowerCase();
+  const outcome = entry.event?.outcome ? formatLabel(entry.event.outcome).toLowerCase() : null;
+  const summary = [`${action} decision`, `severity ${severity}`];
+  if (outcome) summary.push(`outcome ${outcome}`);
+  return summary.join(" | ");
 }
 
-function buildOverviewNarrative({ status, guardrailSummary, evaluation, benchmark }) {
+function buildOverviewNarrative(status, guardrailSummary, evaluation, benchmark) {
   if (!status && !guardrailSummary && !evaluation && !benchmark) {
-    return "Launch a run to inspect attack traces, guardrail decisions, detector evidence, and benchmark drift from one workspace.";
+    return "Create a run to inspect one trace at a time. The layout is organized to keep summary, investigation, benchmarks, and config separate.";
   }
 
   const parts = [];
-
-  if (status?.status) {
-    parts.push(`Run is ${status.status}.`);
-  }
+  if (status?.status) parts.push(`Run is ${status.status}.`);
   if (guardrailSummary?.totalTurns) {
     parts.push(
       `${guardrailSummary.blockedTurns} of ${guardrailSummary.totalTurns} turns were blocked or escalated.`
     );
   }
   if (guardrailSummary?.dominantPolicy && guardrailSummary.dominantPolicy !== "n/a") {
-    parts.push(`Dominant policy was ${formatLabel(guardrailSummary.dominantPolicy)}.`);
+    parts.push(`Dominant policy: ${formatLabel(guardrailSummary.dominantPolicy)}.`);
   }
-  if (evaluation?.overall) {
-    parts.push(`Evaluation is currently ${evaluation.overall}.`);
-  }
+  if (evaluation?.overall) parts.push(`Evaluation is ${evaluation.overall}.`);
   if (benchmark?.comparison) {
-    const delta = benchmark.comparison.delta_passed_cases || 0;
-    const direction = delta >= 0 ? "up" : "down";
-    parts.push(`Configured detectors are ${direction} ${Math.abs(delta)} cases vs baseline.`);
+    parts.push(`Benchmark delta is ${benchmark.comparison.delta_passed_cases || 0} passed cases.`);
   }
-
   return parts.join(" ");
 }
 
@@ -190,170 +186,210 @@ function Badge({ children, tone = "neutral" }) {
   return <span className={`badge badge-${tone}`}>{children}</span>;
 }
 
-function MetricCard({ label, value, detail, tone = "neutral" }) {
+function TabButton({ active, children, onClick }) {
   return (
-    <article className={`metric-card metric-card-${tone}`}>
-      <div className="metric-label">{label}</div>
-      <div className="metric-value">{value}</div>
-      {detail ? <div className="metric-detail">{detail}</div> : null}
-    </article>
+    <button className={`tab-button ${active ? "is-active" : ""}`} onClick={onClick} type="button">
+      {children}
+    </button>
   );
 }
 
-function StatGrid({ items }) {
+function SectionHeader({ eyebrow, title, note, action }) {
   return (
-    <div className="stat-grid">
-      {items.map((item) => (
-        <MetricCard
-          key={item.label}
-          label={item.label}
-          value={item.value}
-          detail={item.detail}
-          tone={item.tone}
-        />
-      ))}
+    <div className="section-header">
+      <div>
+        {eyebrow ? <div className="section-eyebrow">{eyebrow}</div> : null}
+        <h2>{title}</h2>
+        {note ? <p className="section-note">{note}</p> : null}
+      </div>
+      {action ? <div>{action}</div> : null}
     </div>
   );
 }
 
-function KeyValueGrid({ items }) {
-  const visibleItems = items.filter((item) => !isEmptyValue(item.value));
-  if (!visibleItems.length) {
-    return <p className="empty-copy">No structured metadata yet.</p>;
-  }
-
+function StatCard({ label, value, detail }) {
   return (
-    <div className="kv-grid">
-      {visibleItems.map((item) => (
-        <div className="kv-item" key={item.label}>
-          <div className="kv-label">{item.label}</div>
-          <div className="kv-value">{formatScalar(item.value)}</div>
-        </div>
-      ))}
+    <div className="stat-card">
+      <div className="stat-label">{label}</div>
+      <div className="stat-value">{value}</div>
+      {detail ? <div className="stat-detail">{detail}</div> : null}
     </div>
   );
 }
 
-function JsonDrawer({ title, data, defaultOpen = false }) {
+function JsonDrawer({ title, data }) {
   if (data === null || data === undefined) return null;
   if (typeof data === "object" && !Array.isArray(data) && Object.keys(data).length === 0) return null;
   if (Array.isArray(data) && data.length === 0) return null;
 
   return (
-    <details className="json-drawer" open={defaultOpen}>
+    <details className="json-drawer">
       <summary>{title}</summary>
       <pre className="json-block">{typeof data === "string" ? data : pretty(data)}</pre>
     </details>
   );
 }
 
-function DistributionList({ title, values, tone = "neutral" }) {
-  const entries = Object.entries(values || {}).sort((left, right) => right[1] - left[1]);
-  if (!entries.length) return null;
-  const maxValue = Math.max(...entries.map(([, value]) => value), 1);
+function InfoTable({ items }) {
+  const rows = items.filter((item) => !isEmptyValue(item.value));
+  if (!rows.length) return <p className="empty-copy">No details available.</p>;
 
   return (
-    <div className="distribution-card">
-      <div className="panel-kicker">{title}</div>
-      <div className="distribution-list">
-        {entries.map(([label, value]) => (
-          <div className="distribution-row" key={label}>
-            <div className="distribution-copy">
-              <span>{formatLabel(label)}</span>
-              <strong>{value}</strong>
-            </div>
-            <div className="distribution-bar">
-              <span
-                className={`distribution-fill distribution-fill-${tone}`}
-                style={{ width: `${(value / maxValue) * 100}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="info-table">
+      {rows.map((item) => (
+        <div className="info-row" key={item.label}>
+          <div className="info-label">{item.label}</div>
+          <div className="info-value">{formatSimpleValue(item.value)}</div>
+        </div>
+      ))}
     </div>
   );
 }
 
 function MetricRows({ metrics }) {
-  if (!metrics?.length) {
-    return <p className="empty-copy">No benchmark metrics available yet.</p>;
-  }
+  if (!metrics?.length) return <p className="empty-copy">No metrics yet.</p>;
 
   return (
-    <div className="metric-rows">
-      {metrics.map((metric) => {
-        const progress = toPercent(metric.value);
-        const threshold = metric.threshold === undefined ? null : toPercent(metric.threshold);
-        return (
-          <div className="metric-row" key={metric.metric_name}>
-            <div className="metric-row-head">
-              <div>
-                <div className="metric-row-label">{formatLabel(metric.metric_name)}</div>
-                <div className="metric-row-subtitle">
-                  Value {formatMetricValue(metric.value)}
-                  {metric.threshold !== undefined
-                    ? ` | Threshold ${formatMetricValue(metric.threshold)}`
-                    : ""}
-                </div>
-              </div>
+    <table className="data-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Value</th>
+          <th>Threshold</th>
+          <th>Result</th>
+        </tr>
+      </thead>
+      <tbody>
+        {metrics.map((metric) => (
+          <tr key={metric.metric_name}>
+            <td>{formatLabel(metric.metric_name)}</td>
+            <td>{formatMetricValue(metric.value)}</td>
+            <td>{metric.threshold === undefined ? "n/a" : formatMetricValue(metric.threshold)}</td>
+            <td>
               {"pass_fail" in metric ? (
                 <Badge tone={metric.pass_fail === "pass" ? "safe" : "danger"}>
                   {formatLabel(metric.pass_fail)}
                 </Badge>
-              ) : null}
-            </div>
-            <div className="progress-track">
-              {threshold !== null ? (
-                <span className="progress-threshold" style={{ left: `${threshold}%` }} />
-              ) : null}
-              <span className="progress-fill" style={{ width: `${progress}%` }} />
-            </div>
-          </div>
-        );
-      })}
+              ) : (
+                "n/a"
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function BenchmarkComparisonTable({ baseline, configured }) {
+  if (!baseline || !configured) {
+    return <p className="empty-copy">No benchmark comparison loaded yet.</p>;
+  }
+
+  const baselineMetrics = Object.fromEntries(
+    (baseline.metrics || []).map((metric) => [metric.metric_name, metric])
+  );
+  const configuredMetrics = Object.fromEntries(
+    (configured.metrics || []).map((metric) => [metric.metric_name, metric])
+  );
+
+  const rows = [
+    {
+      label: "Passed Cases",
+      baseline: baseline.passed_cases,
+      configured: configured.passed_cases,
+      delta: configured.passed_cases - baseline.passed_cases
+    },
+    {
+      label: "Failed Cases",
+      baseline: baseline.failed_cases,
+      configured: configured.failed_cases,
+      delta: configured.failed_cases - baseline.failed_cases
+    },
+    {
+      label: "Pass Rate",
+      baseline: suitePassRate(baseline),
+      configured: suitePassRate(configured),
+      delta: suitePassRate(configured) - suitePassRate(baseline)
+    }
+  ];
+
+  const metricNames = Array.from(
+    new Set([...Object.keys(baselineMetrics), ...Object.keys(configuredMetrics)])
+  );
+
+  for (const metricName of metricNames) {
+    rows.push({
+      label: formatLabel(metricName),
+      baseline: baselineMetrics[metricName]?.value,
+      configured: configuredMetrics[metricName]?.value,
+      delta:
+        typeof baselineMetrics[metricName]?.value === "number" &&
+        typeof configuredMetrics[metricName]?.value === "number"
+          ? configuredMetrics[metricName].value - baselineMetrics[metricName].value
+          : null
+    });
+  }
+
+  return (
+    <table className="data-table">
+      <thead>
+        <tr>
+          <th>Measure</th>
+          <th>Rules Only</th>
+          <th>Configured</th>
+          <th>Delta</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.label}>
+            <td>{row.label}</td>
+            <td>{formatMetricValue(row.baseline)}</td>
+            <td>{formatMetricValue(row.configured)}</td>
+            <td>{row.delta === null ? "n/a" : formatDelta(row.delta)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function DistributionRows({ values }) {
+  const entries = Object.entries(values || {}).sort((left, right) => right[1] - left[1]);
+  if (!entries.length) return <p className="empty-copy">No distribution data yet.</p>;
+
+  return (
+    <div className="info-table">
+      {entries.map(([label, value]) => (
+        <div className="info-row" key={label}>
+          <div className="info-label">{formatLabel(label)}</div>
+          <div className="info-value">{value}</div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function SuiteSummaryCard({ title, summary, tone }) {
-  if (!summary) {
-    return (
-      <section className="suite-card">
-        <div className="panel-kicker">{title}</div>
-        <p className="empty-copy">No benchmark summary yet.</p>
-      </section>
-    );
-  }
-
+function DetailBlock({ title, note, children }) {
   return (
-    <section className="suite-card">
-      <div className="suite-head">
-        <div>
-          <div className="panel-kicker">{title}</div>
-          <h3>{summary.passed_cases} passed</h3>
-        </div>
-        <Badge tone={tone}>{Math.round(suitePassRate(summary))}% pass rate</Badge>
+    <section className="detail-block">
+      <div className="detail-block-header">
+        <h3>{title}</h3>
+        {note ? <div className="detail-block-note">{note}</div> : null}
       </div>
-      <KeyValueGrid
-        items={[
-          { label: "Total Cases", value: summary.total_cases },
-          { label: "Passed", value: summary.passed_cases },
-          { label: "Failed", value: summary.failed_cases }
-        ]}
-      />
-      <MetricRows metrics={summary.metrics} />
+      <div className="detail-block-body">{children}</div>
     </section>
   );
 }
 
 function DetectorResultsPanel({ detectorResults }) {
-  const aggregation = detectorResults?._aggregation?.policy_evaluations || [];
   const decisionMeta = detectorResults?._decision;
+  const aggregation = detectorResults?._aggregation?.policy_evaluations || [];
   const dryRunMeta = detectorResults?.dry_run;
   const escalationMeta = detectorResults?.escalation;
   const detectorEntries = Object.entries(detectorResults || {}).filter(
-    ([key]) => !["_aggregation", "_decision", "dry_run", "escalation"].includes(key)
+    ([key]) => !["_decision", "_aggregation", "dry_run", "escalation"].includes(key)
   );
 
   if (!decisionMeta && !aggregation.length && !dryRunMeta && !escalationMeta && !detectorEntries.length) {
@@ -361,14 +397,11 @@ function DetectorResultsPanel({ detectorResults }) {
   }
 
   return (
-    <div className="evidence-stack">
+    <div className="detail-stack">
       {decisionMeta ? (
-        <div className="evidence-group">
-          <div className="evidence-title">Decision Rationale</div>
-          <div className="callout callout-info">
-            <strong>{formatLabel(decisionMeta.outcome)} decision.</strong> {decisionMeta.rationale}
-          </div>
-          <KeyValueGrid
+        <DetailBlock title="Decision rationale">
+          <p>{decisionMeta.rationale}</p>
+          <InfoTable
             items={[
               { label: "Selected Policy", value: decisionMeta.selected_policy_id },
               { label: "Category", value: formatLabel(decisionMeta.category) },
@@ -381,384 +414,281 @@ function DetectorResultsPanel({ detectorResults }) {
               {
                 label: "Supporting Detectors",
                 value: decisionMeta.supporting_detectors?.length
-                  ? decisionMeta.supporting_detectors.map((detector) => formatLabel(detector))
+                  ? decisionMeta.supporting_detectors
                   : "n/a"
               }
             ]}
           />
-        </div>
+        </DetailBlock>
       ) : null}
 
       {dryRunMeta ? (
-        <div className="callout callout-warning">
-          <strong>Dry run active.</strong>{" "}
+        <div className="note-row note-warning">
+          Dry run is active.{" "}
           {dryRunMeta.would_escalate
             ? "This turn would have escalated under enforcement."
             : dryRunMeta.would_block
               ? "This turn would have been blocked under enforcement."
-              : "Telemetry was recorded without changing the decision."}
+              : "Telemetry was captured without altering the decision."}
         </div>
       ) : null}
 
       {escalationMeta ? (
-        <div className="callout callout-critical">
-          <strong>Escalation pending.</strong> Interim action is{" "}
-          {formatLabel(escalationMeta.interim_action)} while blue-team review is required.
+        <div className="note-row note-danger">
+          Escalation required. Interim action: {formatLabel(escalationMeta.interim_action)}.
         </div>
       ) : null}
 
       {aggregation.length ? (
-        <div className="evidence-group">
-          <div className="evidence-title">Policy Aggregation</div>
-          <div className="aggregation-list">
-            {aggregation.map((policy) => (
-              <div
-                className={`aggregation-card ${policy.triggered ? "aggregation-card-hit" : ""}`}
-                key={policy.policy_id}
-              >
-                <div className="aggregation-top">
-                  <strong>{formatLabel(policy.policy_id)}</strong>
-                  <Badge tone={policy.triggered ? "danger" : "neutral"}>
-                    {policy.triggered ? "Triggered" : "Observed"}
-                  </Badge>
-                </div>
-                <KeyValueGrid
-                  items={[
-                    {
-                      label: "Aggregated Confidence",
-                      value: formatMetricValue(policy.aggregated_confidence)
-                    },
-                    { label: "Strategy", value: formatLabel(policy.aggregation_strategy) },
-                    {
-                      label: "Threshold",
-                      value: formatMetricValue(policy.aggregation_threshold)
-                    },
-                    { label: "Supporting Detectors", value: policy.supporting_detectors?.length || 0 }
-                  ]}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        <DetailBlock title="Policy aggregation">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Policy</th>
+                <th>Confidence</th>
+                <th>Strategy</th>
+                <th>Threshold</th>
+                <th>Support</th>
+                <th>Triggered</th>
+              </tr>
+            </thead>
+            <tbody>
+              {aggregation.map((policy) => (
+                <tr key={policy.policy_id}>
+                  <td>{formatLabel(policy.policy_id)}</td>
+                  <td>{formatMetricValue(policy.aggregated_confidence)}</td>
+                  <td>{formatLabel(policy.aggregation_strategy)}</td>
+                  <td>{formatMetricValue(policy.aggregation_threshold)}</td>
+                  <td>{policy.supporting_detectors?.length || 0}</td>
+                  <td>
+                    <Badge tone={policy.triggered ? "danger" : "neutral"}>
+                      {policy.triggered ? "Yes" : "No"}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DetailBlock>
       ) : null}
 
       {detectorEntries.length ? (
-        <div className="evidence-group">
-          <div className="evidence-title">Detector Evidence</div>
-          <div className="detector-list">
-            {detectorEntries.map(([detectorId, result]) => {
-              const signals = Array.isArray(result?.signals) ? result.signals : [];
-              const flaggedSignals = signals.filter((signal) => signal.flagged);
-              const matchedPatterns = Array.isArray(result?.matched_patterns)
-                ? result.matched_patterns
-                : [];
-              const firstMetadata = signals[0]?.metadata || {};
+        <DetailBlock title="Detector evidence">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Detector</th>
+                <th>Status</th>
+                <th>Flagged Signals</th>
+                <th>Patterns</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detectorEntries.map(([detectorId, result]) => {
+                const signals = Array.isArray(result?.signals) ? result.signals : [];
+                const flaggedSignals = signals.filter((signal) => signal.flagged);
+                const matchedPatterns = Array.isArray(result?.matched_patterns)
+                  ? result.matched_patterns
+                  : [];
+                const status = signals[0]?.metadata?.status || (flaggedSignals.length ? "flagged" : "clear");
 
-              return (
-                <article className="detector-card" key={detectorId}>
-                  <div className="detector-head">
-                    <strong>{formatLabel(detectorId)}</strong>
-                    <div className="badge-row">
-                      <Badge tone={flaggedSignals.length ? "danger" : "safe"}>
-                        {flaggedSignals.length ? `${flaggedSignals.length} flagged` : "Clear"}
-                      </Badge>
-                      {firstMetadata.source ? (
-                        <Badge tone="info">{formatLabel(firstMetadata.source)}</Badge>
-                      ) : null}
-                      {firstMetadata.status ? (
-                        <Badge
-                          tone={firstMetadata.status === "active" ? "safe" : "warning"}
-                        >
-                          {formatLabel(firstMetadata.status)}
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {matchedPatterns.length ? (
-                    <div className="chip-cloud">
-                      {matchedPatterns.map((pattern, index) => (
-                        <Badge key={`${detectorId}-${pattern}-${index}`} tone="warning">
-                          {pattern}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="empty-copy">No matched patterns were surfaced by this detector.</p>
-                  )}
-
-                  {signals.length ? (
-                    <div className="signal-list">
-                      {signals.slice(0, 3).map((signal, index) => (
-                        <div className="signal-item" key={`${detectorId}-signal-${index}`}>
-                          <div className="signal-copy">
-                            <div className="signal-label">{formatLabel(signal.policy_id)}</div>
-                            <div className="signal-subtitle">
-                              {signal.flagged ? "Flagged signal" : "Safe signal"}
-                            </div>
-                            {signal.metadata?.reason ? (
-                              <div className="signal-rationale">{signal.metadata.reason}</div>
-                            ) : null}
-                            {signal.metadata?.policy_basis ? (
-                              <div className="signal-rationale">
-                                Policy basis: {formatLabel(signal.metadata.policy_basis)}
-                              </div>
-                            ) : null}
-                          </div>
-                          <div className="signal-meta">
-                            <Badge tone={signal.flagged ? "danger" : "safe"}>
-                              {signal.flagged ? "Flagged" : "Safe"}
-                            </Badge>
-                            <span>{formatMetricValue(signal.confidence)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </article>
-              );
-            })}
-          </div>
-        </div>
+                return (
+                  <tr key={detectorId}>
+                    <td>{formatLabel(detectorId)}</td>
+                    <td>{formatLabel(status)}</td>
+                    <td>{flaggedSignals.length}</td>
+                    <td>{matchedPatterns.length ? matchedPatterns.join(", ") : "n/a"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </DetailBlock>
       ) : null}
     </div>
   );
 }
 
-function ScoreCards({ scorerResults }) {
-  if (!scorerResults?.length) return null;
+function ScorerTable({ scorerResults }) {
+  if (!scorerResults?.length) return <p className="empty-copy">No scorer results recorded.</p>;
 
   return (
-    <div className="score-grid">
-      {scorerResults.map((scorer, index) => (
-        <article className="score-card" key={`${scorer.name}-${index}`}>
-          <div className="score-card-head">
-            <strong>{formatLabel(scorer.name)}</strong>
-            <Badge tone={scorer.score > 0 ? "warning" : "neutral"}>
-              {formatMetricValue(scorer.score)}
+    <table className="data-table">
+      <thead>
+        <tr>
+          <th>Scorer</th>
+          <th>Label</th>
+          <th>Score</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {scorerResults.map((scorer, index) => (
+          <tr key={`${scorer.name}-${index}`}>
+            <td>{formatLabel(scorer.name)}</td>
+            <td>{formatLabel(scorer.label)}</td>
+            <td>{formatMetricValue(scorer.score)}</td>
+            <td>{scorer.reason}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function TurnList({ timeline, selectedTurnIndex, onSelect }) {
+  if (!timeline.length) {
+    return <p className="empty-copy">No turns captured yet.</p>;
+  }
+
+  return (
+    <div className="turn-list">
+      {timeline.map((entry, index) => (
+        <button
+          className={`turn-row ${selectedTurnIndex === index ? "is-selected" : ""}`}
+          key={`${entry.event.turn_index}-${entry.event.timestamp}-${index}`}
+          onClick={() => onSelect(index)}
+          type="button"
+        >
+          <div className="turn-row-top">
+            <strong>Turn {entry.event.turn_index}</strong>
+            <Badge tone={getActionTone(entry.verdict.action)}>
+              {formatLabel(entry.verdict.action)}
             </Badge>
           </div>
-          <div className="score-card-body">
-            <div className="score-label">{formatLabel(scorer.label)}</div>
-            <p>{scorer.reason}</p>
+          <div className="turn-row-meta">
+            {formatTimestamp(entry.event.timestamp)} | {formatLabel(entry.verdict.severity)}
           </div>
-        </article>
+          <div className="turn-row-summary">{summarizeTurn(entry)}</div>
+        </button>
       ))}
     </div>
   );
 }
 
-function StageCard({ eyebrow, title, tone = "neutral", children, footer }) {
-  return (
-    <section className={`stage-card stage-card-${tone}`}>
-      <div className="panel-kicker">{eyebrow}</div>
-      <h4>{title}</h4>
-      <div className="stage-body">{children}</div>
-      {footer ? <div className="stage-footer">{footer}</div> : null}
-    </section>
-  );
-}
-
-function TurnTraceCard({ entry, isLast }) {
-  const verdictTone = !entry.verdict.allowed
-    ? entry.verdict.action === "escalate"
-      ? "critical"
-      : "danger"
-    : entry.verdict.dry_run
-      ? "warning"
-      : "safe";
+function TurnDetail({ entry }) {
+  if (!entry) {
+    return <p className="empty-copy">Select a turn to inspect its prompt, response, and guardrail decision.</p>;
+  }
 
   return (
-    <div className="trace-row">
-      <div className="trace-rail">
-        <div className={`trace-marker trace-marker-${verdictTone}`}>{entry.event.turn_index}</div>
-        {!isLast ? <div className="trace-line" /> : null}
-      </div>
-
-      <article className="trace-card">
-        <header className="trace-header">
-          <div className="trace-header-copy">
-            <div className="trace-title-row">
-              <h3>Turn {entry.event.turn_index}</h3>
-              <div className="badge-row">
-                <Badge tone={getActionTone(entry.verdict.action)}>
-                  {formatLabel(entry.verdict.action)}
-                </Badge>
-                <Badge tone={getSeverityTone(entry.verdict.severity)}>
-                  {formatLabel(entry.verdict.severity)}
-                </Badge>
-                {entry.event.outcome ? (
-                  <Badge tone="info">{formatLabel(entry.event.outcome)}</Badge>
-                ) : null}
-              </div>
+    <div className="detail-stack">
+      <section className="panel">
+        <SectionHeader
+          eyebrow="Turn Detail"
+          title={`Turn ${entry.event.turn_index}`}
+          note={summarizeTurn(entry)}
+          action={
+            <div className="header-actions">
+              <Badge tone={getActionTone(entry.verdict.action)}>{formatLabel(entry.verdict.action)}</Badge>
+              <Badge tone={getSeverityTone(entry.verdict.severity)}>
+                {formatLabel(entry.verdict.severity)}
+              </Badge>
             </div>
-            <p className="trace-summary">{summarizeTurn(entry)}</p>
-          </div>
-          <div className="trace-header-meta">
-            <div className="trace-time">{formatTimestamp(entry.event.timestamp)}</div>
-            {entry.event.prompt_hash ? (
-              <div className="trace-hash">{truncateMiddle(entry.event.prompt_hash)}</div>
-            ) : null}
-          </div>
-        </header>
+          }
+        />
+        <InfoTable
+          items={[
+            { label: "Timestamp", value: formatTimestamp(entry.event.timestamp) },
+            { label: "Strategy", value: formatLabel(entry.event.strategy_id) },
+            { label: "Template", value: formatLabel(entry.event.template_id) },
+            { label: "Attack Tag", value: formatLabel(entry.event.attack_tag) },
+            { label: "Attacker Provider", value: entry.event.attacker_provider },
+            { label: "Target Provider", value: entry.event.target_provider },
+            { label: "Prompt Hash", value: truncateMiddle(entry.event.prompt_hash) }
+          ]}
+        />
+      </section>
 
-        <div className="trace-meta-row">
-          {entry.event.strategy_id ? (
-            <Badge tone="warning">Strategy {formatLabel(entry.event.strategy_id)}</Badge>
-          ) : null}
-          {entry.event.template_id ? (
-            <Badge tone="neutral">Template {formatLabel(entry.event.template_id)}</Badge>
-          ) : null}
-          {entry.event.attack_tag ? (
-            <Badge tone="warning">Tag {formatLabel(entry.event.attack_tag)}</Badge>
-          ) : null}
-          {entry.event.attacker_provider ? (
-            <Badge tone="warning">Attacker {entry.event.attacker_provider}</Badge>
-          ) : null}
-          {entry.event.target_provider ? (
-            <Badge tone="info">Target {entry.event.target_provider}</Badge>
-          ) : null}
-        </div>
-
-        <div className="stage-grid">
-          <StageCard eyebrow="Attacker" title="Intent and setup" tone="attack">
-            <KeyValueGrid
+      <section className="panel">
+        <SectionHeader eyebrow="Content" title="Prompt and response" />
+        <div className="detail-grid">
+          <DetailBlock title="Attacker prompt">
+            <p>{entry.event.attacker_prompt || "No attacker prompt captured for this turn."}</p>
+            <InfoTable
               items={[
                 { label: "Objective", value: entry.event.objective_goal },
                 { label: "Rationale", value: entry.event.attacker_rationale }
               ]}
             />
-            {entry.event.attacker_prompt ? (
-              <div className="text-block">
-                <div className="text-label">Pre-converter prompt</div>
-                <p>{entry.event.attacker_prompt}</p>
-              </div>
-            ) : (
-              <p className="empty-copy">No attacker prompt captured for this turn.</p>
-            )}
-          </StageCard>
+          </DetailBlock>
 
-          <StageCard
-            eyebrow="Delivery"
-            title="Prompt transformation"
-            tone="delivery"
-            footer={
-              entry.event.converter_chain?.length ? (
-                <div className="chip-cloud">
-                  {entry.event.converter_chain.map((converter) => (
-                    <Badge key={converter} tone="warning">
-                      {formatLabel(converter)}
-                    </Badge>
-                  ))}
-                </div>
-              ) : null
-            }
-          >
-            <div className="text-block">
-              <div className="text-label">Delivered prompt</div>
-              <p>{entry.event.input}</p>
-            </div>
-            {entry.event.converter_steps?.length ? (
-              <div className="step-list">
-                {entry.event.converter_steps.map((step, index) => (
-                  <div className="step-item" key={`${step.name}-${index}`}>
-                    <div className="step-head">
-                      <strong>{formatLabel(step.name)}</strong>
-                    </div>
-                    <p>{step.output}</p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </StageCard>
-
-          <StageCard
-            eyebrow="Target Model"
-            title="Response and scoring"
-            tone="response"
-            footer={<JsonDrawer title="Raw scorer payloads" data={entry.event.scorer_results} />}
-          >
-            <div className="text-block">
-              <div className="text-label">Target response</div>
-              <p>{entry.event.model_output}</p>
-            </div>
-
-            {entry.event.objective_scorer ? (
-              <div className="objective-banner">
-                <div>
-                  <div className="objective-title">Objective scorer</div>
-                  <div className="objective-copy">{entry.event.objective_scorer.reason}</div>
-                </div>
-                <div className="badge-row">
-                  <Badge tone={entry.event.objective_scorer.label === "success" ? "danger" : "safe"}>
-                    {formatLabel(entry.event.objective_scorer.label)}
-                  </Badge>
-                  <Badge tone="neutral">
-                    {formatMetricValue(entry.event.objective_scorer.score)}
-                  </Badge>
-                </div>
-              </div>
-            ) : null}
-
-            <ScoreCards scorerResults={entry.event.scorer_results} />
-          </StageCard>
-
-          <StageCard
-            eyebrow="Safety Decision"
-            title={entry.verdict.allowed ? "Allowed response" : formatLabel(entry.verdict.action)}
-            tone="guardrail"
-            footer={<JsonDrawer title="Raw verdict payload" data={entry.verdict} />}
-          >
-            <div className="verdict-headline">
-              <div className="badge-row">
-                <Badge tone={entry.verdict.allowed ? "safe" : "danger"}>
-                  {entry.verdict.allowed ? "Allowed" : "Intervened"}
-                </Badge>
-                <Badge tone={getActionTone(entry.verdict.action)}>
-                  {formatLabel(entry.verdict.action)}
-                </Badge>
-                <Badge tone={getSeverityTone(entry.verdict.severity)}>
-                  {formatLabel(entry.verdict.severity)}
-                </Badge>
-                {entry.verdict.dry_run ? <Badge tone="warning">Dry Run</Badge> : null}
-              </div>
-              <div className="confidence-stack">
-                <div className="confidence-copy">
-                  Confidence {formatMetricValue(entry.verdict.confidence)}
-                </div>
-                <div className="progress-track progress-track-tight">
-                  <span
-                    className="progress-fill progress-fill-warning"
-                    style={{ width: `${toPercent(entry.verdict.confidence)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <p className="decision-copy">{entry.verdict.reason}</p>
-
-            <KeyValueGrid
+          <DetailBlock title="Delivered prompt">
+            <p>{entry.event.input}</p>
+            <InfoTable
               items={[
-                { label: "Category", value: formatLabel(entry.verdict.category) },
-                { label: "Policy Id", value: entry.verdict.policy_id },
-                { label: "Effective Action", value: formatLabel(entry.verdict.action) },
-                { label: "Dry Run", value: entry.verdict.dry_run }
+                { label: "Converter Chain", value: entry.event.converter_chain || [] }
               ]}
             />
+            {entry.event.converter_steps?.length ? (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Step</th>
+                    <th>Output</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entry.event.converter_steps.map((step, index) => (
+                    <tr key={`${step.name}-${index}`}>
+                      <td>{formatLabel(step.name)}</td>
+                      <td>{step.output}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : null}
+          </DetailBlock>
 
-            <DetectorResultsPanel detectorResults={entry.verdict.detector_results} />
-          </StageCard>
+          <DetailBlock title="Model output">
+            <p>{entry.event.model_output}</p>
+            {entry.event.objective_scorer ? (
+              <InfoTable
+                items={[
+                  { label: "Objective Label", value: formatLabel(entry.event.objective_scorer.label) },
+                  { label: "Objective Score", value: entry.event.objective_scorer.score },
+                  { label: "Objective Reason", value: entry.event.objective_scorer.reason }
+                ]}
+              />
+            ) : null}
+          </DetailBlock>
+
+          <DetailBlock title="Scorer results">
+            <ScorerTable scorerResults={entry.event.scorer_results} />
+          </DetailBlock>
         </div>
+      </section>
 
-        <div className="trace-drawers">
+      <section className="panel">
+        <SectionHeader
+          eyebrow="Guardrails"
+          title="Decision and evidence"
+          note={entry.verdict.reason}
+        />
+        <InfoTable
+          items={[
+            { label: "Allowed", value: entry.verdict.allowed },
+            { label: "Action", value: formatLabel(entry.verdict.action) },
+            { label: "Category", value: formatLabel(entry.verdict.category) },
+            { label: "Severity", value: formatLabel(entry.verdict.severity) },
+            { label: "Confidence", value: entry.verdict.confidence },
+            { label: "Policy ID", value: entry.verdict.policy_id },
+            { label: "Dry Run", value: entry.verdict.dry_run }
+          ]}
+        />
+        <DetectorResultsPanel detectorResults={entry.verdict.detector_results} />
+        <div className="detail-grid">
           <JsonDrawer title="Raw event payload" data={entry.event} />
+          <JsonDrawer title="Raw verdict payload" data={entry.verdict} />
         </div>
-      </article>
+      </section>
     </div>
   );
 }
 
 export default function App() {
+  const [activeView, setActiveView] = useState("overview");
+  const [selectedTurnIndex, setSelectedTurnIndex] = useState(0);
   const [scenario, setScenario] = useState("Educational assistant");
   const [goal, setGoal] = useState("Extract restricted internal prompt");
   const [provider, setProvider] = useState("mock");
@@ -785,44 +715,37 @@ export default function App() {
     if (!sourceVerdicts.length) return null;
 
     const blockedTurns = sourceVerdicts.filter((verdict) => verdict.allowed === false).length;
-    const allowedTurns = sourceVerdicts.length - blockedTurns;
-
     const severityOrder = { low: 1, medium: 2, high: 3, critical: 4 };
     let highestSeverity = "low";
-    let dryRunTurns = 0;
-    let wouldBlockTurns = 0;
-    let escalationTurns = 0;
     let avgConfidence = 0;
+    let dryRunTurns = 0;
+    let escalationTurns = 0;
 
+    const policyCounts = {};
     for (const verdict of sourceVerdicts) {
       const severity = verdict.severity || "low";
       if ((severityOrder[severity] || 0) > (severityOrder[highestSeverity] || 0)) {
         highestSeverity = severity;
       }
+      avgConfidence += typeof verdict.confidence === "number" ? verdict.confidence : 0;
       if (verdict.dry_run) dryRunTurns += 1;
-      if (verdict.detector_results?.dry_run?.would_block) wouldBlockTurns += 1;
       if (verdict.action === "escalate" || verdict.detector_results?.escalation?.required) {
         escalationTurns += 1;
       }
-      avgConfidence += typeof verdict.confidence === "number" ? verdict.confidence : 0;
-    }
-
-    const policyCounts = {};
-    for (const verdict of sourceVerdicts) {
       const policyId = verdict.policy_id || "unknown";
       policyCounts[policyId] = (policyCounts[policyId] || 0) + 1;
     }
+
     const dominantPolicy =
       Object.entries(policyCounts).sort((left, right) => right[1] - left[1])[0]?.[0] || "n/a";
 
     return {
       totalTurns: sourceVerdicts.length,
       blockedTurns,
-      allowedTurns,
+      allowedTurns: sourceVerdicts.length - blockedTurns,
       highestSeverity,
       dominantPolicy,
       dryRunTurns,
-      wouldBlockTurns,
       escalationTurns,
       averageConfidence: sourceVerdicts.length ? avgConfidence / sourceVerdicts.length : 0
     };
@@ -838,16 +761,17 @@ export default function App() {
     };
   }, [evaluation]);
 
-  const overviewNarrative = useMemo(
-    () =>
-      buildOverviewNarrative({
-        status,
-        guardrailSummary,
-        evaluation,
-        benchmark
-      }),
-    [benchmark, evaluation, guardrailSummary, status]
-  );
+  const selectedEntry = timeline[selectedTurnIndex] || timeline[0] || null;
+
+  useEffect(() => {
+    if (!timeline.length) {
+      setSelectedTurnIndex(0);
+      return;
+    }
+    if (selectedTurnIndex > timeline.length - 1) {
+      setSelectedTurnIndex(timeline.length - 1);
+    }
+  }, [selectedTurnIndex, timeline.length]);
 
   async function loadBenchmark() {
     setError("");
@@ -884,6 +808,7 @@ export default function App() {
       if (!response.ok) throw new Error(body.detail || "Failed to run benchmark");
       setBenchmark(body);
       setBenchmarkHistory(body.history || []);
+      setActiveView("benchmarks");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -922,6 +847,8 @@ export default function App() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.detail || "Failed to create run");
       setRunId(body.run_id);
+      setSelectedTurnIndex(0);
+      setActiveView("run");
       await refreshStatus(body.run_id);
       await refreshEvents(body.run_id);
       setEvaluation(null);
@@ -1002,9 +929,8 @@ export default function App() {
       try {
         const statusResponse = await fetch(`${API_BASE}/api/v1/runs/${runId}`);
         const statusBody = await statusResponse.json();
-        if (statusResponse.ok) {
-          setStatus(statusBody);
-        }
+        if (statusResponse.ok) setStatus(statusBody);
+
         const eventsResponse = await fetch(`${API_BASE}/api/v1/runs/${runId}/events`);
         const eventsBody = await eventsResponse.json();
         if (eventsResponse.ok) {
@@ -1012,6 +938,7 @@ export default function App() {
           setVerdicts(eventsBody.verdicts || []);
           setTimeline(eventsBody.timeline || []);
         }
+
         if (statusBody?.status === "completed" || statusBody?.status === "failed") {
           stopped = true;
           clearInterval(interval);
@@ -1029,34 +956,29 @@ export default function App() {
 
   const benchmarkBaseline = benchmark?.baseline_rules_only?.summary;
   const benchmarkConfigured = benchmark?.configured_detectors?.summary;
+  const overviewNarrative = buildOverviewNarrative(status, guardrailSummary, evaluation, benchmark);
 
   return (
     <main className="page">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <div className="eyebrow">Trace Observatory</div>
-          <h1>Agent Crucible</h1>
-          <p>{overviewNarrative}</p>
+      <header className="page-header">
+        <div>
+          <div className="section-eyebrow">Agent Crucible</div>
+          <h1>Blue-team review workspace</h1>
+          <p className="page-lede">{overviewNarrative}</p>
         </div>
-        <div className="hero-badges">
+        <div className="header-actions">
           <Badge tone={getStatusTone(status?.status)}>{formatLabel(status?.status || "idle")}</Badge>
-          <Badge tone={dryRun ? "warning" : "neutral"}>
-            {dryRun ? "Dry Run On" : "Enforcement On"}
-          </Badge>
-          <Badge tone="info">{provider}</Badge>
-          <Badge tone="warning">{formatLabel(strategyId)}</Badge>
+          <Badge tone={dryRun ? "warning" : "neutral"}>{dryRun ? "Dry run" : "Enforced"}</Badge>
         </div>
-      </section>
+      </header>
 
-      <section className="workspace-grid">
-        <aside className="panel control-panel">
-          <div className="panel-head">
-            <div>
-              <div className="panel-kicker">Run Control</div>
-              <h2>Scenario setup</h2>
-            </div>
-            {loading ? <Badge tone="warning">Working</Badge> : <Badge tone="safe">Ready</Badge>}
-          </div>
+      <section className="app-shell">
+        <aside className="sidebar panel">
+          <SectionHeader
+            eyebrow="Run Control"
+            title="Scenario setup"
+            note="Controls stay on the left. The content area only shows one working surface at a time."
+          />
 
           <label>
             Scenario
@@ -1107,35 +1029,32 @@ export default function App() {
               checked={dryRun}
               onChange={(event) => setDryRun(event.target.checked)}
             />
-            Dry-run mode records unsafe behavior without enforcing the final block.
+            Record unsafe behavior without blocking the final output.
           </label>
 
           <label>
             Benchmark Label
-            <input
-              value={benchmarkLabel}
-              onChange={(event) => setBenchmarkLabel(event.target.value)}
-            />
+            <input value={benchmarkLabel} onChange={(event) => setBenchmarkLabel(event.target.value)} />
           </label>
 
-          <div className="button-grid">
+          <div className="action-grid">
             <button onClick={createRun} disabled={loading}>
-              Create Run
+              Create run
             </button>
             <button onClick={refreshAll} disabled={!canFetchRunData || loading}>
-              Refresh Run
+              Refresh run
             </button>
             <button onClick={runEvaluation} disabled={!canFetchRunData || loading}>
-              Evaluate Run
+              Evaluate
             </button>
             <button onClick={loadBenchmark} disabled={loading}>
-              Refresh Benchmark
+              Refresh benchmark
             </button>
             <button onClick={runBenchmark} disabled={loading}>
-              Run Benchmark
+              Run benchmark
             </button>
             <button onClick={loadBlueTeamConfig} disabled={loading}>
-              Refresh Config
+              Refresh config
             </button>
           </div>
 
@@ -1145,269 +1064,209 @@ export default function App() {
           </label>
 
           {error ? <p className="error">{error}</p> : null}
-          <p className="muted">Use provider `mock` for fast local testing while refining the UI.</p>
+        </aside>
 
-          <div className="mini-stack">
-            <div className="subpanel">
-              <div className="panel-kicker">Active Config</div>
-              {blueTeamConfig ? (
-                <>
-                  <div className="chip-cloud">
-                    <Badge tone={blueTeamConfig.enable_llama_guard ? "safe" : "neutral"}>
-                      LlamaGuard {blueTeamConfig.enable_llama_guard ? "On" : "Off"}
-                    </Badge>
-                    <Badge tone={blueTeamConfig.enable_nemo_guardrails ? "safe" : "neutral"}>
-                      NeMo {blueTeamConfig.enable_nemo_guardrails ? "On" : "Off"}
-                    </Badge>
-                    <Badge tone="info">{blueTeamConfig.benchmark_label}</Badge>
-                  </div>
-                  <KeyValueGrid
-                    items={[
-                      { label: "LlamaGuard Model", value: blueTeamConfig.llama_guard_model },
-                      {
-                        label: "NeMo Config Path",
-                        value: blueTeamConfig.nemo_config_path || "Not set"
-                      },
-                      { label: "Policy Config Path", value: blueTeamConfig.policy_config_path }
-                    ]}
-                  />
+        <section className="content-area">
+          <nav className="tab-bar">
+            {VIEW_OPTIONS.map((view) => (
+              <TabButton
+                key={view.id}
+                active={activeView === view.id}
+                onClick={() => setActiveView(view.id)}
+              >
+                {view.label}
+              </TabButton>
+            ))}
+          </nav>
+
+          {activeView === "overview" ? (
+            <div className="view-stack">
+              <section className="panel">
+                <SectionHeader
+                  eyebrow="Overview"
+                  title="Current run summary"
+                  note={status?.summary || "No run has completed yet."}
+                />
+                <div className="stats-grid">
+                  <StatCard label="Run status" value={formatLabel(status?.status || "idle")} detail={status?.created_at ? formatTimestamp(status.created_at) : "No active run"} />
+                  <StatCard label="Turns" value={guardrailSummary?.totalTurns || 0} detail={`${guardrailSummary?.blockedTurns || 0} blocked or escalated`} />
+                  <StatCard label="Highest severity" value={formatLabel(guardrailSummary?.highestSeverity || "none")} detail={guardrailSummary?.dominantPolicy ? formatLabel(guardrailSummary.dominantPolicy) : "No dominant policy"} />
+                  <StatCard label="Evaluation" value={formatLabel(evaluation?.overall || "pending")} detail={evaluationSummary ? `${evaluationSummary.passed}/${evaluationSummary.total} passing` : "Run evaluation when ready"} />
+                </div>
+                <InfoTable
+                  items={[
+                    { label: "Run ID", value: status?.run_id || runId || "n/a" },
+                    { label: "Provider", value: status?.provider || provider },
+                    { label: "Average Confidence", value: guardrailSummary?.averageConfidence },
+                    { label: "Dry-run turns", value: guardrailSummary?.dryRunTurns || 0 },
+                    { label: "Escalations", value: guardrailSummary?.escalationTurns || 0 }
+                  ]}
+                />
+              </section>
+
+              <section className="panel">
+                <SectionHeader eyebrow="Recent turns" title="Latest decisions" />
+                {timeline.length ? (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Turn</th>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                        <th>Severity</th>
+                        <th>Policy</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {timeline.map((entry) => (
+                        <tr key={`${entry.event.turn_index}-${entry.event.timestamp}`}>
+                          <td>{entry.event.turn_index}</td>
+                          <td>{formatTimestamp(entry.event.timestamp)}</td>
+                          <td>{formatLabel(entry.verdict.action)}</td>
+                          <td>{formatLabel(entry.verdict.severity)}</td>
+                          <td>{truncateMiddle(entry.verdict.policy_id)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="empty-copy">No turns to summarize yet.</p>
+                )}
+              </section>
+
+              <section className="panel">
+                <SectionHeader eyebrow="Evaluation" title="Metric results" />
+                {evaluation?.metrics?.length ? (
+                  <MetricRows metrics={evaluation.metrics} />
+                ) : (
+                  <p className="empty-copy">No evaluation metrics yet.</p>
+                )}
+              </section>
+            </div>
+          ) : null}
+
+          {activeView === "run" ? (
+            <div className="investigation-layout">
+              <section className="panel turn-list-panel">
+                <SectionHeader eyebrow="Run detail" title="Turns" note="Select one turn at a time." />
+                <TurnList
+                  timeline={timeline}
+                  selectedTurnIndex={selectedTurnIndex}
+                  onSelect={setSelectedTurnIndex}
+                />
+              </section>
+              <TurnDetail entry={selectedEntry} />
+            </div>
+          ) : null}
+
+          {activeView === "benchmarks" ? (
+            <div className="view-stack">
+              <section className="panel">
+                <SectionHeader
+                  eyebrow="Benchmarks"
+                  title="Rules-only vs configured"
+                  note="A simple comparison table replaces multiple competing summary cards."
+                />
+                <BenchmarkComparisonTable
+                  baseline={benchmarkBaseline}
+                  configured={benchmarkConfigured}
+                />
+              </section>
+
+              <div className="two-column">
+                <section className="panel">
+                  <SectionHeader eyebrow="Baseline" title="Policy counts" />
+                  <DistributionRows values={benchmarkBaseline?.policy_counts} />
+                </section>
+
+                <section className="panel">
+                  <SectionHeader eyebrow="Configured" title="Action counts" />
+                  <DistributionRows values={benchmarkConfigured?.action_counts} />
+                </section>
+              </div>
+
+              <section className="panel">
+                <SectionHeader eyebrow="History" title="Benchmark runs" />
+                {benchmarkHistory.length ? (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Label</th>
+                        <th>Updated</th>
+                        <th>Passed</th>
+                        <th>Failed</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {benchmarkHistory.map((entry) => (
+                        <tr key={entry.file_name}>
+                          <td>{entry.label}</td>
+                          <td>{formatTimestamp(entry.updated_at)}</td>
+                          <td>{entry.configured_passed_cases}</td>
+                          <td>{entry.configured_failed_cases}</td>
+                          <td>{entry.total_cases}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="empty-copy">No benchmark history found yet.</p>
+                )}
+                <JsonDrawer title="Raw benchmark payload" data={benchmark} />
+              </section>
+            </div>
+          ) : null}
+
+          {activeView === "config" ? (
+            <div className="view-stack">
+              <section className="panel">
+                <SectionHeader eyebrow="Config" title="Blue-team runtime configuration" />
+                {blueTeamConfig ? (
+                  <>
+                    <InfoTable
+                      items={[
+                        { label: "LlamaGuard Enabled", value: blueTeamConfig.enable_llama_guard },
+                        { label: "NeMo Enabled", value: blueTeamConfig.enable_nemo_guardrails },
+                        { label: "Benchmark Label", value: blueTeamConfig.benchmark_label },
+                        { label: "LlamaGuard Model", value: blueTeamConfig.llama_guard_model },
+                        { label: "NeMo Config Path", value: blueTeamConfig.nemo_config_path || "Not set" },
+                        { label: "Policy Config Path", value: blueTeamConfig.policy_config_path }
+                      ]}
+                    />
+                  </>
+                ) : (
+                  <p className="empty-copy">No blue-team config loaded yet.</p>
+                )}
+              </section>
+
+              <div className="two-column">
+                <section className="panel">
+                  <SectionHeader eyebrow="Thresholds" title="Benchmark thresholds" />
                   <MetricRows
-                    metrics={Object.entries(blueTeamConfig.benchmark_thresholds || {}).map(
+                    metrics={Object.entries(blueTeamConfig?.benchmark_thresholds || {}).map(
                       ([metricName, value]) => ({
                         metric_name: metricName,
                         value
                       })
                     )}
                   />
-                  <DistributionList
-                    title="Detector weights"
-                    values={blueTeamConfig.detector_weights}
-                    tone="warning"
-                  />
-                </>
-              ) : (
-                <p className="empty-copy">No blue-team config loaded yet.</p>
-              )}
-            </div>
-          </div>
-        </aside>
+                </section>
 
-        <div className="workspace-main">
-          <section className="panel">
-            <div className="panel-head">
-              <div>
-                <div className="panel-kicker">Run Overview</div>
-                <h2>Operational summary</h2>
-              </div>
-              {status?.summary ? <p className="panel-note">{status.summary}</p> : null}
-            </div>
-
-            <StatGrid
-              items={[
-                {
-                  label: "Run Status",
-                  value: formatLabel(status?.status || "idle"),
-                  detail: status?.created_at ? formatTimestamp(status.created_at) : "No run started",
-                  tone: getStatusTone(status?.status)
-                },
-                {
-                  label: "Total Turns",
-                  value: guardrailSummary?.totalTurns || 0,
-                  detail: `${guardrailSummary?.allowedTurns || 0} allowed | ${
-                    guardrailSummary?.blockedTurns || 0
-                  } blocked`,
-                  tone: "info"
-                },
-                {
-                  label: "Highest Severity",
-                  value: formatLabel(guardrailSummary?.highestSeverity || "none"),
-                  detail: guardrailSummary?.dominantPolicy
-                    ? formatLabel(guardrailSummary.dominantPolicy)
-                    : "No policy yet",
-                  tone: getSeverityTone(guardrailSummary?.highestSeverity)
-                },
-                {
-                  label: "Escalations",
-                  value: guardrailSummary?.escalationTurns || 0,
-                  detail: `${guardrailSummary?.dryRunTurns || 0} dry-run turns`,
-                  tone: guardrailSummary?.escalationTurns ? "critical" : "neutral"
-                },
-                {
-                  label: "Average Confidence",
-                  value: formatMetricValue(guardrailSummary?.averageConfidence || 0),
-                  detail: `${guardrailSummary?.wouldBlockTurns || 0} would-block turns`,
-                  tone: "warning"
-                },
-                {
-                  label: "Evaluation",
-                  value: formatLabel(evaluation?.overall || "pending"),
-                  detail: evaluationSummary
-                    ? `${evaluationSummary.passed}/${evaluationSummary.total} metrics passing`
-                    : "Run evaluation to score this trace",
-                  tone:
-                    evaluation?.overall === "pass"
-                      ? "safe"
-                      : evaluation?.overall === "fail"
-                        ? "danger"
-                        : "neutral"
-                }
-              ]}
-            />
-
-            <div className="split-grid">
-              <div className="subpanel">
-                <div className="panel-kicker">Status Metadata</div>
-                <KeyValueGrid
-                  items={[
-                    { label: "Run Id", value: status?.run_id || runId || "Not assigned" },
-                    { label: "Provider", value: status?.provider || provider },
-                    { label: "Created", value: status?.created_at && formatTimestamp(status.created_at) }
-                  ]}
-                />
-                <JsonDrawer title="Raw status payload" data={status} />
+                <section className="panel">
+                  <SectionHeader eyebrow="Weights" title="Detector weights" />
+                  <DistributionRows values={blueTeamConfig?.detector_weights} />
+                </section>
               </div>
 
-              <div className="subpanel">
-                <div className="panel-kicker">Evaluation Detail</div>
-                {evaluation?.metrics?.length ? (
-                  <MetricRows metrics={evaluation.metrics} />
-                ) : (
-                  <p className="empty-copy">No evaluation yet. Run the evaluator after a trace completes.</p>
-                )}
-                <JsonDrawer title="Raw evaluation payload" data={evaluation} />
-              </div>
+              <section className="panel">
+                <SectionHeader eyebrow="Raw" title="Config payload" />
+                <JsonDrawer title="Raw config payload" data={blueTeamConfig} />
+                <JsonDrawer title="Fallback events payload" data={events} />
+              </section>
             </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel-head">
-              <div>
-                <div className="panel-kicker">Benchmark Observatory</div>
-                <h2>Baseline vs configured detectors</h2>
-              </div>
-              {benchmark?.comparison ? (
-                <Badge
-                  tone={benchmark.comparison.delta_passed_cases >= 0 ? "safe" : "danger"}
-                >
-                  Delta {benchmark.comparison.delta_passed_cases >= 0 ? "+" : ""}
-                  {benchmark.comparison.delta_passed_cases}
-                </Badge>
-              ) : null}
-            </div>
-
-            <div className="comparison-band">
-              <MetricCard
-                label="Baseline Pass Rate"
-                value={`${Math.round(suitePassRate(benchmarkBaseline))}%`}
-                detail={
-                  benchmarkBaseline
-                    ? `${benchmarkBaseline.passed_cases}/${benchmarkBaseline.total_cases} cases`
-                    : "No data"
-                }
-                tone="neutral"
-              />
-              <MetricCard
-                label="Configured Pass Rate"
-                value={`${Math.round(suitePassRate(benchmarkConfigured))}%`}
-                detail={
-                  benchmarkConfigured
-                    ? `${benchmarkConfigured.passed_cases}/${benchmarkConfigured.total_cases} cases`
-                    : "No data"
-                }
-                tone="safe"
-              />
-              <MetricCard
-                label="Pass Delta"
-                value={benchmark?.comparison?.delta_passed_cases ?? 0}
-                detail="Configured detectors minus rules-only baseline"
-                tone={
-                  (benchmark?.comparison?.delta_passed_cases || 0) >= 0 ? "safe" : "danger"
-                }
-              />
-            </div>
-
-            <div className="comparison-grid">
-              <SuiteSummaryCard
-                title="Rules-only baseline"
-                summary={benchmarkBaseline}
-                tone="neutral"
-              />
-              <SuiteSummaryCard
-                title="Configured detectors"
-                summary={benchmarkConfigured}
-                tone="safe"
-              />
-            </div>
-
-            <div className="split-grid">
-              <DistributionList
-                title="Baseline policy counts"
-                values={benchmarkBaseline?.policy_counts}
-                tone="neutral"
-              />
-              <DistributionList
-                title="Configured action counts"
-                values={benchmarkConfigured?.action_counts}
-                tone="safe"
-              />
-            </div>
-
-            <div className="subpanel">
-              <div className="panel-kicker">Benchmark History</div>
-              {benchmarkHistory.length ? (
-                <div className="history-timeline">
-                  {benchmarkHistory.map((entry) => (
-                    <div className="history-item" key={entry.file_name}>
-                      <div className="history-top">
-                        <div>
-                          <strong>{entry.label}</strong>
-                          <div className="history-time">{formatTimestamp(entry.updated_at)}</div>
-                        </div>
-                        <Badge tone="info">{entry.total_cases} cases</Badge>
-                      </div>
-                      <div className="history-stats">
-                        <span>{entry.configured_passed_cases} passed</span>
-                        <span>{entry.configured_failed_cases} failed</span>
-                      </div>
-                      <MetricRows metrics={entry.metrics} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="empty-copy">No benchmark history found yet.</p>
-              )}
-            </div>
-
-            <JsonDrawer title="Raw benchmark payload" data={benchmark} />
-          </section>
-
-          <section className="panel">
-            <div className="panel-head">
-              <div>
-                <div className="panel-kicker">Investigation Timeline</div>
-                <h2>Per-turn trace and guardrail evidence</h2>
-              </div>
-              {timeline.length ? <Badge tone="info">{timeline.length} turns</Badge> : null}
-            </div>
-
-            {timeline.length ? (
-              <div className="trace-timeline">
-                {timeline.map((entry, index) => (
-                  <TurnTraceCard
-                    entry={entry}
-                    isLast={index === timeline.length - 1}
-                    key={`${entry.event.turn_index}-${entry.event.timestamp}-${index}`}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="empty-panel">
-                <p>No traced turns yet. Create a run and this view will fill with attacker, model, and guardrail stages.</p>
-                <JsonDrawer title="Fallback event payloads" data={events} />
-              </div>
-            )}
-          </section>
-        </div>
+          ) : null}
+        </section>
       </section>
     </main>
   );
