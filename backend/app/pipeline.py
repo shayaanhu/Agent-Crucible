@@ -32,6 +32,16 @@ def _redact_text(text: str, matched_patterns: list[str]) -> str:
     return redacted
 
 
+def _safe_rewrite_text(model_output: str, provider_verdict) -> str:
+    policy_id = getattr(provider_verdict, "policy_id", "")
+    category = getattr(provider_verdict, "category", "")
+    if policy_id == "policy.toxicity.safe_rewrite" or category == "toxicity_or_abuse":
+        return "I can continue the conversation respectfully and help with the underlying request."
+    if category == "unsafe_instruction_generation":
+        return "I cannot provide harmful instructions, but I can offer safe, legal alternatives."
+    return "I cannot provide the original response in that form, but I can help with a safer alternative."
+
+
 def _enforce_guardrail_action(
     model_output: str, provider_verdict, dry_run: bool
 ) -> tuple[bool, str, str, str, dict]:
@@ -74,6 +84,14 @@ def _enforce_guardrail_action(
         effective_output = _redact_text(model_output, matched_patterns)
         effective_allowed = True
         effective_reason = f"{provider_verdict.reason} (content redacted)"
+    elif provider_verdict.action == "safe_rewrite":
+        effective_output = _safe_rewrite_text(model_output, provider_verdict)
+        effective_allowed = True
+        detector_results["safe_rewrite"] = {
+            "applied": True,
+            "strategy": "template_rewrite",
+        }
+        effective_reason = f"{provider_verdict.reason} (rewritten for safety)"
 
     return effective_allowed, effective_action, effective_reason, effective_output, detector_results
 

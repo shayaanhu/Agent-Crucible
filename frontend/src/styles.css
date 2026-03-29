@@ -637,6 +637,11 @@ p {
   background: rgba(255, 179, 71, 0.1);
 }
 
+.callout-info {
+  border-color: rgba(90, 167, 255, 0.28);
+  background: rgba(90, 167, 255, 0.1);
+}
+
 .callout-critical {
   border-color: rgba(255, 77, 141, 0.32);
   background: rgba(255, 77, 141, 0.1);
@@ -653,6 +658,17 @@ p {
 .signal-item,
 .history-stats {
   align-items: center;
+}
+
+.signal-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.signal-rationale {
+  color: #c3d3ea;
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .history-stats {

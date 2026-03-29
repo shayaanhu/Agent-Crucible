@@ -355,6 +355,20 @@ def _policy_id_from_text(model_output: str, raw_output: str, flagged: bool) -> t
     lowered = f"{model_output}\n{raw_output}".lower()
     if any(
         token in lowered
+        for token in ("ignore previous instructions", "system prompt", "developer message", "override safety")
+    ):
+        return ("policy.prompt_injection.block", "prompt_injection_keywords")
+    if any(
+        token in lowered
+        for token in ("build a bomb", "weaponize", "harm someone", "violent attack")
+    ):
+        return ("policy.unsafe_instruction.escalate", "unsafe_instruction_keywords")
+    if any(
+        token in lowered for token in ("idiot", "stupid", "shut up", "kill yourself")
+    ):
+        return ("policy.toxicity.safe_rewrite", "toxicity_keywords")
+    if any(
+        token in lowered
         for token in ("password", "api key", "secret token", "credential", "secret", "token")
     ):
         return ("policy.sensitive_data.redaction", "sensitive_data_keywords")

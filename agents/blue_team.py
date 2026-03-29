@@ -60,6 +60,20 @@ class BasicBlueTeamAgent(BlueTeamContract):
         if triggered_policies:
             selected = max(triggered_policies, key=_policy_evaluation_priority)
             unsafe = POLICIES[selected["policy_id"]]
+            detector_results["_decision"] = {
+                "outcome": "unsafe",
+                "selected_policy_id": selected["policy_id"],
+                "category": unsafe["category"],
+                "action": unsafe["action"],
+                "severity": unsafe["severity"],
+                "aggregation_strategy": selected["aggregation_strategy"],
+                "aggregated_confidence": selected["aggregated_confidence"],
+                "supporting_detectors": selected["supporting_detectors"],
+                "rationale": (
+                    f'{unsafe["reason"]} Triggered via {selected["aggregation_strategy"]} '
+                    f"with support from {', '.join(selected['supporting_detectors']) or 'no detectors'}."
+                ),
+            }
             return BlueTeamVerdict(
                 allowed=False,
                 category=unsafe["category"],
@@ -73,6 +87,19 @@ class BasicBlueTeamAgent(BlueTeamContract):
 
         safe_id = "policy.safe.default"
         safe = POLICIES[safe_id]
+        detector_results["_decision"] = {
+            "outcome": "safe",
+            "selected_policy_id": safe_id,
+            "category": safe["category"],
+            "action": safe["action"],
+            "severity": safe["severity"],
+            "aggregation_strategy": "no_policy_triggered",
+            "aggregated_confidence": safe["confidence"],
+            "supporting_detectors": [],
+            "rationale": (
+                "No unsafe policy reached its trigger threshold across the active detector set."
+            ),
+        }
         return BlueTeamVerdict(
             allowed=True,
             category=safe["category"],

@@ -349,18 +349,46 @@ function SuiteSummaryCard({ title, summary, tone }) {
 
 function DetectorResultsPanel({ detectorResults }) {
   const aggregation = detectorResults?._aggregation?.policy_evaluations || [];
+  const decisionMeta = detectorResults?._decision;
   const dryRunMeta = detectorResults?.dry_run;
   const escalationMeta = detectorResults?.escalation;
   const detectorEntries = Object.entries(detectorResults || {}).filter(
-    ([key]) => !["_aggregation", "dry_run", "escalation"].includes(key)
+    ([key]) => !["_aggregation", "_decision", "dry_run", "escalation"].includes(key)
   );
 
-  if (!aggregation.length && !dryRunMeta && !escalationMeta && !detectorEntries.length) {
+  if (!decisionMeta && !aggregation.length && !dryRunMeta && !escalationMeta && !detectorEntries.length) {
     return <p className="empty-copy">No detector telemetry captured for this turn.</p>;
   }
 
   return (
     <div className="evidence-stack">
+      {decisionMeta ? (
+        <div className="evidence-group">
+          <div className="evidence-title">Decision Rationale</div>
+          <div className="callout callout-info">
+            <strong>{formatLabel(decisionMeta.outcome)} decision.</strong> {decisionMeta.rationale}
+          </div>
+          <KeyValueGrid
+            items={[
+              { label: "Selected Policy", value: decisionMeta.selected_policy_id },
+              { label: "Category", value: formatLabel(decisionMeta.category) },
+              { label: "Action", value: formatLabel(decisionMeta.action) },
+              { label: "Severity", value: formatLabel(decisionMeta.severity) },
+              {
+                label: "Aggregation Strategy",
+                value: formatLabel(decisionMeta.aggregation_strategy)
+              },
+              {
+                label: "Supporting Detectors",
+                value: decisionMeta.supporting_detectors?.length
+                  ? decisionMeta.supporting_detectors.map((detector) => formatLabel(detector))
+                  : "n/a"
+              }
+            ]}
+          />
+        </div>
+      ) : null}
+
       {dryRunMeta ? (
         <div className="callout callout-warning">
           <strong>Dry run active.</strong>{" "}
@@ -463,11 +491,19 @@ function DetectorResultsPanel({ detectorResults }) {
                     <div className="signal-list">
                       {signals.slice(0, 3).map((signal, index) => (
                         <div className="signal-item" key={`${detectorId}-signal-${index}`}>
-                          <div>
+                          <div className="signal-copy">
                             <div className="signal-label">{formatLabel(signal.policy_id)}</div>
                             <div className="signal-subtitle">
                               {signal.flagged ? "Flagged signal" : "Safe signal"}
                             </div>
+                            {signal.metadata?.reason ? (
+                              <div className="signal-rationale">{signal.metadata.reason}</div>
+                            ) : null}
+                            {signal.metadata?.policy_basis ? (
+                              <div className="signal-rationale">
+                                Policy basis: {formatLabel(signal.metadata.policy_basis)}
+                              </div>
+                            ) : null}
                           </div>
                           <div className="signal-meta">
                             <Badge tone={signal.flagged ? "danger" : "safe"}>

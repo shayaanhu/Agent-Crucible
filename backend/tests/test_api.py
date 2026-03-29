@@ -73,6 +73,7 @@ def test_events_endpoint() -> None:
     assert verdicts[0]["severity"] in {"low", "medium", "high", "critical"}
     assert "policy_id" in verdicts[0]
     assert "detector_results" in verdicts[0]
+    assert "_decision" in verdicts[0]["detector_results"]
     assert "dry_run" in verdicts[0]
     assert "event" in timeline[0]
     assert "verdict" in timeline[0]
