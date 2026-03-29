@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
 import json
 import re
 import sys
-from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,13 +17,9 @@ def _sanitize_label(value: str) -> str:
 
 
 def _timestamp_fields() -> dict[str, str]:
-    now_utc = datetime.now(timezone.utc)
-    now_local = now_utc.astimezone()
-    return {
-        "generated_at": now_local.strftime("%Y-%m-%d %H:%M:%S %Z"),
-        "generated_at_local": now_local.strftime("%Y-%m-%d %H:%M:%S %Z"),
-        "generated_at_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
-    }
+    from eval.blue_team_eval_utils import timestamp_fields
+
+    return timestamp_fields()
 
 
 def generate_benchmark(label_override: str | None = None) -> dict:
@@ -33,6 +27,7 @@ def generate_benchmark(label_override: str | None = None) -> dict:
     from agents.blue_team_config import get_blue_team_runtime_config
     from agents.blue_team_detectors import RuleDetector
     from backend.app.pipeline import _enforce_guardrail_action
+    from eval.blue_team_eval_utils import summarize_blue_team_results
     from eval.scorer import calculate_metrics
 
     fixture_path = Path("backend/tests/fixtures/blue_team/regression_cases.json")
@@ -52,6 +47,7 @@ def generate_benchmark(label_override: str | None = None) -> dict:
         _enforce_guardrail_action,
         calculate_metrics,
         config.benchmark_thresholds,
+        summarize_blue_team_results,
     )
     configured = _run_benchmark_suite(
         cases,
@@ -59,6 +55,7 @@ def generate_benchmark(label_override: str | None = None) -> dict:
         _enforce_guardrail_action,
         calculate_metrics,
         config.benchmark_thresholds,
+        summarize_blue_team_results,
     )
 
     benchmark = {
@@ -97,13 +94,12 @@ def main() -> None:
     print(f'Wrote labeled blue-team benchmark results to {benchmark["artifacts"]["labeled_path"]}')
 
 
-def _run_benchmark_suite(cases, agent, enforce_guardrail_action, calculate_metrics, thresholds) -> dict:
+def _run_benchmark_suite(
+    cases, agent, enforce_guardrail_action, calculate_metrics, thresholds, summarize_blue_team_results
+) -> dict:
     results: list[dict] = []
     verdicts: list[dict] = []
     events: list[dict] = []
-    policy_counter: Counter[str] = Counter()
-    action_counter: Counter[str] = Counter()
-    pass_count = 0
 
     for case in cases:
         verdict = agent.evaluate_output(case["model_output"])
@@ -124,6 +120,7 @@ def _run_benchmark_suite(cases, agent, enforce_guardrail_action, calculate_metri
             "actual_effective_allowed": effective_allowed,
             "effective_output": effective_output,
             "reason": effective_reason,
+            "confidence": verdict.confidence,
             "detector_results": detector_results,
         }
         case_result["passed"] = (
@@ -133,8 +130,6 @@ def _run_benchmark_suite(cases, agent, enforce_guardrail_action, calculate_metri
             and effective_allowed is case["expected_effective_allowed"]
             and case["expected_output_contains"] in effective_output
         )
-        if case_result["passed"]:
-            pass_count += 1
 
         results.append(case_result)
         verdicts.append(
@@ -145,19 +140,10 @@ def _run_benchmark_suite(cases, agent, enforce_guardrail_action, calculate_metri
             }
         )
         events.append({"model_output": case["model_output"]})
-        policy_counter[verdict.policy_id] += 1
-        action_counter[effective_action] += 1
 
     metrics = calculate_metrics(verdicts, thresholds, events=events)
     return {
-        "summary": {
-            "total_cases": len(results),
-            "passed_cases": pass_count,
-            "failed_cases": len(results) - pass_count,
-            "policy_counts": dict(policy_counter),
-            "action_counts": dict(action_counter),
-            "metrics": metrics,
-        },
+        "summary": summarize_blue_team_results(results, metrics),
         "results": results,
     }
 

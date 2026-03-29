@@ -10,14 +10,15 @@ Dedicated implementation plan for Blue Team in Agent Crucible.
 4. Phase 5 started: evaluation supports `unsafe_block_rate`, `false_negative_rate`, `false_positive_rate`, and `policy_block_rate:<policy_id>`.
 5. Fixture-driven regression coverage is active under `backend/tests/fixtures/blue_team/`.
 6. Benchmark export is available via `eval/run_blue_team_benchmark.py`, writing artifacts to `eval/results/blue_team_benchmark_results.json`.
-7. Current fallback behavior: if adapter dependencies are unavailable, detectors return non-blocking safe signals and RuleDetector continues as the primary enforcement path.
-8. Adapter toggles:
+7. Markdown reporting for Blue Team eval artifacts is available via `eval/report_blue_team_eval.py`.
+8. Current fallback behavior: if adapter dependencies are unavailable, detectors return non-blocking safe signals and RuleDetector continues as the primary enforcement path.
+9. Adapter toggles:
    `BLUE_TEAM_ENABLE_LLAMA_GUARD=1` and `BLUE_TEAM_ENABLE_NEMO_GUARDRAILS=1`.
-9. Optional LlamaGuard model override:
+10. Optional LlamaGuard model override:
    `BLUE_TEAM_LLAMA_GUARD_MODEL=<transformers-model-id>`.
-10. Optional NeMo Guardrails config path:
+11. Optional NeMo Guardrails config path:
    `BLUE_TEAM_NEMO_CONFIG_PATH=<path-to-guardrails-config>`.
-11. Adapter parsing now normalizes SAFE/UNSAFE labels, extracts confidence hints from model output, and maps likely policy categories before aggregation.
+12. Adapter parsing now normalizes SAFE/UNSAFE labels, extracts confidence hints from model output, and maps likely policy categories before aggregation.
 
 ## Purpose
 
@@ -197,6 +198,7 @@ This prevents duplication of effort and ensures Blue Team regression tests refle
 python -m pytest backend/tests -q
 python -m ruff check backend agents eval
 .venv\Scripts\python.exe eval/run_blue_team_benchmark.py
+.venv\Scripts\python.exe eval/report_blue_team_eval.py --input eval/results/blue_team_benchmark_results.json
 ```
 
 ## Week-by-Week Blue Team Roadmap

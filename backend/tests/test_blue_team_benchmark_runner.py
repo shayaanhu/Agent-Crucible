@@ -33,6 +33,7 @@ def test_blue_team_benchmark_runner_writes_results_file() -> None:
     assert isinstance(payload["baseline_rules_only"]["summary"]["policy_counts"], dict)
     assert isinstance(payload["configured_detectors"]["summary"]["action_counts"], dict)
     assert isinstance(payload["configured_detectors"]["summary"]["metrics"], list)
+    assert isinstance(payload["configured_detectors"]["summary"]["case_summaries"], list)
     assert labeled_payload["config"]["benchmark_label"] == "default"
 
 
