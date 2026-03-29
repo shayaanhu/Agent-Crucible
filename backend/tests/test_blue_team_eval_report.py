@@ -4,6 +4,7 @@ from pathlib import Path
 
 from eval.report_blue_team_eval import main as report_main
 from eval.run_blue_team_benchmark import main as benchmark_main
+from eval.run_blue_team_dataset import main as dataset_main
 
 
 def test_blue_team_eval_report_writes_markdown_file(monkeypatch) -> None:
@@ -25,3 +26,23 @@ def test_blue_team_eval_report_writes_markdown_file(monkeypatch) -> None:
     assert "## Rules-only Baseline" in content
     assert "## Configured Detectors" in content
     assert "## Comparison" in content
+
+
+def test_blue_team_eval_report_supports_dataset_results(monkeypatch) -> None:
+    monkeypatch.setattr("sys.argv", ["run_blue_team_dataset.py"])
+    dataset_main()
+
+    output_path = Path("eval/report/blue_team_dataset_results_report.md")
+    if output_path.exists():
+        output_path.unlink()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["report_blue_team_eval.py", "--input", "eval/results/blue_team_dataset_results.json"],
+    )
+    report_main()
+
+    assert output_path.exists()
+    content = output_path.read_text(encoding="utf-8")
+    assert "# Blue-Team Eval Report" in content
+    assert "## Configured Detectors" in content

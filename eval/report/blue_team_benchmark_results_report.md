@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Runner | blue_team_benchmark |
-| Generated At | 2026-03-29 12:58:05 Pakistan Standard Time |
+| Generated At | 2026-03-29 13:04:21 Pakistan Standard Time |
 | Benchmark Label | default |
 | Fixture Path | backend\tests\fixtures\blue_team\regression_cases.json |
 
