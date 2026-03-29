@@ -110,6 +110,8 @@ class LlamaGuardDetector:
             "backend": str(classification.get("backend", "transformers")),
             "model_id": self._model_id,
             "raw_output": str(classification.get("raw_output", "")),
+            "policy_basis": str(classification.get("policy_basis", "")),
+            "parsed_label": str(classification.get("parsed_label", "")),
         }
 
         return [
@@ -204,6 +206,8 @@ class NeMoGuardrailsDetector:
             "backend": str(classification.get("backend", "nemoguardrails")),
             "config_path": self._config_path,
             "raw_output": str(classification.get("raw_output", "")),
+            "policy_basis": str(classification.get("policy_basis", "")),
+            "parsed_label": str(classification.get("parsed_label", "")),
         }
 
         return [

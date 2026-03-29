@@ -8,13 +8,15 @@ Contains:
 Current modules:
 1. `red_team.py`
 2. `blue_team.py`
-3. `blue_team_policies.py`
-4. `provider_adapter.py`
-5. `mock_provider.py`
-6. `contracts.py`
-7. `red_team_models.py`
-8. `red_team_strategies.py`
-9. `red_team_runtime.py`
+3. `blue_team_detectors.py`
+4. `blue_team_aggregation.py`
+5. `blue_team_policies.py`
+6. `provider_adapter.py`
+7. `mock_provider.py`
+8. `contracts.py`
+9. `red_team_models.py`
+10. `red_team_strategies.py`
+11. `red_team_runtime.py`
 
 Parallel ownership model:
 1. Red-team: owns `red_team.py`
