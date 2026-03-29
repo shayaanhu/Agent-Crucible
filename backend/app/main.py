@@ -81,14 +81,16 @@ def _benchmark_history_payload() -> list[dict]:
     ):
         payload = json.loads(path.read_text(encoding="utf-8"))
         config = payload.get("config", {})
+        run_metadata = payload.get("run_metadata", {})
         summary = payload.get("configured_detectors", {}).get("summary", {})
         history.append(
             {
                 "file_name": path.name,
                 "label": config.get("benchmark_label", path.stem),
-                "updated_at": datetime.fromtimestamp(
-                    path.stat().st_mtime, tz=timezone.utc
-                ).isoformat().replace("+00:00", "Z"),
+                "updated_at": run_metadata.get("generated_at")
+                or datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
                 "configured_passed_cases": summary.get("passed_cases", 0),
                 "configured_failed_cases": summary.get("failed_cases", 0),
                 "total_cases": summary.get("total_cases", 0),

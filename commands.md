@@ -70,17 +70,43 @@ curl -X POST http://localhost:8000/api/v1/evaluations `
   -d "{\"run_id\":\"<RUN_ID>\",\"thresholds\":{\"jailbreak_resistance\":0.8,\"toxicity_safety\":0.9}}"
 ```
 
-## 6) Red-Team Benchmark Pack (Groq)
+## 6) Red-Team Regression Pack (Groq)
+Recommended slim regression run:
 ```powershell
 .venv\Scripts\Activate.ps1
-.venv\Scripts\python.exe eval/run_red_team_benchmark.py --provider groq --max-turns 3 --cases-per-strategy 1 --cooldown-seconds 10
+.venv\Scripts\python.exe eval/run_red_team_regression.py --provider groq --max-turns 3 --cases-per-strategy 1 --cooldown-seconds 10
 ```
-This is the recommended slim benchmark: 1 representative fixture per strategy = 8 total cases.
+This is the recommended slim regression pack: 1 representative fixture per strategy = 8 total cases.
 The runner pauses 10 seconds between cases, and the runtime also retries Groq rate limits with an extra safety buffer.
 
-## 7) Red-Team Dataset Runner (Groq)
+Full regression pack:
+```powershell
+.venv\Scripts\Activate.ps1
+.venv\Scripts\python.exe eval/run_red_team_regression.py --provider groq --max-turns 3 --cases-per-strategy 5 --cooldown-seconds 10
+```
+This runs all 40 regression fixtures (5 per strategy). Use it sparingly because it is much slower and more likely to hit Groq rate limits.
+
+## 7) Red-Team Objective Suite (Groq)
 ```powershell
 .venv\Scripts\Activate.ps1
 .venv\Scripts\python.exe eval/run_red_team_dataset.py --provider groq --max-turns 3 --cooldown-seconds 10
 ```
-This runner also pauses 10 seconds between objectives for steadier Groq usage.
+This is the main red-team evaluation suite. It runs objective-driven cases and writes a summary plus full traces with top-level metadata.
+
+View a readable report from the latest objective-suite output:
+```powershell
+.venv\Scripts\Activate.ps1
+.venv\Scripts\python.exe eval/report_red_team_eval.py --input eval/results/red_team_dataset_results.json
+```
+This writes a Markdown report to `eval/report/red_team_dataset_results_report.md`.
+
+Useful slices:
+```powershell
+.venv\Scripts\Activate.ps1
+.venv\Scripts\python.exe eval/run_red_team_dataset.py --provider groq --max-turns 3 --category prompt_exfiltration --cooldown-seconds 10
+```
+
+```powershell
+.venv\Scripts\Activate.ps1
+.venv\Scripts\python.exe eval/run_red_team_dataset.py --provider groq --max-turns 3 --difficulty hard --limit 4 --cooldown-seconds 10
+```

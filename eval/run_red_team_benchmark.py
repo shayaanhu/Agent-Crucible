@@ -40,6 +40,7 @@ def main() -> None:
     args = parser.parse_args()
 
     from agents.red_team import get_red_team_agent, trace_to_dict
+    from eval.red_team_eval_utils import summarize_red_team_results, timestamp_fields
 
     fixtures_dir = Path("eval/fixtures/red_team")
     output_dir = Path("eval/results")
@@ -88,9 +89,30 @@ def main() -> None:
 
     progress.close()
 
-    out_path = output_dir / "red_team_benchmark_results.json"
-    out_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
-    print(f"Wrote {len(results)} benchmark traces to {out_path}", flush=True)
+    payload = {
+        "run_metadata": {
+            "suite_type": "regression_pack",
+            "runner": "red_team_regression",
+            **timestamp_fields(),
+            "provider": args.provider,
+            "attacker_provider": args.attacker_provider or args.provider,
+            "max_turns": args.max_turns,
+            "cases_per_strategy": args.cases_per_strategy,
+            "cooldown_seconds": args.cooldown_seconds,
+            "fixtures_dir": str(fixtures_dir),
+            "strategy_files": len(fixture_payloads),
+            "total_cases": total_cases,
+            "total_results": len(results),
+        },
+        "summary": summarize_red_team_results(results),
+        "results": results,
+    }
+
+    out_path = output_dir / "red_team_regression_results.json"
+    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    compatibility_path = output_dir / "red_team_benchmark_results.json"
+    compatibility_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"Wrote {len(results)} regression traces to {out_path}", flush=True)
 
 
 if __name__ == "__main__":

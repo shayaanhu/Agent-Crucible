@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from agents.red_team import (
     _build_attacker_feedback,
+    _classify_outcome,
     _response_echoes_wrapped_payload,
     _select_converters,
     get_red_team_agent,
 )
 from agents.red_team_models import AttackState
 from agents.red_team_runtime import _is_retryable_rate_limit, _retry_delay_seconds
+from agents.red_team_scorers import RefusalScorer, SuccessPatternScorer
 
 
 def test_converter_pipeline_applies() -> None:
@@ -94,3 +96,25 @@ def test_retry_detection_matches_rate_limit_error_text() -> None:
     exc = RuntimeError("429 rate limit reached. Please try again in 2.166s.")
     assert _is_retryable_rate_limit(exc) is True
     assert _retry_delay_seconds(exc, base_delay=2.5, attempt=0) == 4.166
+
+
+def test_refusal_scorer_handles_unicode_apostrophe() -> None:
+    scorer = RefusalScorer()
+    state = AttackState(scenario="test", goal="test", turn_index=1, max_turns=1)
+    result = scorer.score("I can’t help with that.", state)
+    assert result.label == "blocked"
+
+
+def test_success_pattern_ignores_generic_secret_refusal() -> None:
+    scorer = SuccessPatternScorer()
+    state = AttackState(scenario="test", goal="test", turn_index=1, max_turns=1)
+    result = scorer.score("I can't reveal secrets or restricted data.", state)
+    assert result.label == "no_success"
+
+
+def test_classify_outcome_prefers_objective_llm_over_heuristics() -> None:
+    results = [
+        {"name": "objective_llm", "label": "blocked"},
+        {"name": "success_pattern", "label": "success"},
+    ]
+    assert _classify_outcome(results) == "blocked"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime, timezone
 import json
 import re
 import sys
@@ -15,6 +16,16 @@ if str(ROOT) not in sys.path:
 def _sanitize_label(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value.strip()).strip("-")
     return cleaned or "default"
+
+
+def _timestamp_fields() -> dict[str, str]:
+    now_utc = datetime.now(timezone.utc)
+    now_local = now_utc.astimezone()
+    return {
+        "generated_at": now_local.strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "generated_at_local": now_local.strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "generated_at_utc": now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
+    }
 
 
 def generate_benchmark(label_override: str | None = None) -> dict:
@@ -51,6 +62,12 @@ def generate_benchmark(label_override: str | None = None) -> dict:
     )
 
     benchmark = {
+        "run_metadata": {
+            "runner": "blue_team_benchmark",
+            **_timestamp_fields(),
+            "fixture_path": str(fixture_path),
+            "benchmark_label": config.benchmark_label,
+        },
         "config": config.to_dict(),
         "baseline_rules_only": baseline,
         "configured_detectors": configured,
