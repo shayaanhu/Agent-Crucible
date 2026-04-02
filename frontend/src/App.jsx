@@ -208,6 +208,29 @@ function selectState(value, options) {
   return options.includes(value) ? value : CUSTOM_OPTION;
 }
 
+function TypewriterText({ text, speed = 22 }) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    setDisplayed("");
+    setDone(false);
+    if (!text) return;
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) { setDone(true); clearInterval(id); }
+    }, speed);
+    return () => clearInterval(id);
+  }, [text, speed]);
+  return (
+    <>
+      {displayed}
+      <span className={`narrative-cursor${done ? " done" : ""}`} aria-hidden="true" />
+    </>
+  );
+}
+
 function Badge({ tone = "neutral", children }) {
   const cls = tone === "safe" ? "success" : tone === "info" ? "info" : tone === "warning" ? "warning" : tone === "danger" ? "danger" : "neutral";
   return <span className={`badge badge-${cls}`}>{children}</span>;
@@ -465,7 +488,7 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
 }
 
 
-function TimelineCard({ entry, selected, onSelect }) {
+function TimelineCard({ entry, selected, onSelect, index }) {
   const severity = entry.verdict?.severity || "low";
   const objectiveLabel = formatLabel(entry.event.objective_scorer?.label || entry.event.outcome || "pending");
   const converterCount = entry.event.converter_steps?.length || 0;
@@ -475,9 +498,15 @@ function TimelineCard({ entry, selected, onSelect }) {
       role="button"
       tabIndex={0}
       className={`turn-row severity-${severity}${selected ? " is-selected" : ""}`}
+      style={{ animationDelay: `${(index || 0) * 60}ms` }}
       onClick={onSelect}
       onKeyDown={(e) => e.key === "Enter" && onSelect()}
     >
+      {/* Timeline node */}
+      <div className="turn-node-col">
+        <div className="turn-node-circle" style={{ animationDelay: `${(index || 0) * 60 + 40}ms` }} />
+      </div>
+
       <div className="turn-row-body">
         {/* Header row: turn number + badges */}
         <div className="turn-row-top">
@@ -1068,9 +1097,9 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Outcome border + run narrative */}
+                {/* Outcome shimmer bar */}
                 <div
-                  className="timeline-outcome-bar"
+                  className={`timeline-outcome-bar${status?.status === "running" ? " is-running" : ""}`}
                   style={{
                     "--outcome-color": blueTeamSummary.blocked > 0 ? "var(--success)"
                       : blueTeamSummary.highestSeverity === "critical" ? "var(--danger)"
@@ -1079,17 +1108,18 @@ export default function App() {
                   }}
                 />
 
+                {/* Typewriter run narrative */}
                 {timeline.length > 0 && (
                   <div className="run-narrative">
-                    {timeline.length} turn{timeline.length !== 1 ? "s" : ""} completed.
-                    {blueTeamSummary.blocked > 0
-                      ? ` Blue team blocked ${blueTeamSummary.blocked} attempt${blueTeamSummary.blocked !== 1 ? "s" : ""}.`
-                      : " No turns were blocked."
-                    }
-                    {blueTeamSummary.highestSeverity !== "n/a"
-                      ? ` Highest severity: ${blueTeamSummary.highestSeverity}.`
-                      : ""
-                    }
+                    <TypewriterText text={
+                      `${timeline.length} turn${timeline.length !== 1 ? "s" : ""} completed.` +
+                      (blueTeamSummary.blocked > 0
+                        ? ` Blue team blocked ${blueTeamSummary.blocked} attempt${blueTeamSummary.blocked !== 1 ? "s" : ""}.`
+                        : " No turns were blocked.") +
+                      (blueTeamSummary.highestSeverity !== "n/a"
+                        ? ` Highest severity: ${blueTeamSummary.highestSeverity}.`
+                        : "")
+                    } />
                   </div>
                 )}
 
@@ -1099,8 +1129,8 @@ export default function App() {
 
                 {timeline.length ? (
                   <div className="timeline-list">
-                    {timeline.map((entry) => (
-                      <TimelineCard key={`${entry.event.turn_index}-${entry.event.timestamp}`} entry={entry} selected={selectedEntry?.event?.turn_index === entry.event.turn_index && drawerOpen} onSelect={() => { setSelectedEntry(entry); setDrawerOpen(true); }} />
+                    {timeline.map((entry, index) => (
+                      <TimelineCard key={`${entry.event.turn_index}-${entry.event.timestamp}`} entry={entry} index={index} selected={selectedEntry?.event?.turn_index === entry.event.turn_index && drawerOpen} onSelect={() => { setSelectedEntry(entry); setDrawerOpen(true); }} />
                     ))}
                   </div>
                 ) : (
