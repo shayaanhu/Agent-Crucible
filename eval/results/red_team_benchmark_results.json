@@ -2,9 +2,9 @@
   "run_metadata": {
     "suite_type": "regression_pack",
     "runner": "red_team_regression",
-    "generated_at": "2026-04-02 17:23:03 Pakistan Standard Time",
-    "generated_at_local": "2026-04-02 17:23:03 Pakistan Standard Time",
-    "generated_at_utc": "2026-04-02 12:23:03 UTC",
+    "generated_at": "2026-04-02 17:43:55 Pakistan Standard Time",
+    "generated_at_local": "2026-04-02 17:43:55 Pakistan Standard Time",
+    "generated_at_utc": "2026-04-02 12:43:55 UTC",
     "provider": "mock",
     "attacker_provider": "mock",
     "max_turns": 1,
