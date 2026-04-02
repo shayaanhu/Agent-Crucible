@@ -102,18 +102,47 @@ def execute_run(run_id: str) -> None:
         return
 
     try:
-        store.set_status(run_id, "running", "Running red-team strategies and blue-team checks")
+        store.update_run(
+            run_id,
+            status="running",
+            summary="Run started. Generating the first attack turn.",
+            turns_completed=0,
+            max_turns=request.max_turns,
+            current_phase="attacker",
+            is_complete=False,
+        )
         red_team_agent = get_red_team_agent()
         blue_team_agent = get_blue_team_agent()
-        trace = red_team_agent.run_attack(
-            scenario=request.scenario,
-            goal=request.goal,
-            max_turns=request.max_turns,
-            provider=request.provider,
-            metadata=request.metadata,
-        )
         unsafe_detected = False
-        for turn in trace.turns:
+
+        def update_progress(phase: str, turns_completed: int, max_turns: int) -> None:
+            store.update_run(
+                run_id,
+                status="running",
+                summary=(
+                    f"Run in progress. Completed {turns_completed}/{max_turns} turns. "
+                    f"Current phase: {phase.replace('_', ' ')}."
+                ),
+                turns_completed=turns_completed,
+                max_turns=max_turns,
+                current_phase=phase,
+                is_complete=False,
+            )
+
+        def persist_turn(turn) -> None:
+            nonlocal unsafe_detected
+            store.update_run(
+                run_id,
+                status="running",
+                summary=(
+                    f"Turn {turn.turn_index} generated. Applying blue-team checks "
+                    f"before continuing."
+                ),
+                turns_completed=max(turn.turn_index - 1, 0),
+                max_turns=request.max_turns,
+                current_phase="blue_team",
+                is_complete=False,
+            )
             provider_verdict = blue_team_agent.evaluate_output(turn.response)
             if not provider_verdict.allowed:
                 unsafe_detected = True
@@ -158,11 +187,52 @@ def execute_run(run_id: str) -> None:
                 objective_goal=turn.objective_goal,
             )
             store.add_event(run_id, event, verdict)
+            store.update_run(
+                run_id,
+                status="running",
+                summary=(
+                    f"Captured turn {turn.turn_index}/{request.max_turns}. "
+                    f"Latest outcome: {turn.outcome or 'partial'}."
+                ),
+                turns_completed=turn.turn_index,
+                max_turns=request.max_turns,
+                current_phase="attacker",
+                is_complete=False,
+            )
+
+        trace = red_team_agent.stream_attack(
+            scenario=request.scenario,
+            goal=request.goal,
+            max_turns=request.max_turns,
+            provider=request.provider,
+            metadata=request.metadata,
+            on_turn=persist_turn,
+            on_progress=update_progress,
+        )
 
         summary = (
             f"Run completed: strategy={trace.strategy_id}, stop={trace.stop_reason}, "
             f"unsafe_detected={unsafe_detected}, dry_run={request.dry_run}"
         )
-        store.set_status(run_id, "completed", summary)
+        store.update_run(
+            run_id,
+            status="completed",
+            summary=summary,
+            turns_completed=len(trace.turns),
+            max_turns=request.max_turns,
+            current_phase="complete",
+            is_complete=True,
+        )
     except Exception as exc:
-        store.set_status(run_id, "failed", f"Run failed: {exc}")
+        existing = store.get_run(run_id)
+        turns_completed = existing.turns_completed if existing else 0
+        max_turns = existing.max_turns if existing else request.max_turns
+        store.update_run(
+            run_id,
+            status="failed",
+            summary=f"Run failed: {exc}",
+            turns_completed=turns_completed,
+            max_turns=max_turns,
+            current_phase="failed",
+            is_complete=True,
+        )

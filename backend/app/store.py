@@ -37,12 +37,15 @@ class InMemoryStore:
             run = self._runs.get(run_id)
             return run.model_copy() if run else None
 
-    def set_status(self, run_id: str, status: RunStatus, summary: str) -> None:
+    def update_run(self, run_id: str, **updates) -> None:
         with self._lock:
             run = self._runs.get(run_id)
             if not run:
                 return
-            self._runs[run_id] = run.model_copy(update={"status": status, "summary": summary})
+            self._runs[run_id] = run.model_copy(update=updates)
+
+    def set_status(self, run_id: str, status: RunStatus, summary: str) -> None:
+        self.update_run(run_id, status=status, summary=summary)
 
     def add_event(self, run_id: str, event: AttackTurn, verdict: GuardrailVerdict) -> None:
         with self._lock:

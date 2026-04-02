@@ -31,6 +31,10 @@ class RunRecord(BaseModel):
     status: RunStatus
     created_at: str
     summary: str
+    turns_completed: int = 0
+    max_turns: int = 0
+    current_phase: str = "queued"
+    is_complete: bool = False
 
 
 class RunStatusResponse(BaseModel):
@@ -39,6 +43,14 @@ class RunStatusResponse(BaseModel):
     provider: str
     summary: str
     created_at: str
+    turns_completed: int = 0
+    max_turns: int = 0
+    current_phase: str = "queued"
+    is_complete: bool = False
+    scenario: str | None = None
+    goal: str | None = None
+    strategy_id: str | None = None
+    dry_run: bool = False
 
 
 class AttackTurn(BaseModel):

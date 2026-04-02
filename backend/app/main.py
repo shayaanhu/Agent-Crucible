@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 
 try:
     from dotenv import load_dotenv
@@ -100,6 +101,59 @@ def _benchmark_history_payload() -> list[dict]:
     return history
 
 
+def _artifact_updated_at(path: Path, payload: dict) -> str:
+    run_metadata = payload.get("run_metadata", {})
+    return run_metadata.get("generated_at") or datetime.fromtimestamp(
+        path.stat().st_mtime, tz=timezone.utc
+    ).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _load_eval_artifact(result_file: str, report_file: str, artifact_type: str) -> dict:
+    result_path = Path("eval/results") / result_file
+    report_path = Path("eval/report") / report_file
+    if not result_path.exists():
+        return {
+            "available": False,
+            "artifact_type": artifact_type,
+            "result_file": result_file,
+            "report_file": report_file,
+        }
+    payload = json.loads(result_path.read_text(encoding="utf-8"))
+    return {
+        "available": True,
+        "artifact_type": artifact_type,
+        "result_file": result_path.name,
+        "report_file": report_path.name if report_path.exists() else None,
+        "updated_at": _artifact_updated_at(result_path, payload),
+        "payload": payload,
+    }
+
+
+def _red_team_eval_history_payload() -> list[dict]:
+    results_dir = Path("eval/results")
+    specs = {
+        "red_team_dataset_results.json": "objective_suite",
+        "red_team_regression_results.json": "regression_pack",
+    }
+    history: list[dict] = []
+    for file_name, artifact_type in specs.items():
+        path = results_dir / file_name
+        if not path.exists():
+            continue
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        history.append(
+            {
+                "artifact_type": artifact_type,
+                "result_file": file_name,
+                "updated_at": _artifact_updated_at(path, payload),
+                "summary": payload.get("summary", {}),
+                "run_metadata": payload.get("run_metadata", {}),
+            }
+        )
+    history.sort(key=lambda item: item["updated_at"], reverse=True)
+    return history
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -147,6 +201,10 @@ def create_run(payload: RunCreateRequest, background_tasks: BackgroundTasks) -> 
         status="queued",
         created_at=created_at,
         summary="Run queued",
+        turns_completed=0,
+        max_turns=payload.max_turns,
+        current_phase="queued",
+        is_complete=False,
     )
     store.create_run(run, payload)
     background_tasks.add_task(execute_run, run_id)
@@ -158,7 +216,18 @@ def get_run_status(run_id: str) -> RunStatusResponse:
     run = store.get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
-    return RunStatusResponse(**run.model_dump())
+    request = store.get_request(run_id)
+    payload = run.model_dump()
+    if request is not None:
+        payload.update(
+            {
+                "scenario": request.scenario,
+                "goal": request.goal,
+                "dry_run": request.dry_run,
+                "strategy_id": request.metadata.get("strategy_id", "direct_jailbreak"),
+            }
+        )
+    return RunStatusResponse(**payload)
 
 
 @app.get("/api/v1/runs/{run_id}/events", response_model=RunEventsResponse)
@@ -187,3 +256,43 @@ def evaluate_run(payload: EvaluationRequest) -> EvaluationResponse:
     metrics = [EvalMetric(**metric_map) for metric_map in metric_maps]
     overall = "pass" if all(metric.pass_fail == "pass" for metric in metrics) else "fail"
     return EvaluationResponse(run_id=payload.run_id, metrics=metrics, overall=overall)
+
+
+@app.get("/api/v1/evals/red-team/objective-suite")
+def get_red_team_objective_suite_eval() -> dict:
+    return _load_eval_artifact(
+        "red_team_dataset_results.json",
+        "red_team_dataset_results_report.md",
+        "objective_suite",
+    )
+
+
+@app.get("/api/v1/evals/red-team/regression")
+def get_red_team_regression_eval() -> dict:
+    return _load_eval_artifact(
+        "red_team_regression_results.json",
+        "red_team_regression_results_report.md",
+        "regression_pack",
+    )
+
+
+@app.get("/api/v1/evals/red-team/history")
+def get_red_team_eval_history() -> dict[str, list[dict]]:
+    return {"history": _red_team_eval_history_payload()}
+
+
+def _load_report_text(report_file: str) -> str:
+    report_path = Path("eval/report") / report_file
+    if not report_path.exists():
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report_path.read_text(encoding="utf-8")
+
+
+@app.get("/api/v1/evals/red-team/objective-suite/report", response_class=PlainTextResponse)
+def get_red_team_objective_suite_report() -> str:
+    return _load_report_text("red_team_dataset_results_report.md")
+
+
+@app.get("/api/v1/evals/red-team/regression/report", response_class=PlainTextResponse)
+def get_red_team_regression_report() -> str:
+    return _load_report_text("red_team_regression_results_report.md")

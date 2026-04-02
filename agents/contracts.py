@@ -67,6 +67,18 @@ class RedTeamContract(Protocol):
     ) -> RedTeamRunTrace:
         ...
 
+    def stream_attack(
+        self,
+        scenario: str,
+        goal: str,
+        max_turns: int,
+        provider: str,
+        metadata: Dict[str, str] | None = None,
+        on_turn=None,
+        on_progress=None,
+    ) -> RedTeamRunTrace:
+        ...
+
 
 class BlueTeamContract(Protocol):
     def evaluate_output(self, model_output: str) -> BlueTeamVerdict:

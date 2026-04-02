@@ -39,6 +39,26 @@ class AdvancedRedTeamAgent(RedTeamContract):
     def list_strategies(self) -> list[str]:
         return sorted(self._registry.keys())
 
+    def stream_attack(
+        self,
+        scenario: str,
+        goal: str,
+        max_turns: int,
+        provider: str,
+        metadata: Dict[str, str] | None = None,
+        on_turn=None,
+        on_progress=None,
+    ) -> RedTeamRunTrace:
+        return self._run_attack_internal(
+            scenario=scenario,
+            goal=goal,
+            max_turns=max_turns,
+            provider=provider,
+            metadata=metadata,
+            on_turn=on_turn,
+            on_progress=on_progress,
+        )
+
     def run_attack(
         self,
         scenario: str,
@@ -46,6 +66,24 @@ class AdvancedRedTeamAgent(RedTeamContract):
         max_turns: int,
         provider: str,
         metadata: Dict[str, str] | None = None,
+    ) -> RedTeamRunTrace:
+        return self._run_attack_internal(
+            scenario=scenario,
+            goal=goal,
+            max_turns=max_turns,
+            provider=provider,
+            metadata=metadata,
+        )
+
+    def _run_attack_internal(
+        self,
+        scenario: str,
+        goal: str,
+        max_turns: int,
+        provider: str,
+        metadata: Dict[str, str] | None = None,
+        on_turn=None,
+        on_progress=None,
     ) -> RedTeamRunTrace:
         metadata = metadata or {}
         strategy_id = metadata.get("strategy_id", "direct_jailbreak")
@@ -104,6 +142,8 @@ class AdvancedRedTeamAgent(RedTeamContract):
             state.turn_index += 1
             strategy = self.get_strategy(strategy_id)
             template = _select_template(strategy, state)
+            if on_progress:
+                on_progress("attacker", max(state.turn_index - 1, 0), state.max_turns)
             attacker_context = _build_attacker_context(state, template.prompt_template)
             attacker_feedback = _build_attacker_feedback(state)
             attacker_prompt, attacker_rationale = generate_attacker_prompt(
@@ -123,7 +163,11 @@ class AdvancedRedTeamAgent(RedTeamContract):
             prompt, converter_chain, converter_steps = self._apply_converters(
                 attacker_prompt, state, converters
             )
+            if on_progress:
+                on_progress("target", max(state.turn_index - 1, 0), state.max_turns)
             response = generate_response(prompt=prompt, provider=provider)
+            if on_progress:
+                on_progress("scoring", max(state.turn_index - 1, 0), state.max_turns)
             scorer_results = self._score_response(response, state, scorers)
             objective_scorer = _extract_objective_scorer(scorer_results)
             update = strategy.on_response(state, response)
@@ -178,6 +222,8 @@ class AdvancedRedTeamAgent(RedTeamContract):
                     objective_goal=objective.goal,
                 )
             )
+            if on_turn:
+                on_turn(turns[-1])
             template_sequence.append(template.template_id)
             scorer_stop = _stop_from_scorers(scorer_results)
             if scorer_stop:
