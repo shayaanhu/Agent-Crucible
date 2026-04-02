@@ -1171,7 +1171,7 @@ details[open] > summary::before { transform: rotate(90deg); }
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-lg);
-  max-width: 800px;
+  max-width: 900px;
   width: 100%;
   animation: modalIn var(--dur-normal) var(--ease-out);
   overflow: hidden;
@@ -1220,12 +1220,12 @@ details[open] > summary::before { transform: rotate(90deg); }
 .entry-card-minimal {
   background: var(--bg-surface) !important;
   border: 1px solid var(--border) !important;
-  border-radius: var(--r-xl) !important;
-  padding: 24px !important;
+  border-radius: 20px !important;
+  padding: 48px 32px !important;
   text-align: left !important;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   transition: all var(--dur-fast) !important;
   height: 100%;
 }
@@ -1250,4 +1250,93 @@ details[open] > summary::before { transform: rotate(90deg); }
   font-size: 0.875rem;
   line-height: 1.6;
   margin: 0;
+}
+
+/* ─── Premium UI Components ────────────────────────────────────────────── */
+.custom-select { position: relative; width: 100%; }
+.select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+  user-select: none;
+}
+.select-trigger:hover { border-color: var(--border-focus); background: var(--bg-elevated); }
+.select-trigger.is-open { border-color: var(--border-focus); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+
+.select-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-focus);
+  border-top: none;
+  border-bottom-left-radius: var(--r-xl);
+  border-bottom-right-radius: var(--r-xl);
+  max-height: 280px;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: turnIn var(--dur-fast) var(--ease-out);
+}
+.select-option {
+  padding: 10px 14px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--dur-instant);
+}
+.select-option:hover { background: var(--bg-surface); color: var(--text-primary); }
+.select-option.is-selected { color: var(--info); font-weight: 600; background: var(--info-dim); }
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  height: 42px;
+}
+.stepper-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--dur-instant);
+}
+.stepper-btn:hover:not(:disabled) { background: var(--bg-elevated); color: var(--text-primary); }
+.stepper-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+.stepper-input {
+  width: 60px;
+  height: 100%;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: transparent;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  outline: none;
+}
+.stepper-input::-webkit-inner-spin-button, 
+.stepper-input::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
 }

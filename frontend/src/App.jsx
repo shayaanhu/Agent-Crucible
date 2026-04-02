@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   GraduationCap, Building2, Heart, Headphones, Code2, Scale,
-  PenLine, ArrowLeft, X, Plus, PlayCircle, CheckCircle,
+  PenLine, ArrowLeft, X, Plus, Minus, PlayCircle, CheckCircle,
   Settings, Sword, Shield as ShieldIcon, ChevronDown, ChevronRight, Check
 } from "lucide-react";
 
@@ -296,9 +296,101 @@ function DetailPre({ text }) {
   if (isEmpty(text)) return <p className="empty-copy">No data captured for this section.</p>;
   return <pre className="detail-pre">{text}</pre>;
 }
+
+function CustomSelect({ options, value, onChange, placeholder = "Select an option" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => (typeof o === 'string' ? o === value : o.value === value));
+  const displayValue = selectedOption 
+    ? (typeof selectedOption === 'string' ? selectedOption : selectedOption.label) 
+    : (value || placeholder);
+
+  return (
+    <div className="custom-select" ref={containerRef}>
+      <div className={`select-trigger ${isOpen ? 'is-open' : ''}`} onClick={() => setIsOpen(!isOpen)}>
+        <span>{displayValue}</span>
+        <ChevronDown size={14} style={{ opacity: 0.5, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </div>
+      {isOpen && (
+        <div className="select-options">
+          {options.map((opt) => {
+            const val = typeof opt === 'string' ? opt : opt.value;
+            const label = typeof opt === 'string' ? opt : opt.label;
+            return (
+              <div
+                key={val}
+                className={`select-option ${value === val ? 'is-selected' : ''}`}
+                onClick={() => {
+                  onChange(val);
+                  setIsOpen(false);
+                }}
+              >
+                {label}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stepper({ value, onChange, min = 1, max = 10 }) {
+  const [localVal, setLocalVal] = useState(String(value));
+
+  useEffect(() => {
+    setLocalVal(String(value));
+  }, [value]);
+
+  const commit = (val) => {
+    let num = parseInt(val, 10);
+    if (isNaN(num) || num < min) num = min;
+    if (num > max) num = max;
+    onChange(num);
+    setLocalVal(String(num));
+  };
+
+  return (
+    <div className="stepper">
+      <button 
+        type="button" 
+        className="stepper-btn" 
+        onClick={() => commit(value - 1)}
+        disabled={value <= min}
+      >
+        <Minus size={16} />
+      </button>
+      <input
+        className="stepper-input"
+        type="number"
+        value={localVal}
+        onChange={(e) => setLocalVal(e.target.value)}
+        onBlur={() => commit(localVal)}
+      />
+      <button 
+        type="button" 
+        className="stepper-btn" 
+        onClick={() => commit(value + 1)}
+        disabled={value >= max}
+      >
+        <Plus size={16} />
+      </button>
+    </div>
+  );
+}
 function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, loading, hasRun }) {
   const goalSelectValue = selectState(setup.goal, GOAL_OPTIONS);
-  const isCustomScenario = !SCENARIO_CARDS.some((c) => c.name === setup.scenario);
   const launchReady = Boolean(setup.scenario.trim() && setup.goal.trim());
 
   return (
@@ -312,9 +404,9 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
         ) : null}
 
         <div className="step-indicator">
-          <span className="step-counter">Step {step} of 3</span>
+          <span className="step-counter">Step {step} of 5</span>
           <div className="step-dots">
-            {[1, 2, 3].map((n) => (
+            {[1, 2, 3, 4, 5].map((n) => (
               <div key={n} className={`step-dot${n < step ? " is-done" : n === step ? " is-active" : ""}`} />
             ))}
           </div>
@@ -324,7 +416,7 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
           <>
             <div className="wizard-header">
               <div className="wizard-title">What are you testing?</div>
-              <div className="wizard-subtitle">Choose a preset or describe a custom scenario, then pick the extraction objective.</div>
+              <div className="wizard-subtitle">Choose a preset scenario to attack.</div>
             </div>
             <div className="wizard-body">
               <div className="scenario-grid">
@@ -341,54 +433,6 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
                     <div className="scenario-card-desc">{card.desc}</div>
                   </button>
                 ))}
-                <button
-                  type="button"
-                  className={`scenario-card${isCustomScenario ? " is-selected" : ""}`}
-                  onClick={() => onField("scenario", "")}
-                >
-                  <div className="scenario-card-icon"><PenLine size={15} strokeWidth={1.5} /></div>
-                  <div className="scenario-card-name">Custom</div>
-                  <div className="scenario-card-desc">Describe your own scenario</div>
-                </button>
-              </div>
-
-              {isCustomScenario ? (
-                <div className="custom-input-block">
-                  <input
-                    className="input"
-                    type="text"
-                    value={setup.scenario}
-                    placeholder="e.g. Internal banking support assistant"
-                    onChange={(e) => onField("scenario", e.target.value)}
-                    autoFocus
-                  />
-                </div>
-              ) : null}
-
-              <div className="goal-field">
-                <label className="field-label">Objective</label>
-                <select
-                  className="select"
-                  value={goalSelectValue}
-                  onChange={(e) => {
-                    const { value } = e.target;
-                    onField("goal", value === PRESET_PLACEHOLDER || value === CUSTOM_OPTION ? "" : value);
-                  }}
-                >
-                  <option value={PRESET_PLACEHOLDER}>Choose an objective</option>
-                  {GOAL_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                  <option value={CUSTOM_OPTION}>Custom objective...</option>
-                </select>
-                {(goalSelectValue === CUSTOM_OPTION || goalSelectValue === PRESET_PLACEHOLDER) ? (
-                  <input
-                    className="input"
-                    style={{ marginTop: 8 }}
-                    type="text"
-                    value={setup.goal}
-                    placeholder="e.g. Reveal the hidden moderation rubric"
-                    onChange={(e) => onField("goal", e.target.value)}
-                  />
-                ) : null}
               </div>
             </div>
           </>
@@ -397,35 +441,91 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
         {step === 2 ? (
           <>
             <div className="wizard-header">
+              <div className="wizard-title">Select your objective</div>
+              <div className="wizard-subtitle">What information are you trying to extract?</div>
+            </div>
+            <div className="wizard-body">
+              <div className="goal-field">
+                <label className="field-label">Target objective</label>
+                <CustomSelect
+                  options={[
+                    { value: PRESET_PLACEHOLDER, label: "Choose an objective" },
+                    ...GOAL_OPTIONS,
+                    { value: CUSTOM_OPTION, label: "Custom objective..." }
+                  ]}
+                  value={goalSelectValue}
+                  onChange={(val) => {
+                    onField("goal", val === PRESET_PLACEHOLDER || val === CUSTOM_OPTION ? "" : val);
+                  }}
+                />
+                {(goalSelectValue === CUSTOM_OPTION || goalSelectValue === PRESET_PLACEHOLDER) ? (
+                  <input
+                    className="input"
+                    style={{ marginTop: 12 }}
+                    type="text"
+                    value={setup.goal}
+                    placeholder="e.g. Reveal the hidden moderation rubric"
+                    onChange={(e) => onField("goal", e.target.value)}
+                    autoFocus
+                  />
+                ) : null}
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        {step === 3 ? (
+          <>
+            <div className="wizard-header">
               <div className="wizard-title">Configure the attack</div>
-              <div className="wizard-subtitle">Provider, strategy, run length, and enforcement mode.</div>
+              <div className="wizard-subtitle">Select your model, strategy, and run length.</div>
             </div>
             <div className="wizard-body attack-form">
               <div>
                 <label className="field-label">Provider</label>
-                <select className="select" value={setup.provider} onChange={(e) => onField("provider", e.target.value)}>
-                  {PROVIDER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <CustomSelect
+                  options={PROVIDER_OPTIONS}
+                  value={setup.provider}
+                  onChange={(val) => onField("provider", val)}
+                />
               </div>
               <div>
                 <label className="field-label">Strategy</label>
-                <select className="select" value={setup.strategyId} onChange={(e) => onField("strategyId", e.target.value)}>
-                  {STRATEGY_OPTIONS.map((s) => <option key={s} value={s}>{formatLabel(s)}</option>)}
-                </select>
+                <CustomSelect
+                  options={STRATEGY_OPTIONS.map(s => ({ value: s, label: formatLabel(s) }))}
+                  value={setup.strategyId}
+                  onChange={(val) => onField("strategyId", val)}
+                />
               </div>
               <div>
                 <label className="field-label">Max turns</label>
-                <input className="input" type="number" min="1" max="10" value={setup.maxTurns} onChange={(e) => onField("maxTurns", Number(e.target.value) || 1)} />
+                <Stepper
+                  value={setup.maxTurns}
+                  onChange={(val) => onField("maxTurns", val)}
+                  min={1}
+                  max={10}
+                />
               </div>
+            </div>
+          </>
+        ) : null}
+
+        {step === 4 ? (
+          <>
+            <div className="wizard-header">
+              <div className="wizard-title">Enforcement mode</div>
+              <div className="wizard-subtitle">Choose how the guardrails should respond.</div>
+            </div>
+            <div className="wizard-body attack-form">
               <div>
-                <label className="field-label">Enforcement mode</label>
+                <label className="field-label">Guardrail behavior</label>
                 <div className="mode-group">
                   <label className={`mode-option${setup.dryRun ? " is-selected" : ""}`}>
                     <input type="radio" name="mode" checked={setup.dryRun} onChange={() => onField("dryRun", true)} />
                     <div className="mode-option-dot" />
                     <div className="mode-option-text">
                       <span className="mode-option-label">Dry run</span>
-                      <span className="mode-option-desc">Flag but don't block</span>
+                      <span className="mode-option-desc">Flag safety violations but don't block them</span>
                     </div>
                   </label>
                   <label className={`mode-option${!setup.dryRun ? " is-selected" : ""}`}>
@@ -433,7 +533,7 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
                     <div className="mode-option-dot" />
                     <div className="mode-option-text">
                       <span className="mode-option-label">Enforced</span>
-                      <span className="mode-option-desc">Block unsafe turns</span>
+                      <span className="mode-option-desc">Actively block unsafe turns in real time</span>
                     </div>
                   </label>
                 </div>
@@ -442,7 +542,7 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
           </>
         ) : null}
 
-        {step === 3 ? (
+        {step === 5 ? (
           <>
             <div className="wizard-header">
               <div className="wizard-title">Review your setup</div>
@@ -471,7 +571,7 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
             <ArrowLeft size={14} /> Back
           </button>
           <div className="modal-actions-right">
-            {step < 3 ? (
+            {step < 5 ? (
               <button type="button" className="btn btn-primary" onClick={onNext} disabled={loading || !launchReady}>
                 Continue
               </button>
@@ -1285,7 +1385,7 @@ export default function App() {
         ) : null}
       </div>
 
-      {wizardOpen ? <SetupModal step={wizardStep} setup={setup} onField={updateField} onBack={() => setWizardStep((c) => Math.max(1, c - 1))} onNext={() => setWizardStep((c) => Math.min(3, c + 1))} onLaunch={createRun} onClose={() => setWizardOpen(false)} loading={loading} hasRun={Boolean(runId)} /> : null}
+      {wizardOpen ? <SetupModal step={wizardStep} setup={setup} onField={updateField} onBack={() => setWizardStep((c) => Math.max(1, c - 1))} onNext={() => setWizardStep((c) => Math.min(5, c + 1))} onLaunch={createRun} onClose={() => setWizardOpen(false)} loading={loading} hasRun={Boolean(runId)} /> : null}
       {drawerOpen ? <TurnDrawer entry={selectedEntry} onClose={() => setDrawerOpen(false)} /> : null}
     </div>
   );
