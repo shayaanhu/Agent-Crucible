@@ -41,12 +41,12 @@ const GOAL_OPTIONS = [
 ];
 
 const SCENARIO_CARDS = [
-  { name: "Educational assistant",      desc: "Tutoring, homework help, learning",     Icon: GraduationCap },
-  { name: "Support chatbot for bank",   desc: "Banking, accounts, transactions",        Icon: Building2 },
-  { name: "Healthcare assistant",       desc: "Medical information, triage",            Icon: Heart },
-  { name: "Customer service agent",     desc: "Product support, complaints",            Icon: Headphones },
-  { name: "Developer assistant",        desc: "Code review, debugging, docs",           Icon: Code2 },
-  { name: "Legal assistant",            desc: "Contracts, compliance, advice",          Icon: Scale },
+  { name: "Educational assistant", desc: "Tutoring, homework help, learning", Icon: GraduationCap },
+  { name: "Support chatbot for bank", desc: "Banking, accounts, transactions", Icon: Building2 },
+  { name: "Healthcare assistant", desc: "Medical information, triage", Icon: Heart },
+  { name: "Customer service agent", desc: "Product support, complaints", Icon: Headphones },
+  { name: "Developer assistant", desc: "Code review, debugging, docs", Icon: Code2 },
+  { name: "Legal assistant", desc: "Contracts, compliance, advice", Icon: Scale },
 ];
 
 const PRESET_PLACEHOLDER = "__placeholder__";
@@ -450,12 +450,12 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
             </div>
             <div className="review-list">
               {[
-                { key: "Scenario",  value: setup.scenario },
+                { key: "Scenario", value: setup.scenario },
                 { key: "Objective", value: setup.goal },
-                { key: "Provider",  value: formatLabel(setup.provider) },
-                { key: "Strategy",  value: formatLabel(setup.strategyId) },
-                { key: "Turns",     value: setup.maxTurns },
-                { key: "Mode",      value: setup.dryRun ? "Dry run" : "Enforced" },
+                { key: "Provider", value: formatLabel(setup.provider) },
+                { key: "Strategy", value: formatLabel(setup.strategyId) },
+                { key: "Turns", value: setup.maxTurns },
+                { key: "Mode", value: setup.dryRun ? "Dry run" : "Enforced" },
               ].map((row) => (
                 <div className="review-row" key={row.key}>
                   <span className="review-row-key">{row.key}</span>
@@ -585,79 +585,138 @@ function TurnDrawer({ entry, onClose }) {
             ))}
           </div>
 
-        <KeyGrid
-          items={[
-            { label: "Strategy", value: formatLabel(entry.event.strategy_id) },
-            { label: "Template", value: formatLabel(entry.event.template_id) },
-            { label: "Attack tag", value: formatLabel(entry.event.attack_tag) },
-            { label: "Prompt hash", value: truncateMiddle(entry.event.prompt_hash) },
-            { label: "Target", value: formatLabel(entry.event.target_provider) },
-            { label: "Policy", value: truncateMiddle(entry.verdict.policy_id) }
-          ]}
-        />
-
-        <Fold title="Attacker prompt" defaultOpen>
-          <p className="micro-copy">Pre-converter prompt and rationale</p>
-          <DetailPre text={entry.event.attacker_prompt} />
-          <DetailPre text={entry.event.attacker_rationale} />
-        </Fold>
-
-        <Fold title="Converter steps">
-          {entry.event.converter_steps?.length ? entry.event.converter_steps.map((step, index) => (
-            <div className="converter-card" key={`${step.name}-${index}`}>
-              <div className="converter-title">{formatLabel(step.name)}</div>
-              <DetailPre text={step.output} />
-            </div>
-          )) : <p className="empty-copy">No converter steps recorded.</p>}
-        </Fold>
-
-        <Fold title="Target output" defaultOpen>
-          <DetailPre text={entry.event.model_output} />
-        </Fold>
-
-        <Fold title="Scorer verdict">
-          <div className="score-panel">
-            <div className="score-hero">
-              <div className="score-hero-label">Objective LLM scorer</div>
-              <div className="score-hero-value">{formatLabel(entry.event.objective_scorer?.label || "n/a")}</div>
-              <div className="score-hero-note">{entry.event.objective_scorer?.reason || "No rationale recorded."}</div>
-            </div>
-            {entry.event.scorer_results?.map((scorer, index) => (
-              <div className="score-row" key={`${scorer.name}-${index}`}>
-                <div>
-                  <strong>{formatLabel(scorer.name)}</strong>
-                  <div className="micro-copy">{scorer.reason}</div>
-                </div>
-                <div className="score-row-side">
-                  <Pill tone={toneForOutcome(scorer.label)}>{formatLabel(scorer.label)}</Pill>
-                  <span>{formatNumber(scorer.score)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Fold>
-
-        <Fold title="Blue-team evidence">
           <KeyGrid
             items={[
-              { label: "Action", value: formatLabel(entry.verdict.action) },
-              { label: "Category", value: formatLabel(entry.verdict.category) },
-              { label: "Severity", value: formatLabel(entry.verdict.severity) },
-              { label: "Confidence", value: formatNumber(entry.verdict.confidence) },
-              { label: "Dry run", value: entry.verdict.dry_run ? "Yes" : "No" }
+              { label: "Strategy", value: formatLabel(entry.event.strategy_id) },
+              { label: "Template", value: formatLabel(entry.event.template_id) },
+              { label: "Attack tag", value: formatLabel(entry.event.attack_tag) },
+              { label: "Prompt hash", value: truncateMiddle(entry.event.prompt_hash) },
+              { label: "Target", value: formatLabel(entry.event.target_provider) },
+              { label: "Policy", value: truncateMiddle(entry.verdict.policy_id) }
             ]}
           />
-          <p className="micro-copy">Reason</p>
-          <DetailPre text={entry.verdict.reason} />
-          <Fold title="Detector telemetry">
-            <DetailPre text={JSON.stringify(entry.verdict.detector_results || {}, null, 2)} />
+
+          <Fold title="Attacker prompt" defaultOpen>
+            <p className="micro-copy">Pre-converter prompt and rationale</p>
+            <DetailPre text={entry.event.attacker_prompt} />
+            {entry.event.attacker_rationale ? (
+              <p className="micro-copy" style={{ marginTop: 12 }}>Rationale: {entry.event.attacker_rationale}</p>
+            ) : null}
           </Fold>
-        </Fold>
+
+          <Fold title="Converter steps">
+            {entry.event.converter_steps?.length ? entry.event.converter_steps.map((step, index) => (
+              <div className="converter-card" key={`${step.name}-${index}`}>
+                <div className="converter-title">{formatLabel(step.name)}</div>
+                <DetailPre text={step.output} />
+              </div>
+            )) : <p className="empty-copy">No converter steps recorded.</p>}
+          </Fold>
+
+          <Fold title="Target output" defaultOpen>
+            <DetailPre text={entry.event.model_output} />
+          </Fold>
+
+          <Fold title="Scorer verdict">
+            <div className="score-panel">
+              <div className="score-hero">
+                <div className="score-hero-label">Objective LLM scorer</div>
+                <div className="score-hero-value">{formatLabel(entry.event.objective_scorer?.label || "n/a")}</div>
+                <div className="score-hero-note">{entry.event.objective_scorer?.reason || "No rationale recorded."}</div>
+              </div>
+              {entry.event.scorer_results?.map((scorer, index) => (
+                <div className="score-row" key={`${scorer.name}-${index}`}>
+                  <div>
+                    <strong>{formatLabel(scorer.name)}</strong>
+                    <div className="micro-copy">{scorer.reason}</div>
+                  </div>
+                  <div className="score-row-side">
+                    <Pill tone={toneForOutcome(scorer.label)}>{formatLabel(scorer.label)}</Pill>
+                    <span>{formatNumber(scorer.score)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Fold>
+
+          <Fold title="Blue-team evidence">
+            <KeyGrid
+              items={[
+                { label: "Action", value: formatLabel(entry.verdict.action) },
+                { label: "Category", value: formatLabel(entry.verdict.category) },
+                { label: "Severity", value: formatLabel(entry.verdict.severity) },
+                { label: "Confidence", value: formatNumber(entry.verdict.confidence) },
+                { label: "Dry run", value: entry.verdict.dry_run ? "Yes" : "No" }
+              ]}
+            />
+            <p className="micro-copy">Reason</p>
+            <DetailPre text={entry.verdict.reason} />
+            <Fold title="Detector telemetry">
+              <DetailPre text={JSON.stringify(entry.verdict.detector_results || {}, null, 2)} />
+            </Fold>
+          </Fold>
         </div>{/* /drawer-body */}
       </aside>
     </div>
   );
 }
+
+function EntryView({ onSelectMode }) {
+  return (
+    <div className="modal-shell">
+      <div className="modal-backdrop" />
+      <section className="modal-card">
+        <div style={{ padding: 56 }}>
+          <div className="entry-header-minimal">
+            <div className="entry-title-minimal">Agent Crucible</div>
+            <div className="wizard-subtitle" style={{ color: "var(--text-secondary)", fontSize: "1rem" }}>
+              Choose your testing environment
+            </div>
+          </div>
+
+          <div className="scenario-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+            <button
+              type="button"
+              className="scenario-card entry-card-minimal"
+              onClick={() => onSelectMode("lab")}
+            >
+              <div className="entry-card-top">
+                <div className="entry-icon-box">
+                  <Sword size={22} strokeWidth={1.5} />
+                </div>
+                <div className="entry-card-title">Live Attack Lab</div>
+              </div>
+              <div className="scenario-card-desc">
+                Interactive multi-turn red-team simulator. Target specific objectives with custom strategy chains.
+              </div>
+            </button>
+
+            <button
+              type="button"
+              className="scenario-card entry-card-minimal"
+              onClick={() => onSelectMode("evaluation")}
+            >
+              <div className="entry-card-top">
+                <div className="entry-icon-box">
+                  <ShieldIcon size={22} strokeWidth={1.5} />
+                </div>
+                <div className="entry-card-title">Testing Suite</div>
+              </div>
+              <div className="scenario-card-desc">
+                Comprehensive automated benchmark. Run the full red-team objective suite and view performance metrics.
+              </div>
+            </button>
+          </div>
+
+          <div style={{ textAlign: "center", marginTop: 56, opacity: 0.3, fontSize: "0.75rem", letterSpacing: "0.05em" }}>
+            AGENT CRUCIBLE V1.0.0
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function BreakdownTable({ title, rows }) {
   return (
     <section className="eval-section">
@@ -826,7 +885,8 @@ export default function App() {
     dryRun: true
   });
   const [wizardStep, setWizardStep] = useState(1);
-  const [wizardOpen, setWizardOpen] = useState(true);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [entryViewOpen, setEntryViewOpen] = useState(true);
   const [activeView, setActiveView] = useState("lab");
   const [loading, setLoading] = useState(false);
   const [evalLoading, setEvalLoading] = useState(false);
@@ -932,7 +992,7 @@ export default function App() {
       });
       const data = await resp.json();
       setSuiteRun({ ...data, progress_percentage: 0, is_complete: false });
-      
+
       const poller = setInterval(async () => {
         const pResp = await fetch(`${API_BASE}/api/v1/evals/red-team/run/${data.suite_id}`);
         const pData = await pResp.json();
@@ -1038,9 +1098,9 @@ export default function App() {
   const emptyState = !runId && !wizardOpen;
   const runStatusDot = status?.status === "completed" ? "complete"
     : status?.status === "running" ? "running"
-    : status?.status === "failed" ? "failed"
-    : status?.status === "queued" ? "queued"
-    : "idle";
+      : status?.status === "failed" ? "failed"
+        : status?.status === "queued" ? "queued"
+          : "idle";
 
   function handleNewRun() {
     setRunId(""); setStatus(null); setTimeline([]); setEvaluation(null);
@@ -1048,8 +1108,23 @@ export default function App() {
     setWizardOpen(true); setWizardStep(1);
   }
 
+  function handleSelectMode(mode) {
+    if (mode === "lab") {
+      setEntryViewOpen(false);
+      setWizardOpen(true);
+      setActiveView("lab");
+    } else if (mode === "evaluation") {
+      setEntryViewOpen(false);
+      setActiveView("evaluation");
+    }
+  }
+
   return (
     <div className="app-shell">
+      {entryViewOpen ? (
+        <EntryView onSelectMode={handleSelectMode} />
+      ) : null}
+
       {/* Sidebar */}
       <nav className="sidebar">
         <div className="sidebar-logo">Agent Crucible</div>
@@ -1162,8 +1237,8 @@ export default function App() {
                   style={{
                     "--outcome-color": blueTeamSummary.blocked > 0 ? "var(--success)"
                       : blueTeamSummary.highestSeverity === "critical" ? "var(--danger)"
-                      : blueTeamSummary.highestSeverity === "high" ? "var(--warning)"
-                      : "var(--info)"
+                        : blueTeamSummary.highestSeverity === "high" ? "var(--warning)"
+                          : "var(--info)"
                   }}
                 />
 

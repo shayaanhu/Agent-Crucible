@@ -314,9 +314,9 @@
       "status": "running",
       "provider": "groq",
       "created_at": "2026-04-02T19:04:54.009698Z",
-      "completed_cases": 1,
+      "completed_cases": 2,
       "total_cases": 5,
-      "current_case_id": "case-1",
+      "current_case_id": "case-2",
       "results_file": null
     },
     "suite-ab5603a4": {
