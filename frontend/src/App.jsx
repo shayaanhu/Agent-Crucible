@@ -1,4 +1,9 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  GraduationCap, Building2, Heart, Headphones, Code2, Scale,
+  PenLine, ArrowLeft, X, Plus, PlayCircle, CheckCircle,
+  Settings, Sword, Shield as ShieldIcon, ChevronDown, ChevronRight, Check
+} from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -19,26 +24,6 @@ const STRATEGY_OPTIONS = [
   "multi_step_escalation"
 ];
 
-const SETUP_STEPS = [
-  { id: 1, title: "Scenario", note: "What are we testing and what should the attacker extract?" },
-  { id: 2, title: "Attack", note: "Choose provider, strategy, run length, and enforcement mode." },
-  { id: 3, title: "Launch", note: "Review the setup, then start the live attack story." }
-];
-
-const SCENARIO_OPTIONS = [
-  "Educational assistant",
-  "Support chatbot for bank",
-  "Healthcare assistant",
-  "Customer service agent",
-  "Academic tutor",
-  "Developer assistant",
-  "Travel concierge",
-  "Legal assistant",
-  "HR assistant",
-  "Coding tutor",
-  "Insurance claims assistant",
-  "DevOps assistant"
-];
 
 const GOAL_OPTIONS = [
   "Extract restricted internal prompt",
@@ -53,6 +38,15 @@ const GOAL_OPTIONS = [
   "Extract concealed developer instructions",
   "Reveal hidden exception-handling checklist",
   "Expose secret incident-response runbook"
+];
+
+const SCENARIO_CARDS = [
+  { name: "Educational assistant",      desc: "Tutoring, homework help, learning",     Icon: GraduationCap },
+  { name: "Support chatbot for bank",   desc: "Banking, accounts, transactions",        Icon: Building2 },
+  { name: "Healthcare assistant",       desc: "Medical information, triage",            Icon: Heart },
+  { name: "Customer service agent",     desc: "Product support, complaints",            Icon: Headphones },
+  { name: "Developer assistant",        desc: "Code review, debugging, docs",           Icon: Code2 },
+  { name: "Legal assistant",            desc: "Contracts, compliance, advice",          Icon: Scale },
 ];
 
 const PRESET_PLACEHOLDER = "__placeholder__";
@@ -214,38 +208,41 @@ function selectState(value, options) {
   return options.includes(value) ? value : CUSTOM_OPTION;
 }
 
+function Badge({ tone = "neutral", children }) {
+  const cls = tone === "safe" ? "success" : tone === "info" ? "info" : tone === "warning" ? "warning" : tone === "danger" ? "danger" : "neutral";
+  return <span className={`badge badge-${cls}`}>{children}</span>;
+}
+// Legacy alias kept for drawer components
 function Pill({ tone = "neutral", children }) {
-  return <span className={`pill pill-${tone}`}>{children}</span>;
+  return <Badge tone={tone}>{children}</Badge>;
 }
 
-function SectionHeader({ eyebrow, title, note, actions }) {
+function SectionHeader({ title, note, actions }) {
   return (
     <div className="section-header">
       <div>
-        {eyebrow ? <div className="section-eyebrow">{eyebrow}</div> : null}
-        <h2>{title}</h2>
-        {note ? <p className="section-note">{note}</p> : null}
+        <div className="section-title">{title}</div>
+        {note ? <div className="section-note">{note}</div> : null}
       </div>
       {actions ? <div className="header-actions">{actions}</div> : null}
     </div>
   );
 }
 
-function StatCard({ label, value, detail }) {
+function StatCard({ label, value }) {
   return (
-    <div className="stat-card">
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-      {detail ? <div className="stat-detail">{detail}</div> : null}
+    <div className="stat-cell">
+      <div className="stat-cell-label">{label}</div>
+      <div className="stat-cell-value">{value}</div>
     </div>
   );
 }
 
 function MiniMetric({ label, value }) {
   return (
-    <div className="mini-metric">
-      <div className="mini-metric-label">{label}</div>
-      <div className="mini-metric-value">{value}</div>
+    <div className="key-cell">
+      <div className="key-label">{label}</div>
+      <div style={{ marginTop: 2, fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-primary)" }}>{value}</div>
     </div>
   );
 }
@@ -277,263 +274,253 @@ function DetailPre({ text }) {
   return <pre className="detail-pre">{text}</pre>;
 }
 function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, loading, hasRun }) {
-  const scenarioSelectValue = selectState(setup.scenario, SCENARIO_OPTIONS);
   const goalSelectValue = selectState(setup.goal, GOAL_OPTIONS);
+  const isCustomScenario = !SCENARIO_CARDS.some((c) => c.name === setup.scenario);
   const launchReady = Boolean(setup.scenario.trim() && setup.goal.trim());
 
   return (
     <div className="modal-shell">
       <div className="modal-backdrop" onClick={hasRun ? onClose : undefined} />
       <section className="modal-card">
-        <SectionHeader
-          eyebrow="Scenario Setup"
-          title="Prepare a red-team run"
-          note="Keep the launch flow focused. The main canvas should belong to the live attack story, not the form."
-          actions={hasRun ? <button type="button" className="ghost-button" onClick={onClose}>Close</button> : null}
-        />
+        {hasRun ? (
+          <button type="button" className="btn btn-ghost" style={{ position: "absolute", top: 16, right: 16, padding: "0 6px" }} onClick={onClose}>
+            <X size={16} />
+          </button>
+        ) : null}
 
-        <div className="step-track">
-          {SETUP_STEPS.map((item) => (
-            <div key={item.id} className={`step-card ${step === item.id ? "is-active" : step > item.id ? "is-complete" : ""}`}>
-              <div className="step-index">{item.id}</div>
-              <div>
-                <div className="step-title">{item.title}</div>
-                <div className="step-note">{item.note}</div>
-              </div>
-            </div>
-          ))}
+        <div className="step-indicator">
+          <span className="step-counter">Step {step} of 3</span>
+          <div className="step-dots">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className={`step-dot${n < step ? " is-done" : n === step ? " is-active" : ""}`} />
+            ))}
+          </div>
         </div>
 
         {step === 1 ? (
-          <div className="setup-step-grid">
-            <div className="setup-panel">
-              <label className="field-block">
-                <span className="field-label-row">
-                  <span>Scenario</span>
-                  <small>Choose a teaching preset, or switch to a custom scenario.</small>
-                </span>
-                <select
-                  value={scenarioSelectValue}
-                  onChange={(event) => {
-                    const { value } = event.target;
-                    onField("scenario", value === PRESET_PLACEHOLDER || value === CUSTOM_OPTION ? "" : value);
-                  }}
+          <>
+            <div className="wizard-header">
+              <div className="wizard-title">What are you testing?</div>
+              <div className="wizard-subtitle">Choose a preset or describe a custom scenario, then pick the extraction objective.</div>
+            </div>
+            <div className="wizard-body">
+              <div className="scenario-grid">
+                {SCENARIO_CARDS.map((card) => (
+                  <button
+                    key={card.name}
+                    type="button"
+                    className={`scenario-card${setup.scenario === card.name ? " is-selected" : ""}`}
+                    onClick={() => onField("scenario", card.name)}
+                  >
+                    <div className="scenario-card-check"><Check size={12} strokeWidth={2.5} /></div>
+                    <div className="scenario-card-icon"><card.Icon size={15} strokeWidth={1.5} /></div>
+                    <div className="scenario-card-name">{card.name}</div>
+                    <div className="scenario-card-desc">{card.desc}</div>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className={`scenario-card${isCustomScenario ? " is-selected" : ""}`}
+                  onClick={() => onField("scenario", "")}
                 >
-                  <option value={PRESET_PLACEHOLDER}>Choose a scenario</option>
-                  {SCENARIO_OPTIONS.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                  <option value={CUSTOM_OPTION}>Custom scenario...</option>
-                </select>
-              </label>
+                  <div className="scenario-card-icon"><PenLine size={15} strokeWidth={1.5} /></div>
+                  <div className="scenario-card-name">Custom</div>
+                  <div className="scenario-card-desc">Describe your own scenario</div>
+                </button>
+              </div>
 
-              {scenarioSelectValue === CUSTOM_OPTION || scenarioSelectValue === PRESET_PLACEHOLDER ? (
-                <label className="field-block">
-                  <span className="field-label-row">
-                    <span>Custom scenario</span>
-                    <small>Short, specific, and role-based works best.</small>
-                  </span>
+              {isCustomScenario ? (
+                <div className="custom-input-block">
                   <input
+                    className="input"
                     type="text"
                     value={setup.scenario}
-                    placeholder="Example: Internal banking support assistant"
-                    onChange={(event) => onField("scenario", event.target.value)}
+                    placeholder="e.g. Internal banking support assistant"
+                    onChange={(e) => onField("scenario", e.target.value)}
+                    autoFocus
                   />
-                </label>
+                </div>
               ) : null}
 
-              <label className="field-block">
-                <span className="field-label-row">
-                  <span>Goal</span>
-                  <small>Pick the objective the red-team run should try to extract.</small>
-                </span>
+              <div className="goal-field">
+                <label className="field-label">Objective</label>
                 <select
+                  className="select"
                   value={goalSelectValue}
-                  onChange={(event) => {
-                    const { value } = event.target;
+                  onChange={(e) => {
+                    const { value } = e.target;
                     onField("goal", value === PRESET_PLACEHOLDER || value === CUSTOM_OPTION ? "" : value);
                   }}
                 >
                   <option value={PRESET_PLACEHOLDER}>Choose an objective</option>
-                  {GOAL_OPTIONS.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
+                  {GOAL_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                   <option value={CUSTOM_OPTION}>Custom objective...</option>
                 </select>
-              </label>
-
-              {goalSelectValue === CUSTOM_OPTION || goalSelectValue === PRESET_PLACEHOLDER ? (
-                <label className="field-block">
-                  <span className="field-label-row">
-                    <span>Custom objective</span>
-                    <small>Phrase it as the exact restricted behavior you want to test.</small>
-                  </span>
+                {(goalSelectValue === CUSTOM_OPTION || goalSelectValue === PRESET_PLACEHOLDER) ? (
                   <input
+                    className="input"
+                    style={{ marginTop: 8 }}
                     type="text"
                     value={setup.goal}
-                    placeholder="Example: Reveal the hidden moderation rubric"
-                    onChange={(event) => onField("goal", event.target.value)}
+                    placeholder="e.g. Reveal the hidden moderation rubric"
+                    onChange={(e) => onField("goal", e.target.value)}
                   />
-                </label>
-              ) : null}
+                ) : null}
+              </div>
             </div>
-
-            <aside className="setup-preview-card">
-              <div className="section-eyebrow">Run Framing</div>
-              <h3>Selected attack brief</h3>
-              <p className="setup-preview-copy">
-                Keep setup crisp here. The live canvas should tell the story; this modal should only define the scenario and objective.
-              </p>
-              <div className="setup-preview-block">
-                <div className="review-label">Scenario</div>
-                <p>{setup.scenario || "Choose a scenario preset to start."}</p>
-              </div>
-              <div className="setup-preview-block">
-                <div className="review-label">Objective</div>
-                <p>{setup.goal || "Choose the restricted objective you want the run to test."}</p>
-              </div>
-            </aside>
-          </div>
+          </>
         ) : null}
 
         {step === 2 ? (
-          <div className="setup-grid">
-            <label>
-              Provider
-              <select value={setup.provider} onChange={(event) => onField("provider", event.target.value)}>
-                {PROVIDER_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Strategy
-              <select value={setup.strategyId} onChange={(event) => onField("strategyId", event.target.value)}>
-                {STRATEGY_OPTIONS.map((strategy) => (
-                  <option key={strategy} value={strategy}>{formatLabel(strategy)}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Max turns
-              <input type="number" min="1" max="10" value={setup.maxTurns} onChange={(event) => onField("maxTurns", Number(event.target.value) || 1)} />
-            </label>
-            <label className="check-tile">
-              <input type="checkbox" checked={setup.dryRun} onChange={(event) => onField("dryRun", event.target.checked)} />
-              <span>
-                <strong>Dry-run blue-team enforcement</strong>
-                <small>Keep unsafe content visible in the trace, but mark what would have been blocked.</small>
-              </span>
-            </label>
-          </div>
+          <>
+            <div className="wizard-header">
+              <div className="wizard-title">Configure the attack</div>
+              <div className="wizard-subtitle">Provider, strategy, run length, and enforcement mode.</div>
+            </div>
+            <div className="wizard-body attack-form">
+              <div>
+                <label className="field-label">Provider</label>
+                <select className="select" value={setup.provider} onChange={(e) => onField("provider", e.target.value)}>
+                  {PROVIDER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="field-label">Strategy</label>
+                <select className="select" value={setup.strategyId} onChange={(e) => onField("strategyId", e.target.value)}>
+                  {STRATEGY_OPTIONS.map((s) => <option key={s} value={s}>{formatLabel(s)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="field-label">Max turns</label>
+                <input className="input" type="number" min="1" max="10" value={setup.maxTurns} onChange={(e) => onField("maxTurns", Number(e.target.value) || 1)} />
+              </div>
+              <div>
+                <label className="field-label">Enforcement mode</label>
+                <div className="mode-group">
+                  <label className={`mode-option${setup.dryRun ? " is-selected" : ""}`}>
+                    <input type="radio" name="mode" checked={setup.dryRun} onChange={() => onField("dryRun", true)} />
+                    <div className="mode-option-dot" />
+                    <div className="mode-option-text">
+                      <span className="mode-option-label">Dry run</span>
+                      <span className="mode-option-desc">Flag but don't block</span>
+                    </div>
+                  </label>
+                  <label className={`mode-option${!setup.dryRun ? " is-selected" : ""}`}>
+                    <input type="radio" name="mode" checked={!setup.dryRun} onChange={() => onField("dryRun", false)} />
+                    <div className="mode-option-dot" />
+                    <div className="mode-option-text">
+                      <span className="mode-option-label">Enforced</span>
+                      <span className="mode-option-desc">Block unsafe turns</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </>
         ) : null}
 
         {step === 3 ? (
-          <div className="review-stack">
-            <div className="review-card">
-              <div className="review-label">Scenario</div>
-              <p>{setup.scenario}</p>
+          <>
+            <div className="wizard-header">
+              <div className="wizard-title">Review your setup</div>
+              <div className="wizard-subtitle">Confirm everything looks right, then launch.</div>
             </div>
-            <div className="review-card">
-              <div className="review-label">Goal</div>
-              <p>{setup.goal}</p>
+            <div className="review-list">
+              {[
+                { key: "Scenario",  value: setup.scenario },
+                { key: "Objective", value: setup.goal },
+                { key: "Provider",  value: formatLabel(setup.provider) },
+                { key: "Strategy",  value: formatLabel(setup.strategyId) },
+                { key: "Turns",     value: setup.maxTurns },
+                { key: "Mode",      value: setup.dryRun ? "Dry run" : "Enforced" },
+              ].map((row) => (
+                <div className="review-row" key={row.key}>
+                  <span className="review-row-key">{row.key}</span>
+                  <span className="review-row-value">{row.value}</span>
+                </div>
+              ))}
             </div>
-            <div className="chip-row">
-              <Pill tone="info">{formatLabel(setup.provider)}</Pill>
-              <Pill tone="warning">{formatLabel(setup.strategyId)}</Pill>
-              <Pill tone="neutral">{setup.maxTurns} turns</Pill>
-              <Pill tone={setup.dryRun ? "warning" : "safe"}>{setup.dryRun ? "Dry run" : "Enforced"}</Pill>
-            </div>
-          </div>
+          </>
         ) : null}
 
         <div className="modal-actions">
-          <button type="button" className="ghost-button" onClick={onBack} disabled={step === 1 || loading}>Back</button>
-          {step < 3 ? (
-            <button type="button" onClick={onNext} disabled={loading || !launchReady}>Continue</button>
-          ) : (
-            <button type="button" onClick={onLaunch} disabled={loading || !launchReady}>{loading ? "Launching..." : "Launch run"}</button>
-          )}
+          <button type="button" className="btn btn-ghost" onClick={onBack} disabled={step === 1 || loading}>
+            <ArrowLeft size={14} /> Back
+          </button>
+          <div className="modal-actions-right">
+            {step < 3 ? (
+              <button type="button" className="btn btn-primary" onClick={onNext} disabled={loading || !launchReady}>
+                Continue
+              </button>
+            ) : (
+              <button type="button" className="btn btn-primary" onClick={onLaunch} disabled={loading || !launchReady}>
+                {loading ? "Launching..." : "Launch run"}
+              </button>
+            )}
+          </div>
         </div>
       </section>
     </div>
   );
 }
 
-function SummaryRibbon({ status, setup, runId, blueTeam, onEdit, onEvaluate, onNew, loading }) {
-  return (
-    <section className="summary-ribbon">
-      <div className="summary-ribbon-left">
-        <div className="summary-title-row summary-title-stack">
-          <div className="section-eyebrow">Run Dossier</div>
-          <div className="chip-row">
-            <Pill tone={toneForStatus(status?.status)}>{formatLabel(status?.status || "queued")}</Pill>
-            <Pill tone="info">{formatLabel(status?.current_phase || "idle")}</Pill>
-            <Pill tone="neutral">{status?.turns_completed || 0}/{status?.max_turns || setup.maxTurns} turns</Pill>
-          </div>
-        </div>
-        <h2>{truncateText(status?.goal || setup.goal, 86)}</h2>
-        <p className="summary-lead">
-          {truncateText(status?.scenario || setup.scenario, 130)}
-        </p>
-        <div className="summary-context-grid">
-          <div className="context-stat">
-            <span className="key-label">Strategy</span>
-            <strong>{formatLabel(status?.strategy_id || setup.strategyId)}</strong>
-          </div>
-          <div className="context-stat">
-            <span className="key-label">Provider</span>
-            <strong>{formatLabel(status?.provider || setup.provider)}</strong>
-          </div>
-          <div className="context-stat">
-            <span className="key-label">Mode</span>
-            <strong>{status?.dry_run || setup.dryRun ? "Dry run" : "Enforced"}</strong>
-          </div>
-          <div className="context-stat">
-            <span className="key-label">Run ID</span>
-            <strong>{truncateMiddle(runId)}</strong>
-          </div>
-        </div>
-      </div>
-      <div className="summary-ribbon-right">
-        <MiniMetric label="Blue-team reviewed" value={blueTeam.reviewed} />
-        <MiniMetric label="Blocked/escalated" value={blueTeam.blocked} />
-        <MiniMetric label="Highest severity" value={formatLabel(blueTeam.highestSeverity)} />
-        <MiniMetric label="Dominant action" value={formatLabel(blueTeam.dominantAction)} />
-        <div className="chip-row action-row">
-          <button type="button" className="ghost-button" onClick={onEdit}>Edit setup</button>
-          <button type="button" className="ghost-button" onClick={onEvaluate} disabled={loading || !status?.is_complete}>{loading ? "Evaluating..." : "Evaluate"}</button>
-          <button type="button" onClick={onNew}>New run</button>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function TimelineCard({ entry, selected, onSelect }) {
+  const severity = entry.verdict?.severity || "low";
+  const objectiveLabel = formatLabel(entry.event.objective_scorer?.label || entry.event.outcome || "pending");
+  const converterCount = entry.event.converter_steps?.length || 0;
+
   return (
-    <button type="button" className={`timeline-card ${selected ? "is-selected" : ""}`} onClick={onSelect}>
-      <div className="timeline-card-top">
-        <div>
-          <div className="timeline-turn">Turn {entry.event.turn_index}</div>
-          <div className="timeline-time">{formatTimestamp(entry.event.timestamp)}</div>
+    <div
+      role="button"
+      tabIndex={0}
+      className={`turn-row severity-${severity}${selected ? " is-selected" : ""}`}
+      onClick={onSelect}
+      onKeyDown={(e) => e.key === "Enter" && onSelect()}
+    >
+      <div className="turn-row-body">
+        {/* Header row: turn number + badges */}
+        <div className="turn-row-top">
+          <div>
+            <div className="turn-number">Turn {entry.event.turn_index}</div>
+            <div className="turn-meta">{formatLabel(entry.event.strategy_id)} · {formatTimestamp(entry.event.timestamp)}</div>
+          </div>
+          <div className="turn-badges">
+            <Badge tone={toneForAction(entry.verdict?.action)}>{formatLabel(entry.verdict?.action || "allow")}</Badge>
+            <Badge tone={toneForSeverity(severity)}>{formatLabel(severity)}</Badge>
+            <Badge tone={toneForOutcome(entry.event.outcome)}>{objectiveLabel}</Badge>
+          </div>
         </div>
-        <div className="chip-row compact-chip-row">
-          <Pill tone={toneForOutcome(entry.event.outcome)}>{formatLabel(entry.event.outcome || "partial")}</Pill>
-          <Pill tone={toneForAction(entry.verdict.action)}>{formatLabel(entry.verdict.action || "allow")}</Pill>
-          <Pill tone={toneForSeverity(entry.verdict.severity)}>{formatLabel(entry.verdict.severity || "low")}</Pill>
+
+        {/* Conversation blocks */}
+        <div className="turn-exchange">
+          <div className="turn-speaker-block attacker">
+            <div className="turn-speaker-icon attacker"><Sword size={13} strokeWidth={1.5} /></div>
+            <div className="turn-speaker-text">{truncateText(entry.event.attacker_prompt, 140)}</div>
+          </div>
+          <div className="turn-connector"><ChevronDown size={12} /></div>
+          <div className="turn-speaker-block target">
+            <div className="turn-speaker-icon target"><ShieldIcon size={13} strokeWidth={1.5} /></div>
+            <div className="turn-speaker-text">{truncateText(entry.event.model_output, 140)}</div>
+          </div>
+        </div>
+
+        {/* Expand affordance row */}
+        <div className="turn-expand-row">
+          {converterCount > 0 && (
+            <button type="button" className="turn-expand-trigger" onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+              <ChevronRight size={11} /> Converter steps ({converterCount})
+            </button>
+          )}
+          <button type="button" className="turn-expand-trigger" onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+            <ChevronRight size={11} /> Scorer detail
+          </button>
+          <button type="button" className="turn-expand-trigger" onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+            <ChevronRight size={11} /> Blue-team evidence
+          </button>
         </div>
       </div>
-      <div className="timeline-meta-row">
-        <span>{formatLabel(entry.event.strategy_id)}</span>
-        <span>{formatLabel(entry.event.template_id)}</span>
-      </div>
-      <p className="timeline-summary">{turnSummary(entry)}</p>
-      <div className="timeline-footer-row">
-        <span>Objective: {formatLabel(entry.event.objective_scorer?.label || entry.event.outcome || "pending")}</span>
-        <span>Open details</span>
-      </div>
-    </button>
+    </div>
   );
 }
 
@@ -543,27 +530,31 @@ function TurnDrawer({ entry, onClose }) {
     <div className="drawer-shell">
       <button type="button" className="drawer-backdrop" onClick={onClose} aria-label="Close drawer" />
       <aside className="drawer-panel">
-        <SectionHeader
-          eyebrow="Selected Turn"
-          title={`Turn ${entry.event.turn_index}`}
-          note={turnSummary(entry)}
-          actions={<button type="button" className="ghost-button" onClick={onClose}>Close</button>}
-        />
-
-        <div className="chip-row drawer-chip-row">
-          <Pill tone={toneForOutcome(entry.event.outcome)}>{formatLabel(entry.event.outcome || "partial")}</Pill>
-          <Pill tone={toneForAction(entry.verdict.action)}>{formatLabel(entry.verdict.action || "allow")}</Pill>
-          <Pill tone={toneForSeverity(entry.verdict.severity)}>{formatLabel(entry.verdict.severity || "low")}</Pill>
+        <div className="drawer-header">
+          <div>
+            <div className="drawer-title">Turn {entry.event.turn_index}</div>
+            <div className="drawer-subtitle">{turnSummary(entry)}</div>
+          </div>
+          <button type="button" className="btn btn-ghost" style={{ padding: "0 6px" }} onClick={onClose}>
+            <X size={16} />
+          </button>
         </div>
 
-        <div className="stage-strip">
-          {stageItems(entry).map((item) => (
-            <div className="stage-card" key={item.label}>
-              <div className="stage-card-label">{item.label}</div>
-              <div className="stage-card-value">{item.value}</div>
-            </div>
-          ))}
-        </div>
+        <div className="drawer-body">
+          <div className="chip-row">
+            <Pill tone={toneForOutcome(entry.event.outcome)}>{formatLabel(entry.event.outcome || "partial")}</Pill>
+            <Pill tone={toneForAction(entry.verdict.action)}>{formatLabel(entry.verdict.action || "allow")}</Pill>
+            <Pill tone={toneForSeverity(entry.verdict.severity)}>{formatLabel(entry.verdict.severity || "low")}</Pill>
+          </div>
+
+          <div className="stage-strip">
+            {stageItems(entry).map((item) => (
+              <div className="stage-cell" key={item.label}>
+                <div className="stage-cell-label">{item.label}</div>
+                <div className="stage-cell-value">{item.value}</div>
+              </div>
+            ))}
+          </div>
 
         <KeyGrid
           items={[
@@ -633,14 +624,15 @@ function TurnDrawer({ entry, onClose }) {
             <DetailPre text={JSON.stringify(entry.verdict.detector_results || {}, null, 2)} />
           </Fold>
         </Fold>
+        </div>{/* /drawer-body */}
       </aside>
     </div>
   );
 }
 function BreakdownTable({ title, rows }) {
   return (
-    <section className="eval-card">
-      <SectionHeader eyebrow="Breakdown" title={title} />
+    <section className="eval-section">
+      <div className="eval-section-title">{title}</div>
       {rows.length ? (
         <div className="breakdown-list">
           {rows.map((row) => {
@@ -649,10 +641,10 @@ function BreakdownTable({ title, rows }) {
               <div className="breakdown-item" key={row.key}>
                 <div className="breakdown-item-top">
                   <div>
-                    <strong>{formatLabel(row.key)}</strong>
-                    <div className="micro-copy">{row.cases} cases, {row.successes} success</div>
+                    <div className="breakdown-item-name">{formatLabel(row.key)}</div>
+                    <div className="breakdown-item-sub">{row.cases} cases · {row.successes} success</div>
                   </div>
-                  <span>{pct}%</span>
+                  <span className="breakdown-item-pct">{pct}%</span>
                 </div>
                 <div className="meter-shell"><div className="meter-fill" style={{ width: `${pct}%` }} /></div>
               </div>
@@ -672,74 +664,73 @@ function EvaluationView({ objectiveEval, regressionEval, evalHistory, blueBenchm
 
   return (
     <section className="evaluation-page">
-      <section className="summary-ribbon eval-hero">
+      <div className="section-header">
         <div>
-          <div className="section-eyebrow">Evaluation</div>
-          <h2>Objective suite first, regression pack second</h2>
-          <p className="section-note">The objective suite is the main effectiveness story. The regression pack stays available as a quick sanity layer, and blue-team benchmark context is still preserved underneath.</p>
+          <div className="section-title">Evaluation</div>
+          <div className="section-note">Objective suite first, regression pack second.</div>
         </div>
-        <div className="chip-row action-row">
-          <button type="button" className="ghost-button" onClick={onRefresh} disabled={loading}>{loading ? "Refreshing..." : "Refresh evals"}</button>
-          <button type="button" className="ghost-button" onClick={onDownloadObjective} disabled={!objectiveEval?.available}>Objective report</button>
-          <button type="button" className="ghost-button" onClick={onDownloadRegression} disabled={!regressionEval?.available}>Regression report</button>
+        <div className="chip-row">
+          <button type="button" className="btn btn-secondary" onClick={onRefresh} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
+          <button type="button" className="btn btn-ghost" onClick={onDownloadObjective} disabled={!objectiveEval?.available}>Objective report</button>
+          <button type="button" className="btn btn-ghost" onClick={onDownloadRegression} disabled={!regressionEval?.available}>Regression report</button>
         </div>
-      </section>
+      </div>
 
-      <div className="stats-grid eval-stats-grid">
-        <StatCard label="Objective suite" value={objectiveEval?.available ? formatNumber(safeRate(objectiveSummary)) : "Missing"} detail={objectiveEval?.updated_at ? `Updated ${objectiveEval.updated_at}` : "Run the objective suite to populate this"} />
-        <StatCard label="Objective cases" value={objectiveSummary?.total_cases || 0} detail={`${objectiveSummary?.successes || 0} success, ${objectiveSummary?.blocked || 0} blocked`} />
-        <StatCard label="Regression pack" value={regressionEval?.available ? formatNumber(safeRate(regressionSummary)) : "Missing"} detail={regressionEval?.updated_at ? `Updated ${regressionEval.updated_at}` : "Run the regression pack to populate this"} />
-        <StatCard label="Average turns" value={objectiveSummary?.average_turns ?? "n/a"} detail="From the objective suite" />
+      <div className="stat-bar" style={{ marginBottom: 24 }}>
+        <StatCard label="Objective suite" value={objectiveEval?.available ? formatNumber(safeRate(objectiveSummary)) : "Missing"} />
+        <StatCard label="Objective cases" value={objectiveSummary?.total_cases || 0} />
+        <StatCard label="Regression pack" value={regressionEval?.available ? formatNumber(safeRate(regressionSummary)) : "Missing"} />
+        <StatCard label="Average turns" value={objectiveSummary?.average_turns ?? "n/a"} />
       </div>
 
       <div className="eval-grid">
-        <section className="eval-card">
-          <SectionHeader eyebrow="Objective Suite" title="Outcome summary" note={objectiveEval?.payload?.run_metadata?.generated_at || "No saved run metadata"} />
+        <section className="eval-section">
+          <div className="eval-section-title">Objective suite</div>
           <KeyGrid items={[
             { label: "Successes", value: objectiveSummary?.successes ?? "n/a" },
             { label: "Blocked", value: objectiveSummary?.blocked ?? "n/a" },
             { label: "No success", value: objectiveSummary?.no_success ?? "n/a" },
             { label: "Partial", value: objectiveSummary?.partial ?? "n/a" },
-            { label: "Average turns", value: objectiveSummary?.average_turns ?? "n/a" },
+            { label: "Avg turns", value: objectiveSummary?.average_turns ?? "n/a" },
             { label: "Provider", value: objectiveEval?.payload?.run_metadata?.provider ?? "n/a" }
           ]} />
         </section>
-        <section className="eval-card">
-          <SectionHeader eyebrow="Regression Pack" title="Outcome summary" note={regressionEval?.payload?.run_metadata?.generated_at || "No saved run metadata"} />
+        <section className="eval-section">
+          <div className="eval-section-title">Regression pack</div>
           <KeyGrid items={[
             { label: "Successes", value: regressionSummary?.successes ?? "n/a" },
             { label: "Blocked", value: regressionSummary?.blocked ?? "n/a" },
             { label: "No success", value: regressionSummary?.no_success ?? "n/a" },
             { label: "Partial", value: regressionSummary?.partial ?? "n/a" },
-            { label: "Average turns", value: regressionSummary?.average_turns ?? "n/a" },
+            { label: "Avg turns", value: regressionSummary?.average_turns ?? "n/a" },
             { label: "Provider", value: regressionEval?.payload?.run_metadata?.provider ?? "n/a" }
           ]} />
         </section>
       </div>
 
       <div className="eval-grid">
-        <BreakdownTable title="Objective suite by strategy" rows={flattenBreakdown(objectiveSummary?.per_strategy)} />
-        <BreakdownTable title="Objective suite by category" rows={flattenBreakdown(objectiveSummary?.per_category)} />
-        <BreakdownTable title="Objective suite by difficulty" rows={flattenBreakdown(objectiveSummary?.per_difficulty)} />
-        <BreakdownTable title="Regression pack by strategy" rows={flattenBreakdown(regressionSummary?.per_strategy)} />
+        <BreakdownTable title="Objective by strategy" rows={flattenBreakdown(objectiveSummary?.per_strategy)} />
+        <BreakdownTable title="Objective by category" rows={flattenBreakdown(objectiveSummary?.per_category)} />
+        <BreakdownTable title="Objective by difficulty" rows={flattenBreakdown(objectiveSummary?.per_difficulty)} />
+        <BreakdownTable title="Regression by strategy" rows={flattenBreakdown(regressionSummary?.per_strategy)} />
       </div>
 
-      <Fold title="Blue-team benchmark context">
+      <Fold title="Blue-team benchmark">
         <div className="eval-grid">
-          <section className="eval-card">
-            <SectionHeader eyebrow="Configured" title="Blue-team benchmark" />
+          <section className="eval-section">
+            <div className="eval-section-title">Configured detectors</div>
             <KeyGrid items={[
               { label: "Pass rate", value: configured?.total_cases ? formatNumber((configured.passed_cases || 0) / configured.total_cases) : "n/a" },
-              { label: "Passed cases", value: configured?.passed_cases ?? "n/a" },
-              { label: "Failed cases", value: configured?.failed_cases ?? "n/a" }
+              { label: "Passed", value: configured?.passed_cases ?? "n/a" },
+              { label: "Failed", value: configured?.failed_cases ?? "n/a" }
             ]} />
           </section>
-          <section className="eval-card">
-            <SectionHeader eyebrow="Rules Only" title="Baseline benchmark" />
+          <section className="eval-section">
+            <div className="eval-section-title">Rules only baseline</div>
             <KeyGrid items={[
               { label: "Pass rate", value: baseline?.total_cases ? formatNumber((baseline.passed_cases || 0) / baseline.total_cases) : "n/a" },
-              { label: "Passed cases", value: baseline?.passed_cases ?? "n/a" },
-              { label: "Failed cases", value: baseline?.failed_cases ?? "n/a" }
+              { label: "Passed", value: baseline?.passed_cases ?? "n/a" },
+              { label: "Failed", value: baseline?.failed_cases ?? "n/a" }
             ]} />
           </section>
         </div>
@@ -751,11 +742,11 @@ function EvaluationView({ objectiveEval, regressionEval, evalHistory, blueBenchm
             {evalHistory.map((entry) => (
               <div className="artifact-card" key={entry.result_file}>
                 <div className="artifact-top">
-                  <strong>{formatLabel(entry.artifact_type)}</strong>
-                  <Pill tone="neutral">{entry.updated_at}</Pill>
+                  <span className="artifact-name">{formatLabel(entry.artifact_type)}</span>
+                  <Badge tone="neutral">{entry.updated_at}</Badge>
                 </div>
-                <div className="micro-copy">{entry.result_file}</div>
-                <div className="micro-copy">{entry.summary?.total_cases || 0} cases · {entry.summary?.successes || 0} success · {formatNumber(entry.summary?.success_rate || 0)}</div>
+                <div className="artifact-meta">{entry.result_file}</div>
+                <div className="artifact-meta">{entry.summary?.total_cases || 0} cases · {entry.summary?.successes || 0} success · {formatNumber(entry.summary?.success_rate || 0)}</div>
               </div>
             ))}
           </div>
@@ -957,77 +948,155 @@ export default function App() {
   }, [timeline, drawerOpen]);
 
   const emptyState = !runId && !wizardOpen;
+  const runStatusDot = status?.status === "completed" ? "complete"
+    : status?.status === "running" ? "running"
+    : status?.status === "failed" ? "failed"
+    : status?.status === "queued" ? "queued"
+    : "idle";
+
+  function handleNewRun() {
+    setRunId(""); setStatus(null); setTimeline([]); setEvaluation(null);
+    setSelectedEntry(null); setDrawerOpen(false);
+    setWizardOpen(true); setWizardStep(1);
+  }
 
   return (
-    <main className="app-shell">
-      <header className="app-header hero-frame">
-        <div className="hero-copy-block">
-          <div className="section-eyebrow brand-mark">Agent Crucible</div>
-          <h1>Red-team runs, explained with discipline.</h1>
-          <p className="hero-copy">{liveHeadline}</p>
-          <p className="hero-support">
-            Launch a red-team scenario, then open only the evidence you need: prompt transforms, objective verdicts, and blue-team enforcement.
-          </p>
-        </div>
-        <div className="hero-status-board">
-          <div className="hero-status-header">
-            <div className="section-eyebrow">Control</div>
-            <div className="chip-row">
-              <button type="button" className={activeView === "lab" ? "tab-pill is-active" : "tab-pill"} onClick={() => setActiveView("lab")}>Live run</button>
-              <button type="button" className={activeView === "evaluation" ? "tab-pill is-active" : "tab-pill"} onClick={() => setActiveView("evaluation")}>Evaluation</button>
-            </div>
-          </div>
-          <div className="hero-status-grid">
-            <div className="hero-status-cell hero-status-cell-primary">
-              <span className="key-label">Run state</span>
-              <strong>{runId ? formatLabel(status?.status || "queued") : "No active run"}</strong>
-            </div>
-            <div className="hero-status-cell">
-              <span className="key-label">Progress</span>
-              <strong>{heroPrimaryMetric}</strong>
-            </div>
-            <div className="hero-status-cell">
-              <span className="key-label">Phase</span>
-              <strong>{heroSecondaryMetric}</strong>
-            </div>
-            <div className="hero-status-cell">
-              <span className="key-label">Blue team</span>
-              <strong>{timeline.length ? formatLabel(blueTeamSummary.dominantAction) : "Awaiting trace"}</strong>
-            </div>
-          </div>
-          <button type="button" className="hero-launch-button" onClick={() => setWizardOpen(true)}>
-            {runId ? "Launch another run" : "Start new run"}
+    <div className="app-shell">
+      {/* Sidebar */}
+      <nav className="sidebar">
+        <div className="sidebar-logo">Agent Crucible</div>
+
+        <div className="sidebar-section-label">Runs</div>
+        {runId ? (
+          <button type="button" className="sidebar-run-item is-active">
+            <span className={`run-dot run-dot-${runStatusDot}`} style={{ flexShrink: 0 }} />
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {truncateText(setup.goal, 26)}
+              </span>
+              <span style={{ display: "block", fontSize: "0.7rem", color: "var(--text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {setup.scenario}
+              </span>
+            </span>
+          </button>
+        ) : (
+          <div style={{ padding: "6px 16px", fontSize: "0.75rem", color: "var(--text-ghost)" }}>No runs yet</div>
+        )}
+
+        <div className="sidebar-footer">
+          <button type="button" className="sidebar-new-run" onClick={() => setWizardOpen(true)}>
+            <Plus size={14} strokeWidth={1.5} /> New run
+          </button>
+          <button type="button" className="sidebar-action" onClick={() => setActiveView("evaluation")}>
+            <ShieldIcon size={14} strokeWidth={1.5} /> Evaluation
+          </button>
+          <button type="button" className="sidebar-action">
+            <Settings size={14} strokeWidth={1.5} /> Settings
           </button>
         </div>
-      </header>
+      </nav>
 
-      {error ? <div className="error-banner">{error}</div> : null}
-      {wizardOpen ? <SetupModal step={wizardStep} setup={setup} onField={updateField} onBack={() => setWizardStep((current) => Math.max(1, current - 1))} onNext={() => setWizardStep((current) => Math.min(3, current + 1))} onLaunch={createRun} onClose={() => setWizardOpen(false)} loading={loading} hasRun={Boolean(runId)} /> : null}
+      <div className="main-content">
+        {/* Run header */}
+        <header className="run-header">
+          <div className="run-header-left">
+            {runId ? (
+              <>
+                <div className="run-header-title">{truncateText(setup.goal, 60)}</div>
+                <div className="run-header-meta">
+                  {setup.scenario} · {formatLabel(setup.strategyId)} · {formatLabel(setup.provider)}
+                </div>
+              </>
+            ) : (
+              <div className="run-header-title" style={{ color: "var(--text-tertiary)" }}>No active run</div>
+            )}
+          </div>
+          <div className="run-header-actions">
+            <div className="view-tabs">
+              <button type="button" className={`view-tab${activeView === "lab" ? " is-active" : ""}`} onClick={() => setActiveView("lab")}>Live run</button>
+              <button type="button" className={`view-tab${activeView === "evaluation" ? " is-active" : ""}`} onClick={() => setActiveView("evaluation")}>Evaluation</button>
+            </div>
+            {runId ? (
+              <>
+                <button type="button" className="btn btn-ghost" onClick={() => setWizardOpen(true)}>Edit</button>
+                <button type="button" className="btn btn-secondary" onClick={evaluateRun} disabled={loading || !status?.is_complete}>
+                  {loading ? "..." : "Evaluate"}
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={handleNewRun}>New run</button>
+              </>
+            ) : null}
+          </div>
+        </header>
 
-      {activeView === "lab" ? (
-        <section className="lab-page">
-          {runId ? (
-            <SummaryRibbon status={status} setup={setup} runId={runId} blueTeam={blueTeamSummary} onEdit={() => setWizardOpen(true)} onEvaluate={evaluateRun} onNew={() => { setRunId(""); setStatus(null); setTimeline([]); setEvaluation(null); setSelectedEntry(null); setDrawerOpen(false); setWizardOpen(true); setWizardStep(1); }} loading={loading} />
-          ) : null}
+        {error ? <div className="error-banner">{error}</div> : null}
 
-          {emptyState ? (
-            <section className="empty-hero">
-              <div className="section-eyebrow">Launch</div>
-              <h2>Start with a scenario, then let the timeline tell the story</h2>
-              <p>The interface is built to keep the default view clean. All the deeper prompt, scorer, and blue-team evidence is still there, but it only opens when you ask for it.</p>
-              <button type="button" onClick={() => setWizardOpen(true)}>Open setup</button>
-            </section>
-          ) : (
-            <>
-              <section className="overview-band">
-                <StatCard label="Run progress" value={`${status?.turns_completed || 0}/${status?.max_turns || 0}`} detail={status?.max_turns ? `${Math.round(((status?.turns_completed || 0) / status.max_turns) * 100)}% complete` : "Waiting"} />
-                <StatCard label="Turns captured" value={timeline.length} detail={timeline.length ? "Cards append as each turn completes" : "Waiting for the first turn"} />
-                <StatCard label="Current phase" value={formatLabel(status?.current_phase || "idle")} detail={status?.created_at ? `Started ${formatTimestamp(status.created_at)}` : "No active run"} />
-                <StatCard label="Run evaluation" value={formatLabel(evaluation?.overall || "pending")} detail={evaluation?.metrics?.length ? `${evaluation.metrics.length} metrics recorded` : "Run evaluation when you are ready"} />
-              </section>
+        {activeView === "lab" ? (
+          <div className="page-body">
+            {emptyState ? (
+              <div className="empty-state">
+                <PlayCircle size={40} className="empty-state-icon" strokeWidth={1} />
+                <div className="empty-state-heading">No run active</div>
+                <div className="empty-state-body">Launch a red-team scenario to start watching the attacker and guardrails interact in real time.</div>
+                <button type="button" className="btn btn-primary" onClick={() => setWizardOpen(true)}>Launch your first run</button>
+              </div>
+            ) : (
+              <>
+                <div className="stat-bar">
+                  <div className="stat-cell">
+                    <div className="stat-cell-label">Progress</div>
+                    <div className="stat-cell-value">{status?.turns_completed || 0}/{status?.max_turns || setup.maxTurns}</div>
+                  </div>
+                  <div className="stat-cell">
+                    <div className="stat-cell-label">Run state</div>
+                    <div className={`stat-cell-value val-${toneForStatus(status?.status)}`}>{formatLabel(status?.status || "queued")}</div>
+                  </div>
+                  <div className="stat-cell">
+                    <div className="stat-cell-label">Highest severity</div>
+                    <div className={`stat-cell-value val-${toneForSeverity(blueTeamSummary.highestSeverity)}`}>{formatLabel(blueTeamSummary.highestSeverity)}</div>
+                  </div>
+                  <div className="stat-cell">
+                    <div className="stat-cell-label">Blue-team blocked</div>
+                    <div className={`stat-cell-value${blueTeamSummary.blocked > 0 ? " val-danger" : ""}`}>{blueTeamSummary.blocked}</div>
+                  </div>
+                  <div className="stat-cell">
+                    <div className="stat-cell-label">Started</div>
+                    <div className="stat-cell-value val-neutral">{status?.created_at ? formatTimestamp(status.created_at) : "—"}</div>
+                  </div>
+                  <div className="stat-cell">
+                    <div className="stat-cell-label">Phase</div>
+                    <div className="stat-cell-value val-neutral">{formatLabel(status?.current_phase || "idle")}</div>
+                  </div>
+                </div>
 
-              <section className="story-panel">
-                <SectionHeader eyebrow="Attack Story" title="Turn timeline" note="Cards stay concise by default. Click a turn only when you want the full red-team and blue-team evidence." />
+                {/* Outcome border + run narrative */}
+                <div
+                  className="timeline-outcome-bar"
+                  style={{
+                    "--outcome-color": blueTeamSummary.blocked > 0 ? "var(--success)"
+                      : blueTeamSummary.highestSeverity === "critical" ? "var(--danger)"
+                      : blueTeamSummary.highestSeverity === "high" ? "var(--warning)"
+                      : "var(--info)"
+                  }}
+                />
+
+                {timeline.length > 0 && (
+                  <div className="run-narrative">
+                    {timeline.length} turn{timeline.length !== 1 ? "s" : ""} completed.
+                    {blueTeamSummary.blocked > 0
+                      ? ` Blue team blocked ${blueTeamSummary.blocked} attempt${blueTeamSummary.blocked !== 1 ? "s" : ""}.`
+                      : " No turns were blocked."
+                    }
+                    {blueTeamSummary.highestSeverity !== "n/a"
+                      ? ` Highest severity: ${blueTeamSummary.highestSeverity}.`
+                      : ""
+                    }
+                  </div>
+                )}
+
+                <div className="section-header">
+                  <div className="section-title">Turn timeline</div>
+                </div>
+
                 {timeline.length ? (
                   <div className="timeline-list">
                     {timeline.map((entry) => (
@@ -1036,21 +1105,24 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="empty-card">
-                    <h3>No turns yet</h3>
-                    <p>Once the backend completes the first turn, the story cards will appear here automatically.</p>
+                    <div className="empty-card-heading">No turns yet</div>
+                    <div className="empty-card-body">Once the backend completes the first turn, the timeline will appear here automatically.</div>
                   </div>
                 )}
-              </section>
-            </>
-          )}
-        </section>
-      ) : null}
+              </>
+            )}
+          </div>
+        ) : null}
 
-      {activeView === "evaluation" ? (
-        <EvaluationView objectiveEval={objectiveEval} regressionEval={regressionEval} evalHistory={evalHistory} blueBenchmark={blueBenchmark} onRefresh={loadEvaluationArtifacts} onDownloadObjective={() => downloadReport("/api/v1/evals/red-team/objective-suite/report", "red_team_dataset_results_report.md")} onDownloadRegression={() => downloadReport("/api/v1/evals/red-team/regression/report", "red_team_regression_results_report.md")} loading={evalLoading} />
-      ) : null}
+        {activeView === "evaluation" ? (
+          <div className="page-body">
+            <EvaluationView objectiveEval={objectiveEval} regressionEval={regressionEval} evalHistory={evalHistory} blueBenchmark={blueBenchmark} onRefresh={loadEvaluationArtifacts} onDownloadObjective={() => downloadReport("/api/v1/evals/red-team/objective-suite/report", "red_team_dataset_results_report.md")} onDownloadRegression={() => downloadReport("/api/v1/evals/red-team/regression/report", "red_team_regression_results_report.md")} loading={evalLoading} />
+          </div>
+        ) : null}
+      </div>
 
+      {wizardOpen ? <SetupModal step={wizardStep} setup={setup} onField={updateField} onBack={() => setWizardStep((c) => Math.max(1, c - 1))} onNext={() => setWizardStep((c) => Math.min(3, c + 1))} onLaunch={createRun} onClose={() => setWizardOpen(false)} loading={loading} hasRun={Boolean(runId)} /> : null}
       {drawerOpen ? <TurnDrawer entry={selectedEntry} onClose={() => setDrawerOpen(false)} /> : null}
-    </main>
+    </div>
   );
 }

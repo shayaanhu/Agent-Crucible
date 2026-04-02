@@ -3,7 +3,8 @@
     "allow": [
       "Bash(python .agent/skills/skills/ui-ux-pro-max/scripts/search.py \"security tool dashboard\" --domain product)",
       "Bash(python -c ':*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npx vite:*)"
     ]
   }
 }
