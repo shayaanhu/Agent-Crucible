@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from threading import Lock
 from typing import Dict, List, Optional
 
@@ -14,14 +16,44 @@ from backend.app.schemas import (
 )
 
 
-class InMemoryStore:
-    def __init__(self) -> None:
+class JsonStore:
+    def __init__(self, data_path: str = "backend/data/store.json"):
         self._lock = Lock()
-        self._runs: Dict[str, RunRecord] = {}
+        self._data_path = Path(data_path)
         self._requests: Dict[str, RunCreateRequest] = {}
+        self._runs: Dict[str, RunRecord] = {}
         self._events: Dict[str, List[AttackTurn]] = {}
         self._verdicts: Dict[str, List[GuardrailVerdict]] = {}
         self._suite_runs: Dict[str, SuiteRunRecord] = {}
+        self._load()
+
+    def _load(self) -> None:
+        if not self._data_path.exists():
+            return
+        try:
+            raw = json.loads(self._data_path.read_text(encoding="utf-8"))
+            self._requests = {k: RunCreateRequest(**v) for k, v in raw.get("requests", {}).items()}
+            self._runs = {k: RunRecord(**v) for k, v in raw.get("runs", {}).items()}
+            self._events = {
+                k: [AttackTurn(**t) for t in v] for k, v in raw.get("events", {}).items()
+            }
+            self._verdicts = {
+                k: [GuardrailVerdict(**t) for t in v] for k, v in raw.get("verdicts", {}).items()
+            }
+            self._suite_runs = {k: SuiteRunRecord(**v) for k, v in raw.get("suite_runs", {}).items()}
+        except Exception:
+            pass
+
+    def _persist(self) -> None:
+        data = {
+            "requests": {k: v.model_dump() for k, v in self._requests.items()},
+            "runs": {k: v.model_dump() for k, v in self._runs.items()},
+            "events": {k: [t.model_dump() for t in v] for k, v in self._events.items()},
+            "verdicts": {k: [t.model_dump() for t in v] for k, v in self._verdicts.items()},
+            "suite_runs": {k: v.model_dump() for k, v in self._suite_runs.items()},
+        }
+        self._data_path.parent.mkdir(parents=True, exist_ok=True)
+        self._data_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     def clear(self) -> None:
         with self._lock:
@@ -30,13 +62,13 @@ class InMemoryStore:
             self._events.clear()
             self._verdicts.clear()
             self._suite_runs.clear()
+            self._persist()
 
     def create_run(self, run: RunRecord, request: RunCreateRequest) -> None:
         with self._lock:
             self._runs[run.run_id] = run
             self._requests[run.run_id] = request
-            self._events[run.run_id] = []
-            self._verdicts[run.run_id] = []
+            self._persist()
 
     def get_request(self, run_id: str) -> Optional[RunCreateRequest]:
         with self._lock:
@@ -53,6 +85,7 @@ class InMemoryStore:
             if not run:
                 return
             self._runs[run_id] = run.model_copy(update=updates)
+            self._persist()
 
     def set_status(self, run_id: str, status: RunStatus, summary: str) -> None:
         self.update_run(run_id, status=status, summary=summary)
@@ -65,6 +98,7 @@ class InMemoryStore:
                 self._verdicts[run_id] = []
             self._events[run_id].append(event)
             self._verdicts[run_id].append(verdict)
+            self._persist()
 
     def list_events(self, run_id: str) -> List[AttackTurn]:
         with self._lock:
@@ -77,6 +111,7 @@ class InMemoryStore:
     def create_suite_run(self, suite_run: SuiteRunRecord) -> None:
         with self._lock:
             self._suite_runs[suite_run.suite_id] = suite_run
+            self._persist()
 
     def get_suite_run(self, suite_id: str) -> Optional[SuiteRunRecord]:
         with self._lock:
@@ -87,6 +122,7 @@ class InMemoryStore:
             run = self._suite_runs.get(suite_id)
             if run:
                 self._suite_runs[suite_id] = run.model_copy(update=updates)
+                self._persist()
 
 
-store = InMemoryStore()
+store = JsonStore()

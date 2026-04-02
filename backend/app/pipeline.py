@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -248,7 +249,8 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
         return
 
     try:
-        cases = json.loads(dataset_path.read_text(encoding="utf-8"))
+        dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
+        cases = dataset.get("cases", [])
         if limit > 0:
             cases = cases[:limit]
         
@@ -305,5 +307,6 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
             results_file=str(results_path)
         )
         
-    except Exception as exc:
-        store.update_suite_run(suite_id, status="failed", current_case_id=f"Error: {exc}")
+    except Exception:
+        err = traceback.format_exc()
+        store.update_suite_run(suite_id, status="failed", current_case_id=f"Error: {err}")

@@ -928,7 +928,7 @@ export default function App() {
       const resp = await fetch(`${API_BASE}/api/v1/evals/red-team/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, max_turns: 3, limit: 5 }) // Limit to 5 for speed in real-time demo
+        body: JSON.stringify({ provider, max_turns: 3, limit: 10 }) // Limit to 10 for better coverage
       });
       const data = await resp.json();
       setSuiteRun({ ...data, progress_percentage: 0, is_complete: false });
