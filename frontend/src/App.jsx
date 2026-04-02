@@ -625,12 +625,16 @@ function TimelineCard({ entry, selected, onSelect, index }) {
         <div className="turn-exchange">
           <div className="turn-speaker-block attacker">
             <div className="turn-speaker-icon attacker"><Sword size={13} strokeWidth={1.5} /></div>
-            <div className="turn-speaker-text">{truncateText(entry.event.attacker_prompt, 140)}</div>
+            <div className="turn-speaker-text">
+              <TypewriterText text={truncateText(entry.event.attacker_prompt, 140)} speed={12} />
+            </div>
           </div>
           <div className="turn-connector"><ChevronDown size={12} /></div>
           <div className="turn-speaker-block target">
             <div className="turn-speaker-icon target"><ShieldIcon size={13} strokeWidth={1.5} /></div>
-            <div className="turn-speaker-text">{truncateText(entry.event.model_output, 140)}</div>
+            <div className="turn-speaker-text">
+              <TypewriterText text={truncateText(entry.event.model_output, 140)} speed={12} />
+            </div>
           </div>
         </div>
 
