@@ -16,7 +16,7 @@ except ImportError:
     load_dotenv = None
 
 from agents.blue_team_config import get_blue_team_runtime_config
-from backend.app.pipeline import execute_run
+from backend.app.pipeline import execute_run, execute_suite_run
 from backend.app.schemas import (
     BlueTeamBenchmarkRunRequest,
     EvalMetric,
@@ -28,6 +28,9 @@ from backend.app.schemas import (
     RunEventsResponse,
     RunRecord,
     RunStatusResponse,
+    SuiteRunRequest,
+    SuiteRunRecord,
+    SuiteRunStatusResponse,
 )
 from backend.app.store import store
 from eval.scorer import calculate_metrics
@@ -279,6 +282,49 @@ def get_red_team_regression_eval() -> dict:
 @app.get("/api/v1/evals/red-team/history")
 def get_red_team_eval_history() -> dict[str, list[dict]]:
     return {"history": _red_team_eval_history_payload()}
+
+
+@app.post("/api/v1/evals/red-team/run", response_model=SuiteRunRecord)
+def start_red_team_suite(payload: SuiteRunRequest, background_tasks: BackgroundTasks):
+    suite_id = f"suite-{uuid4().hex[:8]}"
+    suite_run = SuiteRunRecord(
+        suite_id=suite_id,
+        status="queued",
+        provider=payload.provider,
+        created_at=utc_now(),
+        total_cases=0,
+    )
+    store.create_suite_run(suite_run)
+    background_tasks.add_task(
+        execute_suite_run, 
+        suite_id, 
+        payload.provider, 
+        payload.max_turns, 
+        payload.limit
+    )
+    return suite_run
+
+
+@app.get("/api/v1/evals/red-team/run/{suite_id}", response_model=SuiteRunStatusResponse)
+def get_suite_run_status(suite_id: str):
+    run = store.get_suite_run(suite_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Suite run not found")
+    
+    progress = 0.0
+    if run.total_cases > 0:
+        progress = round((run.completed_cases / run.total_cases) * 100, 1)
+        
+    return SuiteRunStatusResponse(
+        suite_id=run.suite_id,
+        status=run.status,
+        provider=run.provider,
+        completed_cases=run.completed_cases,
+        total_cases=run.total_cases,
+        current_case_id=run.current_case_id,
+        progress_percentage=progress,
+        is_complete=(run.status in ["completed", "failed"]),
+    )
 
 
 def _load_report_text(report_file: str) -> str:

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Literal
 from pydantic import BaseModel, Field
 
 RunStatus = Literal["queued", "running", "completed", "failed"]
+SuiteStatus = Literal["queued", "running", "completed", "failed"]
 PassFail = Literal["pass", "fail"]
 BlueTeamAction = Literal["allow", "block", "redact", "safe_rewrite", "escalate"]
 BlueTeamSeverity = Literal["low", "medium", "high", "critical"]
@@ -123,6 +124,34 @@ class EvaluationResponse(BaseModel):
 
 class BlueTeamBenchmarkRunRequest(BaseModel):
     label: str = Field(default="default", min_length=1, max_length=100)
+
+
+class SuiteRunRequest(BaseModel):
+    provider: str = "groq"
+    max_turns: int = 3
+    limit: int = 0
+
+
+class SuiteRunRecord(BaseModel):
+    suite_id: str
+    status: SuiteStatus
+    provider: str
+    created_at: str
+    completed_cases: int = 0
+    total_cases: int = 0
+    current_case_id: str | None = None
+    results_file: str | None = None
+
+
+class SuiteRunStatusResponse(BaseModel):
+    suite_id: str
+    status: SuiteStatus
+    provider: str
+    completed_cases: int
+    total_cases: int
+    current_case_id: str | None = None
+    progress_percentage: float
+    is_complete: bool
 
 
 MetricMap = Dict[str, Any]

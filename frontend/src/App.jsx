@@ -685,7 +685,7 @@ function BreakdownTable({ title, rows }) {
   );
 }
 
-function EvaluationView({ evaluation, objectiveEval, regressionEval, evalHistory, blueBenchmark, onRefresh, onDownloadObjective, onDownloadRegression, loading }) {
+function EvaluationView({ evaluation, suiteRun, objectiveEval, regressionEval, evalHistory, blueBenchmark, onRefresh, onStartSuite, onDownloadObjective, onDownloadRegression, loading }) {
   const objectiveSummary = objectiveEval?.payload?.summary;
   const regressionSummary = regressionEval?.payload?.summary;
   const configured = blueBenchmark?.configured_detectors?.summary;
@@ -695,15 +695,33 @@ function EvaluationView({ evaluation, objectiveEval, regressionEval, evalHistory
     <section className="evaluation-page">
       <div className="section-header">
         <div>
-          <div className="section-title">Evaluation</div>
-          <div className="section-note">Objective suite first, regression pack second.</div>
+          <div className="section-title">Testing Suite</div>
+          <div className="section-note">Test the current model against the Agent Crucible Red-Team Suite.</div>
         </div>
         <div className="chip-row">
+          <button type="button" className="btn btn-primary" onClick={() => onStartSuite("groq")} disabled={loading || (suiteRun && !suiteRun.is_complete)}>
+            {suiteRun && !suiteRun.is_complete ? "Suite Running..." : "Run Testing Suite"}
+          </button>
           <button type="button" className="btn btn-secondary" onClick={onRefresh} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
           <button type="button" className="btn btn-ghost" onClick={onDownloadObjective} disabled={!objectiveEval?.available}>Objective report</button>
           <button type="button" className="btn btn-ghost" onClick={onDownloadRegression} disabled={!regressionEval?.available}>Regression report</button>
         </div>
       </div>
+
+      {suiteRun && !suiteRun.is_complete ? (
+        <div className="card" style={{ marginBottom: 24, border: "1px solid var(--accent-gold)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontWeight: 600 }}>Running Testing Suite ({suiteRun.provider})</span>
+            <span>{suiteRun.completed_cases} / {suiteRun.total_cases} cases</span>
+          </div>
+          <div style={{ height: 8, background: "var(--bg-card)", borderRadius: 4, overflow: "hidden" }}>
+            <div style={{ height: "100%", background: "var(--accent-gold)", width: `${suiteRun.progress_percentage}%`, transition: "width 0.3s ease" }}></div>
+          </div>
+          <div style={{ marginTop: 8, fontSize: "0.8rem", color: "var(--text-muted)" }}>
+            Current objective: {suiteRun.current_case_id || "..."}
+          </div>
+        </div>
+      ) : null}
 
       {evaluation ? (
         <Fold title="Current Run Evaluation" defaultOpen>
@@ -817,6 +835,7 @@ export default function App() {
   const [status, setStatus] = useState(null);
   const [timeline, setTimeline] = useState([]);
   const [evaluation, setEvaluation] = useState(null);
+  const [suiteRun, setSuiteRun] = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [objectiveEval, setObjectiveEval] = useState(null);
@@ -900,6 +919,33 @@ export default function App() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function startSuiteRun(provider = "groq") {
+    setEvalLoading(true);
+    try {
+      const resp = await fetch(`${API_BASE}/api/v1/evals/red-team/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, max_turns: 3, limit: 5 }) // Limit to 5 for speed in real-time demo
+      });
+      const data = await resp.json();
+      setSuiteRun({ ...data, progress_percentage: 0, is_complete: false });
+      
+      const poller = setInterval(async () => {
+        const pResp = await fetch(`${API_BASE}/api/v1/evals/red-team/run/${data.suite_id}`);
+        const pData = await pResp.json();
+        setSuiteRun(pData);
+        if (pData.is_complete) {
+          clearInterval(poller);
+          loadEvaluationArtifacts();
+        }
+      }, 2000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEvalLoading(false);
     }
   }
 
@@ -1159,7 +1205,7 @@ export default function App() {
 
         {activeView === "evaluation" ? (
           <div className="page-body">
-            <EvaluationView evaluation={evaluation} objectiveEval={objectiveEval} regressionEval={regressionEval} evalHistory={evalHistory} blueBenchmark={blueBenchmark} onRefresh={loadEvaluationArtifacts} onDownloadObjective={() => downloadReport("/api/v1/evals/red-team/objective-suite/report", "red_team_dataset_results_report.md")} onDownloadRegression={() => downloadReport("/api/v1/evals/red-team/regression/report", "red_team_regression_results_report.md")} loading={evalLoading} />
+            <EvaluationView evaluation={evaluation} suiteRun={suiteRun} objectiveEval={objectiveEval} regressionEval={regressionEval} evalHistory={evalHistory} blueBenchmark={blueBenchmark} onRefresh={loadEvaluationArtifacts} onStartSuite={startSuiteRun} onDownloadObjective={() => downloadReport("/api/v1/evals/red-team/objective-suite/report", "red_team_dataset_results_report.md")} onDownloadRegression={() => downloadReport("/api/v1/evals/red-team/regression/report", "red_team_regression_results_report.md")} loading={evalLoading} />
           </div>
         ) : null}
       </div>

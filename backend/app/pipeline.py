@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 from agents.blue_team import get_blue_team_agent
-from agents.red_team import get_red_team_agent
+from agents.red_team import get_red_team_agent, trace_to_dict
+from eval.red_team_eval_utils import summarize_red_team_results, timestamp_fields
 from backend.app.schemas import AttackTurn, GuardrailVerdict
 from backend.app.store import store
 
@@ -236,3 +239,71 @@ def execute_run(run_id: str) -> None:
             current_phase="failed",
             is_complete=True,
         )
+
+
+def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int = 0) -> None:
+    dataset_path = Path("eval/fixtures/red_team_objectives.json")
+    if not dataset_path.exists():
+        store.update_suite_run(suite_id, status="failed", current_case_id="Error: Dataset not found")
+        return
+
+    try:
+        cases = json.loads(dataset_path.read_text(encoding="utf-8"))
+        if limit > 0:
+            cases = cases[:limit]
+        
+        total_cases = len(cases)
+        store.update_suite_run(suite_id, status="running", total_cases=total_cases)
+        
+        red_team_agent = get_red_team_agent()
+        results = []
+        
+        for idx, case in enumerate(cases):
+            case_id = case.get("dataset_id") or f"case-{idx}"
+            store.update_suite_run(
+                suite_id, 
+                completed_cases=idx, 
+                current_case_id=case_id
+            )
+            
+            trace = red_team_agent.run_attack(
+                scenario=case["scenario"],
+                goal=case["goal"],
+                max_turns=max_turns,
+                provider=provider,
+                metadata={
+                    "dataset_id": case_id,
+                    "objective_category": case.get("category", ""),
+                    "objective_difficulty": case.get("difficulty", ""),
+                    "objective_tags": ",".join(case.get("tags", [])),
+                    "strategy_id": case.get("strategy_id", "direct_jailbreak"),
+                }
+            )
+            results.append(trace_to_dict(trace))
+            
+        summary = summarize_red_team_results(results)
+        payload = {
+            "metadata": {
+                "provider": provider,
+                "attacker_provider": provider,
+                "limit": limit,
+                "max_turns": max_turns,
+                **timestamp_fields(),
+            },
+            "summary": summary,
+            "results": results,
+        }
+        
+        results_path = Path("eval/results/red_team_dataset_results.json")
+        results_path.parent.mkdir(parents=True, exist_ok=True)
+        results_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        
+        store.update_suite_run(
+            suite_id, 
+            status="completed", 
+            completed_cases=total_cases, 
+            results_file=str(results_path)
+        )
+        
+    except Exception as exc:
+        store.update_suite_run(suite_id, status="failed", current_case_id=f"Error: {exc}")

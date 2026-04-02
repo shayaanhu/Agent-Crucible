@@ -3,7 +3,15 @@ from __future__ import annotations
 from threading import Lock
 from typing import Dict, List, Optional
 
-from backend.app.schemas import AttackTurn, GuardrailVerdict, RunCreateRequest, RunRecord, RunStatus
+from backend.app.schemas import (
+    AttackTurn,
+    GuardrailVerdict,
+    RunCreateRequest,
+    RunRecord,
+    RunStatus,
+    SuiteRunRecord,
+    SuiteStatus,
+)
 
 
 class InMemoryStore:
@@ -13,6 +21,7 @@ class InMemoryStore:
         self._requests: Dict[str, RunCreateRequest] = {}
         self._events: Dict[str, List[AttackTurn]] = {}
         self._verdicts: Dict[str, List[GuardrailVerdict]] = {}
+        self._suite_runs: Dict[str, SuiteRunRecord] = {}
 
     def clear(self) -> None:
         with self._lock:
@@ -20,6 +29,7 @@ class InMemoryStore:
             self._requests.clear()
             self._events.clear()
             self._verdicts.clear()
+            self._suite_runs.clear()
 
     def create_run(self, run: RunRecord, request: RunCreateRequest) -> None:
         with self._lock:
@@ -63,6 +73,20 @@ class InMemoryStore:
     def list_verdicts(self, run_id: str) -> List[GuardrailVerdict]:
         with self._lock:
             return [verdict.model_copy() for verdict in self._verdicts.get(run_id, [])]
+
+    def create_suite_run(self, suite_run: SuiteRunRecord) -> None:
+        with self._lock:
+            self._suite_runs[suite_run.suite_id] = suite_run
+
+    def get_suite_run(self, suite_id: str) -> Optional[SuiteRunRecord]:
+        with self._lock:
+            return self._suite_runs.get(suite_id)
+
+    def update_suite_run(self, suite_id: str, **updates) -> None:
+        with self._lock:
+            run = self._suite_runs.get(suite_id)
+            if run:
+                self._suite_runs[suite_id] = run.model_copy(update=updates)
 
 
 store = InMemoryStore()
