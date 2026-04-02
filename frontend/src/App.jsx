@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   GraduationCap, Building2, Heart, Headphones, Code2, Scale,
   PenLine, ArrowLeft, X, Plus, PlayCircle, CheckCircle,
@@ -8,7 +8,7 @@ import {
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 const PROVIDER_OPTIONS = [
-  { value: "groq", label: "groq (Kimi K2)" },
+  { value: "groq", label: "groq (GPT-OSS 120B)" },
   { value: "openai", label: "openai" },
   { value: "mock", label: "mock" }
 ];
@@ -685,7 +685,7 @@ function BreakdownTable({ title, rows }) {
   );
 }
 
-function EvaluationView({ objectiveEval, regressionEval, evalHistory, blueBenchmark, onRefresh, onDownloadObjective, onDownloadRegression, loading }) {
+function EvaluationView({ evaluation, objectiveEval, regressionEval, evalHistory, blueBenchmark, onRefresh, onDownloadObjective, onDownloadRegression, loading }) {
   const objectiveSummary = objectiveEval?.payload?.summary;
   const regressionSummary = regressionEval?.payload?.summary;
   const configured = blueBenchmark?.configured_detectors?.summary;
@@ -704,6 +704,19 @@ function EvaluationView({ objectiveEval, regressionEval, evalHistory, blueBenchm
           <button type="button" className="btn btn-ghost" onClick={onDownloadRegression} disabled={!regressionEval?.available}>Regression report</button>
         </div>
       </div>
+
+      {evaluation ? (
+        <Fold title="Current Run Evaluation" defaultOpen>
+          <div className="stat-bar" style={{ marginBottom: 16 }}>
+            {evaluation.metrics.map((m) => (
+              <StatCard key={m.metric_name} label={formatLabel(m.metric_name)} value={`${formatNumber(m.value)} (Goal: ${formatNumber(m.threshold)})`} />
+            ))}
+          </div>
+          <div className="eval-section">
+            <div className="eval-section-title">Verdict: <Badge tone={evaluation.overall === "pass" ? "safe" : "danger"}>{evaluation.overall.toUpperCase()}</Badge></div>
+          </div>
+        </Fold>
+      ) : null}
 
       <div className="stat-bar" style={{ marginBottom: 24 }}>
         <StatCard label="Objective suite" value={objectiveEval?.available ? formatNumber(safeRate(objectiveSummary)) : "Missing"} />
@@ -1146,7 +1159,7 @@ export default function App() {
 
         {activeView === "evaluation" ? (
           <div className="page-body">
-            <EvaluationView objectiveEval={objectiveEval} regressionEval={regressionEval} evalHistory={evalHistory} blueBenchmark={blueBenchmark} onRefresh={loadEvaluationArtifacts} onDownloadObjective={() => downloadReport("/api/v1/evals/red-team/objective-suite/report", "red_team_dataset_results_report.md")} onDownloadRegression={() => downloadReport("/api/v1/evals/red-team/regression/report", "red_team_regression_results_report.md")} loading={evalLoading} />
+            <EvaluationView evaluation={evaluation} objectiveEval={objectiveEval} regressionEval={regressionEval} evalHistory={evalHistory} blueBenchmark={blueBenchmark} onRefresh={loadEvaluationArtifacts} onDownloadObjective={() => downloadReport("/api/v1/evals/red-team/objective-suite/report", "red_team_dataset_results_report.md")} onDownloadRegression={() => downloadReport("/api/v1/evals/red-team/regression/report", "red_team_regression_results_report.md")} loading={evalLoading} />
           </div>
         ) : null}
       </div>
