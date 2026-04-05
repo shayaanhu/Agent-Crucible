@@ -995,6 +995,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [evalLoading, setEvalLoading] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [runs, setRuns] = useState([]); // [{ runId, goal, scenario, statusDot }]
   const [error, setError] = useState("");
   const [runId, setRunId] = useState("");
   const [status, setStatus] = useState(null);
@@ -1028,6 +1029,21 @@ export default function App() {
     if (!eventsResponse.ok) throw new Error(eventsBody.detail || "Failed to fetch run events");
     setStatus(statusBody);
     setTimeline(eventsBody.timeline || []);
+    const dot = statusBody.status === "completed" ? "complete"
+      : statusBody.status === "running" ? "running"
+      : statusBody.status === "failed" ? "failed"
+      : statusBody.status === "queued" ? "queued" : "idle";
+    setRuns(prev => prev.map(r => r.runId === (currentRunId) ? { ...r, statusDot: dot } : r));
+  }
+
+  async function switchRun(targetRunId) {
+    setRunId(targetRunId);
+    setStatus(null); setTimeline([]); setEvaluation(null);
+    setSelectedEntry(null); setDrawerOpen(false);
+    setActiveView("lab");
+    const run = runs.find(r => r.runId === targetRunId);
+    if (run) setSetup(prev => ({ ...prev, goal: run.goal, scenario: run.scenario }));
+    await refreshRun(targetRunId);
   }
 
   async function createRun() {
@@ -1049,6 +1065,7 @@ export default function App() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.detail || "Failed to create run");
       setRunId(body.run_id);
+      setRuns(prev => [...prev, { runId: body.run_id, goal: setup.goal, scenario: setup.scenario, statusDot: "queued" }]);
       setWizardOpen(false);
       setWizardStep(1);
       setActiveView("lab");
@@ -1208,8 +1225,6 @@ export default function App() {
           : "idle";
 
   function handleNewRun() {
-    setRunId(""); setStatus(null); setTimeline([]); setEvaluation(null);
-    setSelectedEntry(null); setDrawerOpen(false);
     setWizardOpen(true); setWizardStep(1);
   }
 
@@ -1247,21 +1262,26 @@ export default function App() {
         {!sidebarCollapsed && (
           <>
             <div className="sidebar-section-label">Runs</div>
-            {runId ? (
-              <button type="button" className="sidebar-run-item is-active">
-                <span className={`run-dot run-dot-${runStatusDot}`} style={{ flexShrink: 0 }} />
+            {runs.length === 0 ? (
+              <div style={{ padding: "6px 16px", fontSize: "0.75rem", color: "var(--text-ghost)" }}>No runs yet</div>
+            ) : [...runs].reverse().map(run => (
+              <button
+                key={run.runId}
+                type="button"
+                className={`sidebar-run-item${run.runId === runId ? " is-active" : ""}`}
+                onClick={() => run.runId !== runId && switchRun(run.runId)}
+              >
+                <span className={`run-dot run-dot-${run.statusDot}`} style={{ flexShrink: 0 }} />
                 <span style={{ minWidth: 0 }}>
                   <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {truncateText(setup.goal, 26)}
+                    {truncateText(run.goal, 26)}
                   </span>
                   <span style={{ display: "block", fontSize: "0.7rem", color: "var(--text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {setup.scenario}
+                    {run.scenario}
                   </span>
                 </span>
               </button>
-            ) : (
-              <div style={{ padding: "6px 16px", fontSize: "0.75rem", color: "var(--text-ghost)" }}>No runs yet</div>
-            )}
+            ))}
 
             <div className="sidebar-footer">
               <button type="button" className="sidebar-new-run" onClick={() => setWizardOpen(true)}>
@@ -1316,28 +1336,28 @@ export default function App() {
               <>
                 <div className="stat-bar">
                   <div className="stat-cell">
-                    <div className="stat-cell-label">Progress</div>
-                    <div className="stat-cell-value">{status?.turns_completed || 0}/{status?.max_turns || setup.maxTurns}</div>
-                  </div>
-                  <div className="stat-cell">
                     <div className="stat-cell-label">Run state</div>
                     <div className={`stat-cell-value val-${toneForStatus(status?.status)}`}>{formatLabel(status?.status || "queued")}</div>
                   </div>
                   <div className="stat-cell">
-                    <div className="stat-cell-label">Highest severity</div>
-                    <div className={`stat-cell-value val-${toneForSeverity(blueTeamSummary.highestSeverity)}`}>{formatLabel(blueTeamSummary.highestSeverity)}</div>
+                    <div className="stat-cell-label">Progress</div>
+                    <div className="stat-cell-value">{status?.turns_completed || 0}/{status?.max_turns || setup.maxTurns}</div>
+                  </div>
+                  <div className="stat-cell">
+                    <div className="stat-cell-label">Phase</div>
+                    <div className="stat-cell-value val-neutral">{formatLabel(status?.current_phase || "idle")}</div>
                   </div>
                   <div className="stat-cell">
                     <div className="stat-cell-label">Blue-team blocked</div>
                     <div className={`stat-cell-value${blueTeamSummary.blocked > 0 ? " val-danger" : ""}`}>{blueTeamSummary.blocked}</div>
                   </div>
                   <div className="stat-cell">
-                    <div className="stat-cell-label">Started</div>
-                    <div className="stat-cell-value val-neutral">{status?.created_at ? formatTimestamp(status.created_at) : "—"}</div>
+                    <div className="stat-cell-label">Highest severity</div>
+                    <div className={`stat-cell-value val-${toneForSeverity(blueTeamSummary.highestSeverity)}`}>{formatLabel(blueTeamSummary.highestSeverity)}</div>
                   </div>
                   <div className="stat-cell">
-                    <div className="stat-cell-label">Phase</div>
-                    <div className="stat-cell-value val-neutral">{formatLabel(status?.current_phase || "idle")}</div>
+                    <div className="stat-cell-label">Started</div>
+                    <div className="stat-cell-value val-neutral">{status?.created_at ? formatTimestamp(status.created_at) : "—"}</div>
                   </div>
                 </div>
 
