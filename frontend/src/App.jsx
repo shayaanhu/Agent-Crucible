@@ -994,6 +994,7 @@ export default function App() {
   const [activeView, setActiveView] = useState("lab");
   const [loading, setLoading] = useState(false);
   const [evalLoading, setEvalLoading] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [error, setError] = useState("");
   const [runId, setRunId] = useState("");
   const [status, setStatus] = useState(null);
@@ -1230,37 +1231,51 @@ export default function App() {
       ) : null}
 
       {/* Sidebar */}
-      <nav className="sidebar">
-        <div className="sidebar-logo">Agent Crucible</div>
-
-        <div className="sidebar-section-label">Runs</div>
-        {runId ? (
-          <button type="button" className="sidebar-run-item is-active">
-            <span className={`run-dot run-dot-${runStatusDot}`} style={{ flexShrink: 0 }} />
-            <span style={{ minWidth: 0 }}>
-              <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {truncateText(setup.goal, 26)}
-              </span>
-              <span style={{ display: "block", fontSize: "0.7rem", color: "var(--text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {setup.scenario}
-              </span>
-            </span>
-          </button>
-        ) : (
-          <div style={{ padding: "6px 16px", fontSize: "0.75rem", color: "var(--text-ghost)" }}>No runs yet</div>
-        )}
-
-        <div className="sidebar-footer">
-          <button type="button" className="sidebar-new-run" onClick={() => setWizardOpen(true)}>
-            <Plus size={14} strokeWidth={1.5} /> New run
-          </button>
-          <button type="button" className="sidebar-action" onClick={() => setActiveView("evaluation")}>
-            <ShieldIcon size={14} strokeWidth={1.5} /> Evaluation
-          </button>
-          <button type="button" className="sidebar-action">
-            <Settings size={14} strokeWidth={1.5} /> Settings
-          </button>
+      <nav className={`sidebar${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
+        <div className="sidebar-logo">
+          {!sidebarCollapsed && "Agent Crucible"}
         </div>
+        <button
+          type="button"
+          className="sidebar-collapse-btn"
+          onClick={() => setSidebarCollapsed(c => !c)}
+          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <ChevronRight size={18} strokeWidth={2} style={{ transform: sidebarCollapsed ? "rotate(0deg)" : "rotate(180deg)", transition: "transform 200ms ease-out" }} />
+        </button>
+
+        {!sidebarCollapsed && (
+          <>
+            <div className="sidebar-section-label">Runs</div>
+            {runId ? (
+              <button type="button" className="sidebar-run-item is-active">
+                <span className={`run-dot run-dot-${runStatusDot}`} style={{ flexShrink: 0 }} />
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {truncateText(setup.goal, 26)}
+                  </span>
+                  <span style={{ display: "block", fontSize: "0.7rem", color: "var(--text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {setup.scenario}
+                  </span>
+                </span>
+              </button>
+            ) : (
+              <div style={{ padding: "6px 16px", fontSize: "0.75rem", color: "var(--text-ghost)" }}>No runs yet</div>
+            )}
+
+            <div className="sidebar-footer">
+              <button type="button" className="sidebar-new-run" onClick={() => setWizardOpen(true)}>
+                <Plus size={14} strokeWidth={1.5} /> New run
+              </button>
+              <button type="button" className="sidebar-action" onClick={() => setActiveView("evaluation")}>
+                <ShieldIcon size={14} strokeWidth={1.5} /> Evaluation
+              </button>
+              <button type="button" className="sidebar-action">
+                <Settings size={14} strokeWidth={1.5} /> Settings
+              </button>
+            </div>
+          </>
+        )}
       </nav>
 
       <div className="main-content">
@@ -1283,15 +1298,6 @@ export default function App() {
               <button type="button" className={`view-tab${activeView === "lab" ? " is-active" : ""}`} onClick={() => setActiveView("lab")}>Live run</button>
               <button type="button" className={`view-tab${activeView === "evaluation" ? " is-active" : ""}`} onClick={() => setActiveView("evaluation")}>Evaluation</button>
             </div>
-            {runId ? (
-              <>
-                <button type="button" className="btn btn-ghost" onClick={() => setWizardOpen(true)}>Edit</button>
-                <button type="button" className="btn btn-secondary" onClick={evaluateRun} disabled={loading || !status?.is_complete}>
-                  {loading ? "..." : "Evaluate"}
-                </button>
-                <button type="button" className="btn btn-ghost" onClick={handleNewRun}>New run</button>
-              </>
-            ) : null}
           </div>
         </header>
 
