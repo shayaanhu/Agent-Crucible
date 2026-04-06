@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   GraduationCap, Building2, Heart, Headphones, Code2, Scale,
   PenLine, ArrowLeft, X, Plus, Minus, PlayCircle, CheckCircle,
-  Settings, Sword, Shield as ShieldIcon, ChevronDown, ChevronRight, Check
+  Sword, Shield as ShieldIcon, ChevronDown, ChevronRight, Check
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
@@ -1289,9 +1289,6 @@ export default function App() {
               </button>
               <button type="button" className="sidebar-action" onClick={() => setActiveView("evaluation")}>
                 <ShieldIcon size={14} strokeWidth={1.5} /> Evaluation
-              </button>
-              <button type="button" className="sidebar-action">
-                <Settings size={14} strokeWidth={1.5} /> Settings
               </button>
             </div>
           </>
