@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   GraduationCap, Building2, Heart, Headphones, Code2, Scale,
-  PenLine, ArrowLeft, X, Plus, Minus, PlayCircle, CheckCircle,
-  Sword, Shield as ShieldIcon, ChevronDown, ChevronRight, Check
+  PenLine, ArrowLeft, X, Plus, PlayCircle, CheckCircle,
+  Sword, Shield as ShieldIcon, Bot, ChevronRight, Check
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
@@ -130,6 +130,17 @@ function toneForSeverity(value) {
   if (value === "medium") return "warning";
   if (value === "low") return "safe";
   return "neutral";
+}
+
+function buildTurnBadgeLabels(entry) {
+  const severity = formatLabel(entry?.verdict?.severity || "low");
+  const objective = formatLabel(entry?.event?.objective_scorer?.label || entry?.event?.outcome || "pending");
+  return {
+    severityShort: `Sev: ${severity}`,
+    objectiveShort: `Obj: ${objective}`,
+    severityLong: `Blue-team severity is ${severity}`,
+    objectiveLong: `Red-team objective outcome is ${objective}`
+  };
 }
 
 function runNarrative(status, turns) {
@@ -297,101 +308,10 @@ function DetailPre({ text }) {
   return <pre className="detail-pre">{text}</pre>;
 }
 
-function CustomSelect({ options, value, onChange, placeholder = "Select an option" }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const selectedOption = options.find(o => (typeof o === 'string' ? o === value : o.value === value));
-  const displayValue = selectedOption 
-    ? (typeof selectedOption === 'string' ? selectedOption : selectedOption.label) 
-    : (value || placeholder);
-
-  return (
-    <div className="custom-select" ref={containerRef}>
-      <div className={`select-trigger ${isOpen ? 'is-open' : ''}`} onClick={() => setIsOpen(!isOpen)}>
-        <span>{displayValue}</span>
-        <ChevronDown size={14} style={{ opacity: 0.5, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-      </div>
-      {isOpen && (
-        <div className="select-options">
-          {options.map((opt) => {
-            const val = typeof opt === 'string' ? opt : opt.value;
-            const label = typeof opt === 'string' ? opt : opt.label;
-            return (
-              <div
-                key={val}
-                className={`select-option ${value === val ? 'is-selected' : ''}`}
-                onClick={() => {
-                  onChange(val);
-                  setIsOpen(false);
-                }}
-              >
-                {label}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Stepper({ value, onChange, min = 1, max = 10 }) {
-  const [localVal, setLocalVal] = useState(String(value));
-
-  useEffect(() => {
-    setLocalVal(String(value));
-  }, [value]);
-
-  const commit = (val) => {
-    let num = parseInt(val, 10);
-    if (isNaN(num) || num < min) num = min;
-    if (num > max) num = max;
-    onChange(num);
-    setLocalVal(String(num));
-  };
-
-  return (
-    <div className="stepper">
-      <button 
-        type="button" 
-        className="stepper-btn" 
-        onClick={() => commit(value - 1)}
-        disabled={value <= min}
-      >
-        <Minus size={16} />
-      </button>
-      <input
-        className="stepper-input"
-        type="number"
-        value={localVal}
-        onChange={(e) => setLocalVal(e.target.value)}
-        onBlur={() => commit(localVal)}
-      />
-      <button 
-        type="button" 
-        className="stepper-btn" 
-        onClick={() => commit(value + 1)}
-        disabled={value >= max}
-      >
-        <Plus size={16} />
-      </button>
-    </div>
-  );
-}
 function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, loading, hasRun }) {
   const goalSelectValue = selectState(setup.goal, GOAL_OPTIONS);
   const launchReady = Boolean(setup.scenario.trim() && setup.goal.trim());
+  const validStep = step >= 1 && step <= 5;
 
   return (
     <div className="modal-shell">
@@ -447,17 +367,20 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
             <div className="wizard-body">
               <div className="goal-field">
                 <label className="field-label">Target objective</label>
-                <CustomSelect
-                  options={[
-                    { value: PRESET_PLACEHOLDER, label: "Choose an objective" },
-                    ...GOAL_OPTIONS,
-                    { value: CUSTOM_OPTION, label: "Custom objective..." }
-                  ]}
+                <select
+                  className="input"
                   value={goalSelectValue}
-                  onChange={(val) => {
+                  onChange={(e) => {
+                    const val = e.target.value;
                     onField("goal", val === PRESET_PLACEHOLDER || val === CUSTOM_OPTION ? "" : val);
                   }}
-                />
+                >
+                  <option value={PRESET_PLACEHOLDER}>Choose an objective</option>
+                  {GOAL_OPTIONS.map((goal) => (
+                    <option key={goal} value={goal}>{goal}</option>
+                  ))}
+                  <option value={CUSTOM_OPTION}>Custom objective...</option>
+                </select>
                 {(goalSelectValue === CUSTOM_OPTION || goalSelectValue === PRESET_PLACEHOLDER) ? (
                   <input
                     className="input"
@@ -483,27 +406,37 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
             <div className="wizard-body attack-form">
               <div>
                 <label className="field-label">Provider</label>
-                <CustomSelect
-                  options={PROVIDER_OPTIONS}
+                <select
+                  className="input"
                   value={setup.provider}
-                  onChange={(val) => onField("provider", val)}
-                />
+                  onChange={(e) => onField("provider", e.target.value)}
+                >
+                  {PROVIDER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="field-label">Strategy</label>
-                <CustomSelect
-                  options={STRATEGY_OPTIONS.map(s => ({ value: s, label: formatLabel(s) }))}
+                <select
+                  className="input"
                   value={setup.strategyId}
-                  onChange={(val) => onField("strategyId", val)}
-                />
+                  onChange={(e) => onField("strategyId", e.target.value)}
+                >
+                  {STRATEGY_OPTIONS.map((strategy) => (
+                    <option key={strategy} value={strategy}>{formatLabel(strategy)}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="field-label">Max turns</label>
-                <Stepper
+                <input
+                  className="input"
+                  type="number"
+                  min="1"
+                  max="10"
                   value={setup.maxTurns}
-                  onChange={(val) => onField("maxTurns", val)}
-                  min={1}
-                  max={10}
+                  onChange={(e) => onField("maxTurns", Math.min(10, Math.max(1, Number(e.target.value) || 1)))}
                 />
               </div>
             </div>
@@ -566,6 +499,15 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
           </>
         ) : null}
 
+        {!validStep ? (
+          <>
+            <div className="wizard-header">
+              <div className="wizard-title">Wizard state reset needed</div>
+              <div className="wizard-subtitle">The setup step became invalid. Use Back to recover.</div>
+            </div>
+          </>
+        ) : null}
+
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onBack} disabled={step === 1 || loading}>
             <ArrowLeft size={14} /> Back
@@ -590,7 +532,9 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
 
 function TimelineCard({ entry, selected, onSelect, index }) {
   const severity = entry.verdict?.severity || "low";
-  const objectiveLabel = formatLabel(entry.event.objective_scorer?.label || entry.event.outcome || "pending");
+  const badgeLabels = buildTurnBadgeLabels(entry);
+  const blueAction = formatLabel(entry.verdict?.action || "allow");
+  const blueSeverity = formatLabel(entry.verdict?.severity || "low");
   const converterCount = entry.event.converter_steps?.length || 0;
 
   return (
@@ -615,9 +559,12 @@ function TimelineCard({ entry, selected, onSelect, index }) {
             <div className="turn-meta">{formatLabel(entry.event.strategy_id)} · {formatTimestamp(entry.event.timestamp)}</div>
           </div>
           <div className="turn-badges">
-            <Badge tone={toneForAction(entry.verdict?.action)}>{formatLabel(entry.verdict?.action || "allow")}</Badge>
-            <Badge tone={toneForSeverity(severity)}>{formatLabel(severity)}</Badge>
-            <Badge tone={toneForOutcome(entry.event.outcome)}>{objectiveLabel}</Badge>
+            <span title={badgeLabels.severityLong}>
+              <Badge tone={toneForSeverity(severity)}>{badgeLabels.severityShort}</Badge>
+            </span>
+            <span title={badgeLabels.objectiveLong}>
+              <Badge tone={toneForOutcome(entry.event.outcome)}>{badgeLabels.objectiveShort}</Badge>
+            </span>
           </div>
         </div>
 
@@ -629,9 +576,18 @@ function TimelineCard({ entry, selected, onSelect, index }) {
               <TypewriterText text={truncateText(entry.event.attacker_prompt, 140)} speed={12} />
             </div>
           </div>
-          <div className="turn-connector"><ChevronDown size={12} /></div>
+          <div className="turn-gate">
+            <div className="turn-gate-left">
+              <ShieldIcon size={14} strokeWidth={1.7} />
+              <span className="turn-gate-label">Blue-team checkpoint</span>
+            </div>
+            <div className="turn-gate-status">
+              <span className={`gate-pill gate-pill-${toneForAction(entry.verdict?.action)}`}>{blueAction}</span>
+              <span className={`gate-pill gate-pill-${toneForSeverity(entry.verdict?.severity)}`}>{blueSeverity}</span>
+            </div>
+          </div>
           <div className="turn-speaker-block target">
-            <div className="turn-speaker-icon target"><ShieldIcon size={13} strokeWidth={1.5} /></div>
+            <div className="turn-speaker-icon target"><Bot size={13} strokeWidth={1.5} /></div>
             <div className="turn-speaker-text">
               <TypewriterText text={truncateText(entry.event.model_output, 140)} speed={12} />
             </div>
@@ -659,6 +615,7 @@ function TimelineCard({ entry, selected, onSelect, index }) {
 
 function TurnDrawer({ entry, onClose }) {
   if (!entry) return null;
+  const badgeLabels = buildTurnBadgeLabels(entry);
   return (
     <div className="drawer-shell">
       <button type="button" className="drawer-backdrop" onClick={onClose} aria-label="Close drawer" />
@@ -675,9 +632,9 @@ function TurnDrawer({ entry, onClose }) {
 
         <div className="drawer-body">
           <div className="chip-row">
-            <Pill tone={toneForOutcome(entry.event.outcome)}>{formatLabel(entry.event.outcome || "partial")}</Pill>
-            <Pill tone={toneForAction(entry.verdict.action)}>{formatLabel(entry.verdict.action || "allow")}</Pill>
-            <Pill tone={toneForSeverity(entry.verdict.severity)}>{formatLabel(entry.verdict.severity || "low")}</Pill>
+            <Pill tone={toneForAction(entry.verdict.action)}>{`Gate: ${formatLabel(entry.verdict.action || "allow")}`}</Pill>
+            <Pill tone={toneForSeverity(entry.verdict.severity)}>{badgeLabels.severityShort}</Pill>
+            <Pill tone={toneForOutcome(entry.event.outcome)}>{badgeLabels.objectiveShort}</Pill>
           </div>
 
           <div className="stage-strip">
@@ -1016,6 +973,11 @@ export default function App() {
   const heroSecondaryMetric = runId ? formatLabel(status?.current_phase || status?.status || "idle") : "Setup";
 
   const updateField = (key, value) => setSetup((current) => ({ ...current, [key]: value }));
+
+  useEffect(() => {
+    if (wizardStep < 1) setWizardStep(1);
+    if (wizardStep > 5) setWizardStep(5);
+  }, [wizardStep]);
 
   async function refreshRun(currentRunId = runId) {
     if (!currentRunId) return;
