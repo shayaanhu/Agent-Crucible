@@ -92,6 +92,16 @@ function truncateText(value, length = 150) {
   return text.length <= length ? text : `${text.slice(0, length).trim()}...`;
 }
 
+function previewText(value, length = 210) {
+  if (isEmpty(value)) return { text: "n/a", truncated: false };
+  const text = String(value).trim().replace(/\s+/g, " ");
+  if (text.length <= length) return { text, truncated: false };
+  const slice = text.slice(0, length + 1);
+  const lastSpace = slice.lastIndexOf(" ");
+  const safeCut = lastSpace > Math.floor(length * 0.65) ? lastSpace : length;
+  return { text: `${text.slice(0, safeCut).trim()}…`, truncated: true };
+}
+
 function truncateMiddle(value, head = 10, tail = 8) {
   if (isEmpty(value)) return "n/a";
   const text = String(value);
@@ -184,9 +194,10 @@ function runNarrative(status, turns) {
 
 function turnSummary(entry) {
   if (!entry) return "No explanation recorded.";
-  return truncateText(
-    entry.event?.objective_scorer?.reason || entry.verdict?.reason || "No explanation recorded.",
-    155
+  return (
+    entry.event?.objective_scorer?.reason ||
+    entry.verdict?.reason ||
+    "No explanation recorded."
   );
 }
 
@@ -560,6 +571,8 @@ function TimelineCard({ entry, selected, onSelect, index }) {
   const blueAction = getGateActionLabel(entry.verdict);
   const blueSeverity = formatLabel(entry.verdict?.severity || "low");
   const converterCount = entry.event.converter_steps?.length || 0;
+  const attackerPreview = previewText(entry.event.attacker_prompt, 210);
+  const targetPreview = previewText(entry.event.model_output, 230);
 
   return (
     <div
@@ -596,8 +609,8 @@ function TimelineCard({ entry, selected, onSelect, index }) {
         <div className="turn-exchange">
           <div className="turn-speaker-block attacker">
             <div className="turn-speaker-icon attacker"><Sword size={13} strokeWidth={1.5} /></div>
-            <div className="turn-speaker-text">
-              <TypewriterText text={truncateText(entry.event.attacker_prompt, 140)} speed={12} />
+            <div className={`turn-speaker-text${attackerPreview.truncated ? " is-truncated" : ""}`}>
+              <TypewriterText text={attackerPreview.text} speed={12} />
             </div>
           </div>
           <div className="turn-gate">
@@ -612,8 +625,8 @@ function TimelineCard({ entry, selected, onSelect, index }) {
           </div>
           <div className="turn-speaker-block target">
             <div className="turn-speaker-icon target"><Bot size={13} strokeWidth={1.5} /></div>
-            <div className="turn-speaker-text">
-              <TypewriterText text={truncateText(entry.event.model_output, 140)} speed={12} />
+            <div className={`turn-speaker-text${targetPreview.truncated ? " is-truncated" : ""}`}>
+              <TypewriterText text={targetPreview.text} speed={12} />
             </div>
           </div>
         </div>
