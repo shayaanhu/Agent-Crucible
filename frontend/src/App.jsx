@@ -1314,10 +1314,6 @@ export default function App() {
                     <div className="stat-cell-label">Highest severity</div>
                     <div className={`stat-cell-value val-${toneForSeverity(blueTeamSummary.highestSeverity)}`}>{formatLabel(blueTeamSummary.highestSeverity)}</div>
                   </div>
-                  <div className="stat-cell">
-                    <div className="stat-cell-label">Started</div>
-                    <div className="stat-cell-value val-neutral">{status?.created_at ? formatTimestamp(status.created_at) : "—"}</div>
-                  </div>
                 </div>
 
                 {/* Outcome shimmer bar */}
@@ -1379,3 +1375,4 @@ export default function App() {
     </div>
   );
 }
+
