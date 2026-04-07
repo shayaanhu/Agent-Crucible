@@ -42,7 +42,7 @@ class RuleDetector:
                 continue
             if not policy["patterns"]:
                 continue
-            matches = [pattern for pattern in policy["patterns"] if pattern in lowered]
+            matches = _match_policy_patterns(policy_id, policy["patterns"], lowered)
             if not matches:
                 continue
             signals.append(
@@ -69,6 +69,78 @@ class RuleDetector:
                 metadata={"source": "rules"},
             )
         ]
+
+
+_PROMPT_INJECTION_STRONG_PATTERNS = (
+    "ignore previous instructions",
+    "override safety",
+)
+
+_PROMPT_INJECTION_SENSITIVE_PATTERNS = (
+    "system prompt",
+    "developer message",
+)
+
+_PROMPT_DISCLOSURE_HINTS = (
+    "reveal",
+    "provide",
+    "print",
+    "list",
+    "show",
+    "output",
+    "verbatim",
+    "exact",
+    "disclose",
+    "share",
+)
+
+_REFUSAL_HINTS = (
+    "i can't",
+    "i cannot",
+    "i can’t",
+    "i won't",
+    "i will not",
+    "cannot help",
+    "can't help",
+    "cannot provide",
+    "can't provide",
+    "cannot share",
+    "can't share",
+    "won’t share",
+)
+
+
+def _match_policy_patterns(policy_id: str, patterns: list[str], lowered_output: str) -> list[str]:
+    literal_matches = [pattern for pattern in patterns if pattern in lowered_output]
+    if not literal_matches:
+        return []
+
+    if policy_id == "policy.prompt_injection.block":
+        if not _is_prompt_injection_disclosure_context(lowered_output):
+            return []
+
+    return literal_matches
+
+
+def _is_prompt_injection_disclosure_context(lowered_output: str) -> bool:
+    if any(pattern in lowered_output for pattern in _PROMPT_INJECTION_STRONG_PATTERNS):
+        return True
+
+    if not any(pattern in lowered_output for pattern in _PROMPT_INJECTION_SENSITIVE_PATTERNS):
+        return False
+
+    has_disclosure_intent = any(token in lowered_output for token in _PROMPT_DISCLOSURE_HINTS)
+    has_structured_leak_shape = (
+        re.search(r"(system prompt|developer message)\s*[:=\-]", lowered_output) is not None
+        or re.search(r"(here(?:'s| is)|the)\s+(system prompt|developer message)", lowered_output)
+        is not None
+    )
+    refusal_like = any(token in lowered_output for token in _REFUSAL_HINTS)
+
+    if refusal_like and not has_structured_leak_shape:
+        return False
+
+    return has_disclosure_intent or has_structured_leak_shape
 
 
 class LlamaGuardDetector:

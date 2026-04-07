@@ -132,6 +132,29 @@ function toneForSeverity(value) {
   return "neutral";
 }
 
+function getDryRunMeta(verdict) {
+  const meta = verdict?.detector_results?.dry_run;
+  if (!meta || typeof meta !== "object" || meta.enabled !== true) return null;
+  return meta;
+}
+
+function getGateActionLabel(verdict) {
+  const action = verdict?.action || "allow";
+  const dryRunMeta = getDryRunMeta(verdict);
+  if (dryRunMeta && action === "allow" && dryRunMeta.original_action && dryRunMeta.original_action !== "allow") {
+    return "Allow (dry-run)";
+  }
+  return formatLabel(action);
+}
+
+function getGateActionTone(verdict) {
+  const dryRunMeta = getDryRunMeta(verdict);
+  if (dryRunMeta && verdict?.action === "allow" && dryRunMeta.original_action && dryRunMeta.original_action !== "allow") {
+    return "info";
+  }
+  return toneForAction(verdict?.action);
+}
+
 function buildTurnBadgeLabels(entry) {
   const severity = formatLabel(entry?.verdict?.severity || "low");
   const objective = formatLabel(entry?.event?.objective_scorer?.label || entry?.event?.outcome || "pending");
@@ -168,6 +191,7 @@ function turnSummary(entry) {
 }
 
 function stageItems(entry) {
+  const gateActionLabel = getGateActionLabel(entry?.verdict);
   return [
     { label: "Attack", value: entry?.event?.attacker_prompt ? "Ready" : "Pending" },
     {
@@ -178,7 +202,7 @@ function stageItems(entry) {
     },
     { label: "Target", value: entry?.event?.model_output ? "Captured" : "Pending" },
     { label: "Objective", value: formatLabel(entry?.event?.objective_scorer?.label || entry?.event?.outcome || "pending") },
-    { label: "Blue team", value: formatLabel(entry?.verdict?.action || "allow") }
+    { label: "Blue team", value: gateActionLabel }
   ];
 }
 
@@ -533,7 +557,7 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
 function TimelineCard({ entry, selected, onSelect, index }) {
   const severity = entry.verdict?.severity || "low";
   const badgeLabels = buildTurnBadgeLabels(entry);
-  const blueAction = formatLabel(entry.verdict?.action || "allow");
+  const blueAction = getGateActionLabel(entry.verdict);
   const blueSeverity = formatLabel(entry.verdict?.severity || "low");
   const converterCount = entry.event.converter_steps?.length || 0;
 
@@ -582,7 +606,7 @@ function TimelineCard({ entry, selected, onSelect, index }) {
               <span className="turn-gate-label">Blue-team checkpoint</span>
             </div>
             <div className="turn-gate-status">
-              <span className={`gate-pill gate-pill-${toneForAction(entry.verdict?.action)}`}>{blueAction}</span>
+              <span className={`gate-pill gate-pill-${getGateActionTone(entry.verdict)}`}>{blueAction}</span>
               <span className={`gate-pill gate-pill-${toneForSeverity(entry.verdict?.severity)}`}>{blueSeverity}</span>
             </div>
           </div>
@@ -616,6 +640,7 @@ function TimelineCard({ entry, selected, onSelect, index }) {
 function TurnDrawer({ entry, onClose }) {
   if (!entry) return null;
   const badgeLabels = buildTurnBadgeLabels(entry);
+  const gateActionLabel = getGateActionLabel(entry.verdict);
   return (
     <div className="drawer-shell">
       <button type="button" className="drawer-backdrop" onClick={onClose} aria-label="Close drawer" />
@@ -632,7 +657,7 @@ function TurnDrawer({ entry, onClose }) {
 
         <div className="drawer-body">
           <div className="chip-row">
-            <Pill tone={toneForAction(entry.verdict.action)}>{`Gate: ${formatLabel(entry.verdict.action || "allow")}`}</Pill>
+            <Pill tone={getGateActionTone(entry.verdict)}>{`Gate: ${gateActionLabel}`}</Pill>
             <Pill tone={toneForSeverity(entry.verdict.severity)}>{badgeLabels.severityShort}</Pill>
             <Pill tone={toneForOutcome(entry.event.outcome)}>{badgeLabels.objectiveShort}</Pill>
           </div>
@@ -703,7 +728,7 @@ function TurnDrawer({ entry, onClose }) {
           <Fold title="Blue-team evidence">
             <KeyGrid
               items={[
-                { label: "Action", value: formatLabel(entry.verdict.action) },
+                { label: "Action", value: gateActionLabel },
                 { label: "Category", value: formatLabel(entry.verdict.category) },
                 { label: "Severity", value: formatLabel(entry.verdict.severity) },
                 { label: "Confidence", value: formatNumber(entry.verdict.confidence) },
