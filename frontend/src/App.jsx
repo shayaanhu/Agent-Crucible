@@ -130,7 +130,7 @@ function toneForOutcome(value) {
 
 function toneForAction(value) {
   if (value === "block") return "danger";
-  if (value === "redact" || value === "escalate") return "warning";
+  if (value === "redact" || value === "escalate" || value === "safe_rewrite") return "warning";
   if (value === "allow") return "safe";
   return "neutral";
 }
@@ -247,6 +247,92 @@ function summarizeBlueTeam(timeline) {
   });
   const dominantAction = Object.entries(actions).sort((left, right) => right[1] - left[1])[0]?.[0] || "allow";
   return { reviewed: verdicts.length, blocked, highestSeverity: highest, dominantAction };
+}
+
+function sortCountEntries(values) {
+  return Object.entries(values || {}).sort((left, right) => {
+    if (right[1] !== left[1]) return right[1] - left[1];
+    return String(left[0]).localeCompare(String(right[0]));
+  });
+}
+
+function sumBlueInterventions(summary) {
+  return sortCountEntries(summary?.action_counts).reduce(
+    (total, [action, count]) => total + (action === "allow" ? 0 : count),
+    0
+  );
+}
+
+function summarizeBlueBenchmarkResults(results) {
+  const severityRank = { low: 1, medium: 2, high: 3, critical: 4 };
+  const severityCounts = {};
+  let highestSeverity = "n/a";
+  let totalConfidence = 0;
+  let confidenceSamples = 0;
+  let agreementSamples = 0;
+  let multiDetectorHits = 0;
+  let supportTotal = 0;
+
+  (results || []).forEach((result) => {
+    if (typeof result?.confidence === "number") {
+      totalConfidence += result.confidence;
+      confidenceSamples += 1;
+    }
+
+    const severity = result?.detector_results?._decision?.severity;
+    if (severity) {
+      severityCounts[severity] = (severityCounts[severity] || 0) + 1;
+      if (
+        highestSeverity === "n/a" ||
+        (severityRank[severity] || 0) > (severityRank[highestSeverity] || 0)
+      ) {
+        highestSeverity = severity;
+      }
+    }
+
+    const decision = result?.detector_results?._decision;
+    const evaluations = result?.detector_results?._aggregation?.policy_evaluations || [];
+    const selectedPolicy =
+      evaluations.find(
+        (item) => item.triggered && item.policy_id === decision?.selected_policy_id
+      ) || evaluations.find((item) => item.triggered);
+
+    if (selectedPolicy) {
+      const supportCount =
+        selectedPolicy.supporting_count || selectedPolicy.supporting_detectors?.length || 0;
+      agreementSamples += 1;
+      supportTotal += supportCount;
+      if (supportCount > 1) multiDetectorHits += 1;
+    }
+  });
+
+  return {
+    severityCounts,
+    highestSeverity,
+    averageConfidence: confidenceSamples ? totalConfidence / confidenceSamples : null,
+    averageSupport: agreementSamples ? supportTotal / agreementSamples : null,
+    multiDetectorHits,
+    multiDetectorRate: agreementSamples ? multiDetectorHits / agreementSamples : null,
+    agreementSamples
+  };
+}
+
+function formatSignedCount(value) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "n/a";
+  if (value === 0) return "0";
+  return `${value > 0 ? "+" : ""}${value}`;
+}
+
+function formatSignedPoints(value) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "n/a";
+  const points = Math.round(value * 100);
+  if (points === 0) return "0 pts";
+  return `${points > 0 ? "+" : ""}${points} pts`;
+}
+
+function toneForDelta(value) {
+  if (typeof value !== "number" || Number.isNaN(value) || value === 0) return "neutral";
+  return value > 0 ? "safe" : "danger";
 }
 
 function selectState(value, options) {
@@ -869,18 +955,153 @@ function BreakdownTable({ title, rows }) {
   );
 }
 
+function DistributionTable({ title, entries, total, toneForKey = () => "neutral", emptyLabel = "No data available yet." }) {
+  return (
+    <section className="eval-section">
+      <div className="eval-section-title">{title}</div>
+      {entries.length ? (
+        <div className="distribution-list">
+          {entries.map(([key, value]) => {
+            const pct = total ? Math.max(0, Math.min(100, Math.round((value / total) * 100))) : 0;
+            return (
+              <div className="distribution-row" key={key}>
+                <div className="distribution-row-top">
+                  <div className="distribution-row-label">{formatLabel(key)}</div>
+                  <div className="distribution-row-value">
+                    <span>{typeof value === "number" ? formatNumber(value) : value}</span>
+                    <Badge tone={toneForKey(key)}>{pct}%</Badge>
+                  </div>
+                </div>
+                <div className="distribution-meter">
+                  <div
+                    className={`distribution-meter-fill tone-${toneForKey(key)}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : <p className="empty-copy">{emptyLabel}</p>}
+    </section>
+  );
+}
+
+function PolicySpotlight({ entries, total }) {
+  return (
+    <section className="eval-section">
+      <div className="eval-section-title">Policy spotlight</div>
+      {entries.length ? (
+        <div className="policy-spotlight-list">
+          {entries.map(([policyId, count], index) => {
+            const pct = total ? Math.round((count / total) * 100) : 0;
+            return (
+              <div className="policy-spotlight-row" key={policyId}>
+                <div className="policy-spotlight-rank">#{index + 1}</div>
+                <div className="policy-spotlight-main">
+                  <div className="policy-spotlight-name">{formatLabel(policyId)}</div>
+                  <div className="policy-spotlight-meta">{count} cases</div>
+                </div>
+                <Badge tone="neutral">{pct}%</Badge>
+              </div>
+            );
+          })}
+        </div>
+      ) : <p className="empty-copy">No policy patterns captured yet.</p>}
+    </section>
+  );
+}
+
+function BlueCaseTraceList({ results }) {
+  if (!results?.length) {
+    return <p className="empty-copy">No case traces available yet.</p>;
+  }
+
+  return (
+    <div className="blue-trace-list">
+      {results.map((result) => (
+        <div className="blue-trace-card" key={result.id}>
+          <div className="blue-trace-top">
+            <div>
+              <div className="blue-trace-title">{formatLabel(result.id)}</div>
+              <div className="blue-trace-meta">{truncateMiddle(result.actual_policy_id, 18, 16)}</div>
+            </div>
+            <div className="chip-row">
+              <Badge tone={result.passed ? "safe" : "danger"}>
+                {result.passed ? "Pass" : "Fail"}
+              </Badge>
+              <Badge tone={toneForAction(result.actual_action)}>
+                {formatLabel(result.actual_action)}
+              </Badge>
+            </div>
+          </div>
+          <KeyGrid
+            items={[
+              { label: "Expected policy", value: truncateMiddle(result.expected_policy_id, 18, 16) },
+              { label: "Allowed", value: result.actual_effective_allowed ? "Yes" : "No" },
+              { label: "Confidence", value: formatNumber(result.confidence) },
+              {
+                label: "Severity",
+                value: formatLabel(result.detector_results?._decision?.severity || "n/a")
+              }
+            ]}
+          />
+          <Fold title="Detector trace">
+            <DetailPre text={JSON.stringify(result.detector_results || {}, null, 2)} />
+          </Fold>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EvaluationView({ evaluation, suiteRun, objectiveEval, regressionEval, evalHistory, blueBenchmark, onRefresh, onStartSuite, onDownloadObjective, onDownloadRegression, loading }) {
   const objectiveSummary = objectiveEval?.payload?.summary;
   const regressionSummary = regressionEval?.payload?.summary;
   const configured = blueBenchmark?.configured_detectors?.summary;
   const baseline = blueBenchmark?.baseline_rules_only?.summary;
+  const configuredResults = blueBenchmark?.configured_detectors?.results || [];
+  const configuredInsights = useMemo(
+    () => summarizeBlueBenchmarkResults(configuredResults),
+    [configuredResults]
+  );
+  const configuredPassRate = configured?.total_cases ? (configured.passed_cases || 0) / configured.total_cases : null;
+  const baselinePassRate = baseline?.total_cases ? (baseline.passed_cases || 0) / baseline.total_cases : null;
+  const passedCaseDelta =
+    typeof configured?.passed_cases === "number" && typeof baseline?.passed_cases === "number"
+      ? configured.passed_cases - baseline.passed_cases
+      : null;
+  const passRateDelta =
+    typeof configuredPassRate === "number" && typeof baselinePassRate === "number"
+      ? configuredPassRate - baselinePassRate
+      : null;
+  const interventionCount = sumBlueInterventions(configured);
+  const actionEntries = useMemo(
+    () => sortCountEntries(configured?.action_counts),
+    [configured?.action_counts]
+  );
+  const severityEntries = useMemo(
+    () => sortCountEntries(configuredInsights.severityCounts),
+    [configuredInsights]
+  );
+  const policyEntries = useMemo(
+    () => sortCountEntries(configured?.policy_counts).slice(0, 4),
+    [configured?.policy_counts]
+  );
+  const importantCaseTraces = useMemo(() => {
+    const sorted = [...configuredResults].sort((left, right) => {
+      if (left.passed !== right.passed) return left.passed ? 1 : -1;
+      return (right.confidence || 0) - (left.confidence || 0);
+    });
+    return sorted.slice(0, 6);
+  }, [configuredResults]);
 
   return (
     <section className="evaluation-page">
       <div className="section-header">
         <div>
           <div className="section-title">Testing Suite</div>
-          <div className="section-note">Test the current model against the Agent Crucible Red-Team Suite.</div>
+          <div className="section-note">Track attack pressure and blue-team defenses without burying the important signals.</div>
         </div>
         <div className="chip-row">
           <button type="button" className="btn btn-primary" onClick={() => onStartSuite("groq")} disabled={loading || (suiteRun && !suiteRun.is_complete)}>
@@ -920,6 +1141,140 @@ function EvaluationView({ evaluation, suiteRun, objectiveEval, regressionEval, e
         </Fold>
       ) : null}
 
+      <section className="eval-section blue-overview-shell">
+        <SectionHeader
+          title="Blue-team defense overview"
+          note="Signal-first view of defense outcome, action mix, benchmark delta, and dominant policy patterns."
+          actions={
+            blueBenchmark?.run_metadata ? (
+              <div className="chip-row">
+                <Badge tone="info">{formatLabel(blueBenchmark.run_metadata.benchmark_label || "default")}</Badge>
+                <Badge tone="neutral">{formatTimestamp(blueBenchmark.run_metadata.generated_at)}</Badge>
+              </div>
+            ) : null
+          }
+        />
+
+        <div className="blue-hero-grid">
+          <div className="blue-hero-card">
+            <div className="blue-hero-label">Defense outcome</div>
+            <div className="blue-hero-value">{formatNumber(configuredPassRate)}</div>
+            <div className="blue-hero-note">
+              {configured?.passed_cases ?? 0} of {configured?.total_cases ?? 0} benchmark cases matched the expected blue-team outcome.
+            </div>
+          </div>
+
+          <div className="blue-hero-card">
+            <div className="blue-hero-label">Unsafe stopped</div>
+            <div className="blue-hero-value">{configured?.blocked_cases ?? 0}</div>
+            <div className="blue-hero-note">
+              Effective blocks or escalations across {configured?.total_cases ?? 0} benchmark cases.
+            </div>
+          </div>
+
+          <div className="blue-hero-card">
+            <div className="blue-hero-label">Actioned responses</div>
+            <div className="blue-hero-value">{interventionCount}</div>
+            <div className="blue-hero-note">
+              Non-allow outcomes including block, escalate, redact, and safe rewrite.
+            </div>
+          </div>
+
+          <div className="blue-hero-card">
+            <div className="blue-hero-label">Benchmark delta</div>
+            <div className={`blue-hero-value tone-${toneForDelta(passedCaseDelta)}`}>
+              {formatSignedCount(passedCaseDelta)}
+            </div>
+            <div className="blue-hero-note">
+              {formatSignedPoints(passRateDelta)} versus the rules-only baseline.
+            </div>
+          </div>
+        </div>
+
+        <div className="eval-grid">
+          <DistributionTable
+            title="Action mix"
+            entries={actionEntries}
+            total={configured?.total_cases || 0}
+            toneForKey={toneForAction}
+            emptyLabel="No blue-team action data yet."
+          />
+          <DistributionTable
+            title="Severity mix"
+            entries={severityEntries}
+            total={configured?.total_cases || 0}
+            toneForKey={toneForSeverity}
+            emptyLabel="No severity signal captured yet."
+          />
+          <PolicySpotlight entries={policyEntries} total={configured?.total_cases || 0} />
+        </div>
+
+        <Fold title="More blue-team details">
+          <div className="eval-grid">
+            <section className="eval-section">
+              <div className="eval-section-title">Confidence and detector agreement</div>
+              <KeyGrid
+                items={[
+                  { label: "Average confidence", value: formatNumber(configuredInsights.averageConfidence) },
+                  { label: "Average detector support", value: formatNumber(configuredInsights.averageSupport) },
+                  {
+                    label: "Multi-detector hits",
+                    value:
+                      configuredInsights.multiDetectorRate === null
+                        ? "n/a"
+                        : `${configuredInsights.multiDetectorHits} (${formatNumber(configuredInsights.multiDetectorRate)})`
+                  },
+                  { label: "Highest severity", value: formatLabel(configuredInsights.highestSeverity) },
+                  { label: "Generated", value: blueBenchmark?.run_metadata?.generated_at || "n/a" },
+                  { label: "Fixture", value: blueBenchmark?.run_metadata?.fixture_path || "n/a" }
+                ]}
+              />
+            </section>
+
+            <section className="eval-section">
+              <div className="eval-section-title">Benchmark comparison</div>
+              <KeyGrid
+                items={[
+                  { label: "Configured pass rate", value: formatNumber(configuredPassRate) },
+                  { label: "Baseline pass rate", value: formatNumber(baselinePassRate) },
+                  {
+                    label: "Passed case delta",
+                    value: formatSignedCount(passedCaseDelta)
+                  },
+                  { label: "Configured allowed", value: configured?.allowed_cases ?? "n/a" },
+                  { label: "Configured blocked", value: configured?.blocked_cases ?? "n/a" },
+                  { label: "Configured benchmark label", value: blueBenchmark?.config?.benchmark_label || "n/a" }
+                ]}
+              />
+            </section>
+          </div>
+
+          <div className="eval-grid">
+            <DistributionTable
+              title="Policy counts"
+              entries={sortCountEntries(configured?.policy_counts)}
+              total={configured?.total_cases || 0}
+              emptyLabel="No policy distribution available yet."
+            />
+            <DistributionTable
+              title="Benchmark metrics"
+              entries={(configured?.metrics || []).map((metric) => [metric.metric_name, metric.value])}
+              total={1}
+              emptyLabel="No benchmark metrics available yet."
+            />
+          </div>
+
+          <section className="eval-section">
+            <div className="eval-section-title">Case traces</div>
+            <BlueCaseTraceList results={importantCaseTraces} />
+          </section>
+
+          <Fold title="Raw benchmark payload">
+            <DetailPre text={JSON.stringify(blueBenchmark || {}, null, 2)} />
+          </Fold>
+        </Fold>
+      </section>
+
       <div className="stat-bar" style={{ marginBottom: 24 }}>
         <StatCard label="Objective suite" value={objectiveEval?.available ? formatNumber(safeRate(objectiveSummary)) : "Missing"} />
         <StatCard label="Objective cases" value={objectiveSummary?.total_cases || 0} />
@@ -958,27 +1313,6 @@ function EvaluationView({ evaluation, suiteRun, objectiveEval, regressionEval, e
         <BreakdownTable title="Objective by difficulty" rows={flattenBreakdown(objectiveSummary?.per_difficulty)} />
         <BreakdownTable title="Regression by strategy" rows={flattenBreakdown(regressionSummary?.per_strategy)} />
       </div>
-
-      <Fold title="Blue-team benchmark">
-        <div className="eval-grid">
-          <section className="eval-section">
-            <div className="eval-section-title">Configured detectors</div>
-            <KeyGrid items={[
-              { label: "Pass rate", value: configured?.total_cases ? formatNumber((configured.passed_cases || 0) / configured.total_cases) : "n/a" },
-              { label: "Passed", value: configured?.passed_cases ?? "n/a" },
-              { label: "Failed", value: configured?.failed_cases ?? "n/a" }
-            ]} />
-          </section>
-          <section className="eval-section">
-            <div className="eval-section-title">Rules only baseline</div>
-            <KeyGrid items={[
-              { label: "Pass rate", value: baseline?.total_cases ? formatNumber((baseline.passed_cases || 0) / baseline.total_cases) : "n/a" },
-              { label: "Passed", value: baseline?.passed_cases ?? "n/a" },
-              { label: "Failed", value: baseline?.failed_cases ?? "n/a" }
-            ]} />
-          </section>
-        </div>
-      </Fold>
 
       <Fold title="Saved artifacts">
         {evalHistory.length ? (
