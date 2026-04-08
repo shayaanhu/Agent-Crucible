@@ -8,7 +8,7 @@ from agents.contracts import RedTeamContract, RedTeamRunTrace, RedTeamTurn
 from agents.red_team_converters import build_converter_registry
 from agents.red_team_models import AttackState
 from agents.red_team_objective import Objective
-from agents.red_team_runtime import generate_attacker_prompt, generate_response
+from agents.red_team_runtime import generate_attacker_prompt, generate_response, get_scenario_system_prompt
 from agents.red_team_scorers import ScorerResult, build_scorer_registry
 from agents.red_team_strategies import RedTeamStrategy, build_strategy_registry
 
@@ -112,6 +112,7 @@ class AdvancedRedTeamAgent(RedTeamContract):
             objective_scorer_model=objective_scorer_model,
             objective_scorer_prompt=objective_scorer_prompt,
         )
+        target_system_prompt = get_scenario_system_prompt(state.scenario)
         turns: list[RedTeamTurn] = []
         strategy_sequence: list[str] = [strategy_id]
         template_sequence: list[str] = []
@@ -165,7 +166,7 @@ class AdvancedRedTeamAgent(RedTeamContract):
             )
             if on_progress:
                 on_progress("target", max(state.turn_index - 1, 0), state.max_turns)
-            response = generate_response(prompt=prompt, provider=provider)
+            response = generate_response(prompt=prompt, provider=provider, system_prompt=target_system_prompt)
             if on_progress:
                 on_progress("scoring", max(state.turn_index - 1, 0), state.max_turns)
             scorer_results = self._score_response(response, state, scorers)
@@ -461,7 +462,7 @@ def _select_template(strategy: RedTeamStrategy, state: AttackState):
     templates = strategy.template_pack(state)
     if not templates:
         raise ValueError(f"Strategy '{strategy.metadata().strategy_id}' has no templates.")
-    idx = min(state.template_index, len(templates) - 1)
+    idx = state.template_index % len(templates)
     return templates[idx]
 
 
