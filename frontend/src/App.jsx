@@ -254,21 +254,30 @@ function selectState(value, options) {
   return options.includes(value) ? value : CUSTOM_OPTION;
 }
 
-function TypewriterText({ text, speed = 22 }) {
+function TypewriterText({ text, speed = 22, delay = 0, onDone }) {
   const [displayed, setDisplayed] = useState("");
   const [done, setDone] = useState(false);
+  const onDoneRef = useRef(onDone);
+  useEffect(() => { onDoneRef.current = onDone; });
   useEffect(() => {
     setDisplayed("");
     setDone(false);
-    if (!text) return;
     let i = 0;
-    const id = setInterval(() => {
-      i += 1;
-      setDisplayed(text.slice(0, i));
-      if (i >= text.length) { setDone(true); clearInterval(id); }
-    }, speed);
-    return () => clearInterval(id);
-  }, [text, speed]);
+    let intervalId = null;
+    const timeoutId = setTimeout(() => {
+      if (!text) { onDoneRef.current?.(); return; }
+      intervalId = setInterval(() => {
+        i += 1;
+        setDisplayed(text.slice(0, i));
+        if (i >= text.length) {
+          setDone(true);
+          clearInterval(intervalId);
+          onDoneRef.current?.();
+        }
+      }, speed);
+    }, delay);
+    return () => { clearTimeout(timeoutId); if (intervalId) clearInterval(intervalId); };
+  }, [text, speed, delay]);
   return (
     <>
       {displayed}
@@ -574,6 +583,19 @@ function TimelineCard({ entry, selected, onSelect, index }) {
   const attackerPreview = previewText(entry.event.attacker_prompt, 210);
   const targetPreview = previewText(entry.event.model_output, 230);
 
+  // 0: attacker typing  1: attacker done → waiting → gate  2: gate visible → waiting → target  3: target visible
+  const [phase, setPhase] = useState(0);
+  useEffect(() => {
+    if (phase === 1) {
+      const t = setTimeout(() => setPhase(2), 350);
+      return () => clearTimeout(t);
+    }
+    if (phase === 2) {
+      const t = setTimeout(() => setPhase(3), 630); // gate anim (380ms) + gap (250ms)
+      return () => clearTimeout(t);
+    }
+  }, [phase]);
+
   return (
     <div
       role="button"
@@ -605,30 +627,34 @@ function TimelineCard({ entry, selected, onSelect, index }) {
           </div>
         </div>
 
-        {/* Conversation blocks */}
+        {/* Conversation blocks — phase-gated: attacker types → gate fades in → target types */}
         <div className="turn-exchange">
-          <div className="turn-speaker-block attacker">
+          <div className="turn-speaker-block attacker" style={{ animation: "blockIn 380ms var(--ease-out) 150ms both" }}>
             <div className="turn-speaker-icon attacker"><Sword size={13} strokeWidth={1.5} /></div>
             <div className={`turn-speaker-text${attackerPreview.truncated ? " is-truncated" : ""}`}>
-              <TypewriterText text={attackerPreview.text} speed={12} />
+              <TypewriterText text={attackerPreview.text} speed={12} delay={150} onDone={() => setPhase(1)} />
             </div>
           </div>
-          <div className="turn-gate">
-            <div className="turn-gate-left">
-              <ShieldIcon size={14} strokeWidth={1.7} />
-              <span className="turn-gate-label">Blue-team checkpoint</span>
+          {phase >= 2 && (
+            <div className="turn-gate" style={{ animation: "blockIn 380ms var(--ease-out) both" }}>
+              <div className="turn-gate-left">
+                <ShieldIcon size={14} strokeWidth={1.7} />
+                <span className="turn-gate-label">Blue-team checkpoint</span>
+              </div>
+              <div className="turn-gate-status">
+                <span className={`gate-pill gate-pill-${getGateActionTone(entry.verdict)}`}>{blueAction}</span>
+                <span className={`gate-pill gate-pill-${toneForSeverity(entry.verdict?.severity)}`}>{blueSeverity}</span>
+              </div>
             </div>
-            <div className="turn-gate-status">
-              <span className={`gate-pill gate-pill-${getGateActionTone(entry.verdict)}`}>{blueAction}</span>
-              <span className={`gate-pill gate-pill-${toneForSeverity(entry.verdict?.severity)}`}>{blueSeverity}</span>
+          )}
+          {phase >= 3 && (
+            <div className="turn-speaker-block target" style={{ animation: "blockIn 380ms var(--ease-out) both" }}>
+              <div className="turn-speaker-icon target"><Bot size={13} strokeWidth={1.5} /></div>
+              <div className={`turn-speaker-text${targetPreview.truncated ? " is-truncated" : ""}`}>
+                <TypewriterText text={targetPreview.text} speed={12} />
+              </div>
             </div>
-          </div>
-          <div className="turn-speaker-block target">
-            <div className="turn-speaker-icon target"><Bot size={13} strokeWidth={1.5} /></div>
-            <div className={`turn-speaker-text${targetPreview.truncated ? " is-truncated" : ""}`}>
-              <TypewriterText text={targetPreview.text} speed={12} />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Expand affordance row */}
