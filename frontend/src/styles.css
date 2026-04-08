@@ -1011,6 +1011,24 @@ a {
   border-bottom: 1px solid var(--border-subtle);
   min-height: 1.5em;
 }
+.live-blue-team-section {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+  animation: turnIn 260ms var(--ease-out) both;
+}
+.live-blue-team-section > .stat-bar {
+  animation: turnIn 300ms var(--ease-out) 40ms both;
+  opacity: 0;
+}
+.live-blue-team-section > .eval-grid {
+  animation: turnIn 340ms var(--ease-out) 90ms both;
+  opacity: 0;
+}
+.live-blue-team-section > .fold {
+  animation: turnIn 360ms var(--ease-out) 140ms both;
+  opacity: 0;
+}
 
 .narrative-cursor {
   display: inline-block;
@@ -1770,6 +1788,10 @@ details[open]>summary::before {
   border-radius: inherit;
   background: var(--neutral);
 }
+.live-blue-team-section .distribution-meter-fill {
+  transform-origin: left center;
+  animation: growMeter 420ms var(--ease-out) both;
+}
 .distribution-meter-fill.tone-safe { background: var(--success); }
 .distribution-meter-fill.tone-warning { background: var(--warning); }
 .distribution-meter-fill.tone-danger { background: var(--danger); }
@@ -1789,6 +1811,16 @@ details[open]>summary::before {
   background: rgba(12, 12, 12, 0.54);
   border: 1px solid var(--border-subtle);
 }
+.live-blue-team-section .policy-spotlight-row,
+.live-blue-team-section .blue-trace-card {
+  animation: turnIn 320ms var(--ease-out) both;
+}
+.live-blue-team-section .policy-spotlight-row:nth-child(2),
+.live-blue-team-section .blue-trace-card:nth-child(2) { animation-delay: 60ms; }
+.live-blue-team-section .policy-spotlight-row:nth-child(3),
+.live-blue-team-section .blue-trace-card:nth-child(3) { animation-delay: 100ms; }
+.live-blue-team-section .policy-spotlight-row:nth-child(4),
+.live-blue-team-section .blue-trace-card:nth-child(4) { animation-delay: 140ms; }
 .policy-spotlight-rank {
   width: 28px;
   height: 28px;
@@ -2007,6 +2039,18 @@ details[open]>summary::before {
 
   to {
     transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes growMeter {
+  from {
+    transform: scaleX(0);
+    opacity: 0.5;
+  }
+
+  to {
+    transform: scaleX(1);
     opacity: 1;
   }
 }

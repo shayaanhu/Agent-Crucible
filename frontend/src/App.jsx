@@ -539,6 +539,83 @@ function summarizeBlueBenchmarkResults(results) {
   };
 }
 
+function summarizeLiveBlueRun(timeline) {
+  const severityRank = { low: 1, medium: 2, high: 3, critical: 4 };
+  const actionCounts = {};
+  const severityCounts = {};
+  const policyCounts = {};
+  const outcomeCounts = {};
+  let highestSeverity = "n/a";
+  let interventionCount = 0;
+  let stoppedCount = 0;
+  let dryRunTurns = 0;
+  let totalConfidence = 0;
+  let confidenceSamples = 0;
+  let supportTotal = 0;
+  let agreementSamples = 0;
+  let multiDetectorHits = 0;
+
+  (timeline || []).forEach((entry) => {
+    const verdict = entry?.verdict || {};
+    const action = verdict.action || "allow";
+    const severity = verdict.severity || "low";
+    const policyId = verdict.policy_id || "policy.safe.default";
+    const outcome = entry?.event?.objective_scorer?.label || entry?.event?.outcome || "pending";
+
+    actionCounts[action] = (actionCounts[action] || 0) + 1;
+    severityCounts[severity] = (severityCounts[severity] || 0) + 1;
+    policyCounts[policyId] = (policyCounts[policyId] || 0) + 1;
+    outcomeCounts[outcome] = (outcomeCounts[outcome] || 0) + 1;
+
+    if (action !== "allow") interventionCount += 1;
+    if (action === "block" || action === "escalate") stoppedCount += 1;
+    if (verdict.dry_run) dryRunTurns += 1;
+    if ((severityRank[severity] || 0) > (severityRank[highestSeverity] || 0)) {
+      highestSeverity = severity;
+    }
+    if (typeof verdict.confidence === "number") {
+      totalConfidence += verdict.confidence;
+      confidenceSamples += 1;
+    }
+
+    const evaluations = verdict?.detector_results?._aggregation?.policy_evaluations || [];
+    const selectedPolicy =
+      evaluations.find(
+        (item) => item.triggered && item.policy_id === verdict?.policy_id
+      ) || evaluations.find((item) => item.triggered);
+    if (selectedPolicy) {
+      const supportCount =
+        selectedPolicy.supporting_count || selectedPolicy.supporting_detectors?.length || 0;
+      agreementSamples += 1;
+      supportTotal += supportCount;
+      if (supportCount > 1) multiDetectorHits += 1;
+    }
+  });
+
+  const totalTurns = (timeline || []).length;
+  const successfulTurns = outcomeCounts.success || 0;
+  const defendedTurns = totalTurns - successfulTurns;
+
+  return {
+    totalTurns,
+    defendedTurns,
+    defendedRate: totalTurns ? defendedTurns / totalTurns : null,
+    successfulTurns,
+    stoppedCount,
+    interventionCount,
+    actionCounts,
+    severityCounts,
+    policyCounts,
+    outcomeCounts,
+    highestSeverity,
+    averageConfidence: confidenceSamples ? totalConfidence / confidenceSamples : null,
+    averageSupport: agreementSamples ? supportTotal / agreementSamples : null,
+    multiDetectorHits,
+    multiDetectorRate: agreementSamples ? multiDetectorHits / agreementSamples : null,
+    dryRunTurns
+  };
+}
+
 function formatSignedCount(value) {
   if (typeof value !== "number" || Number.isNaN(value)) return "n/a";
   if (value === 0) return "0";
@@ -1301,53 +1378,200 @@ function BlueCaseTraceList({ results }) {
   );
 }
 
-function EvaluationView({ evaluation, suiteRun, objectiveEval, regressionEval, evalHistory, blueBenchmark, onRefresh, onStartSuite, onDownloadObjective, onDownloadRegression, loading }) {
-  const objectiveSummary = objectiveEval?.payload?.summary;
-  const regressionSummary = regressionEval?.payload?.summary;
-  const configured = blueBenchmark?.configured_detectors?.summary;
-  const baseline = blueBenchmark?.baseline_rules_only?.summary;
-  const configuredResults = blueBenchmark?.configured_detectors?.results || [];
-  const configuredInsights = useMemo(
-    () => summarizeBlueBenchmarkResults(configuredResults),
-    [configuredResults]
+function LiveBlueTurnTraceList({ entries }) {
+  if (!entries?.length) {
+    return <p className="empty-copy">No live turn traces available yet.</p>;
+  }
+
+  return (
+    <div className="blue-trace-list">
+      {entries.map((entry) => {
+        const verdict = entry?.verdict || {};
+        const outcome = entry?.event?.objective_scorer?.label || entry?.event?.outcome || "pending";
+        return (
+          <div className="blue-trace-card" key={`${entry.event?.turn_index}-${entry.event?.timestamp}`}>
+            <div className="blue-trace-top">
+              <div>
+                <div className="blue-trace-title">Turn {entry.event?.turn_index}</div>
+                <div className="blue-trace-meta">{truncateMiddle(verdict.policy_id || "policy.safe.default", 18, 16)}</div>
+              </div>
+              <div className="chip-row">
+                <Badge tone={toneForOutcome(outcome)}>{formatLabel(outcome)}</Badge>
+                <Badge tone={toneForAction(verdict.action)}>{formatLabel(verdict.action || "allow")}</Badge>
+              </div>
+            </div>
+            <KeyGrid
+              items={[
+                { label: "Severity", value: formatLabel(verdict.severity || "low") },
+                { label: "Confidence", value: formatNumber(verdict.confidence) },
+                { label: "Dry run", value: verdict.dry_run ? "Yes" : "No" },
+                { label: "Objective", value: formatLabel(outcome) }
+              ]}
+            />
+            <Fold title="Detector trace">
+              <DetailPre text={JSON.stringify(verdict.detector_results || {}, null, 2)} />
+            </Fold>
+          </div>
+        );
+      })}
+    </div>
   );
-  const configuredPassRate = configured?.total_cases ? (configured.passed_cases || 0) / configured.total_cases : null;
-  const baselinePassRate = baseline?.total_cases ? (baseline.passed_cases || 0) / baseline.total_cases : null;
-  const passedCaseDelta =
-    typeof configured?.passed_cases === "number" && typeof baseline?.passed_cases === "number"
-      ? configured.passed_cases - baseline.passed_cases
+}
+
+function LiveBlueBenchmarkSection({ timeline }) {
+  const liveInsights = useMemo(() => summarizeLiveBlueRun(timeline), [timeline]);
+  const successRate = liveInsights.totalTurns ? liveInsights.successfulTurns / liveInsights.totalTurns : null;
+  const turnDelta =
+    typeof liveInsights.defendedTurns === "number" && typeof liveInsights.successfulTurns === "number"
+      ? liveInsights.defendedTurns - liveInsights.successfulTurns
       : null;
-  const passRateDelta =
-    typeof configuredPassRate === "number" && typeof baselinePassRate === "number"
-      ? configuredPassRate - baselinePassRate
+  const rateDelta =
+    typeof liveInsights.defendedRate === "number" && typeof successRate === "number"
+      ? liveInsights.defendedRate - successRate
       : null;
-  const interventionCount = sumBlueInterventions(configured);
   const actionEntries = useMemo(
-    () => sortCountEntries(configured?.action_counts),
-    [configured?.action_counts]
+    () => sortCountEntries(liveInsights.actionCounts),
+    [liveInsights]
   );
   const severityEntries = useMemo(
-    () => sortCountEntries(configuredInsights.severityCounts),
-    [configuredInsights]
+    () => sortCountEntries(liveInsights.severityCounts),
+    [liveInsights]
   );
   const policyEntries = useMemo(
-    () => sortCountEntries(configured?.policy_counts).slice(0, 4),
-    [configured?.policy_counts]
+    () => sortCountEntries(liveInsights.policyCounts).slice(0, 4),
+    [liveInsights]
   );
-  const importantCaseTraces = useMemo(() => {
-    const sorted = [...configuredResults].sort((left, right) => {
-      if (left.passed !== right.passed) return left.passed ? 1 : -1;
-      return (right.confidence || 0) - (left.confidence || 0);
+  const outcomeEntries = useMemo(
+    () => sortCountEntries(liveInsights.outcomeCounts),
+    [liveInsights]
+  );
+  const importantTurnTraces = useMemo(() => {
+    const severityRank = { low: 1, medium: 2, high: 3, critical: 4 };
+    const sorted = [...(timeline || [])].sort((left, right) => {
+      const leftOutcome = left?.event?.objective_scorer?.label || left?.event?.outcome || "pending";
+      const rightOutcome = right?.event?.objective_scorer?.label || right?.event?.outcome || "pending";
+      if (leftOutcome !== rightOutcome) {
+        if (leftOutcome === "success") return -1;
+        if (rightOutcome === "success") return 1;
+      }
+      return (severityRank[right?.verdict?.severity] || 0) - (severityRank[left?.verdict?.severity] || 0);
     });
     return sorted.slice(0, 6);
-  }, [configuredResults]);
+  }, [timeline]);
+
+  return (
+    <section className="live-blue-team-section">
+      <SectionHeader
+        title="Blue-team overview"
+        note="Keep defense outcome, policy patterns, and turn movement next to the live run."
+        actions={<Badge tone="neutral">{liveInsights.totalTurns} turns</Badge>}
+      />
+
+      {!!liveInsights.totalTurns && (
+        <>
+          <div className="stat-bar">
+            <StatCard label="Defense outcome" value={liveInsights.defendedRate === null ? "n/a" : formatNumber(liveInsights.defendedRate)} />
+            <StatCard label="Unsafe stopped" value={liveInsights.stoppedCount} />
+            <StatCard label="Actioned responses" value={liveInsights.interventionCount} />
+            <StatCard label="Defense delta" value={`${formatSignedCount(turnDelta)} / ${formatSignedPoints(rateDelta)}`} />
+          </div>
+
+          <div className="eval-grid">
+            <DistributionTable
+              title="Action mix"
+              entries={actionEntries}
+              total={liveInsights.totalTurns}
+              toneForKey={toneForAction}
+              emptyLabel="No blue-team action data yet."
+            />
+            <DistributionTable
+              title="Severity mix"
+              entries={severityEntries}
+              total={liveInsights.totalTurns}
+              toneForKey={toneForSeverity}
+              emptyLabel="No severity signal captured yet."
+            />
+            <PolicySpotlight entries={policyEntries} total={liveInsights.totalTurns} />
+          </div>
+
+          <Fold title="More blue-team details">
+            <div className="eval-grid">
+              <section className="eval-section">
+                <div className="eval-section-title">Confidence and detector agreement</div>
+                <KeyGrid
+                  items={[
+                    { label: "Average confidence", value: formatNumber(liveInsights.averageConfidence) },
+                    { label: "Average detector support", value: formatNumber(liveInsights.averageSupport) },
+                    {
+                      label: "Multi-detector hits",
+                      value:
+                        liveInsights.multiDetectorRate === null
+                          ? "n/a"
+                          : `${liveInsights.multiDetectorHits} (${formatNumber(liveInsights.multiDetectorRate)})`
+                    },
+                    { label: "Highest severity", value: formatLabel(liveInsights.highestSeverity) },
+                    { label: "Dry-run turns", value: liveInsights.dryRunTurns },
+                    { label: "Defended turns", value: liveInsights.defendedTurns }
+                  ]}
+                />
+              </section>
+
+              <section className="eval-section">
+                <div className="eval-section-title">Run comparison</div>
+                <KeyGrid
+                  items={[
+                    { label: "Defense outcome", value: formatNumber(liveInsights.defendedRate) },
+                    { label: "Attack success rate", value: formatNumber(successRate) },
+                    { label: "Turn delta", value: formatSignedCount(turnDelta) },
+                    { label: "Allowed turns", value: liveInsights.actionCounts.allow || 0 },
+                    { label: "Stopped turns", value: liveInsights.stoppedCount },
+                    { label: "Dominant policy", value: policyEntries[0] ? formatLabel(policyEntries[0][0]) : "n/a" }
+                  ]}
+                />
+              </section>
+            </div>
+
+            <div className="eval-grid">
+              <DistributionTable
+                title="Policy counts"
+                entries={sortCountEntries(liveInsights.policyCounts)}
+                total={liveInsights.totalTurns}
+                emptyLabel="No policy distribution available yet."
+              />
+              <DistributionTable
+                title="Outcome mix"
+                entries={outcomeEntries}
+                total={liveInsights.totalTurns}
+                toneForKey={toneForOutcome}
+                emptyLabel="No outcome distribution available yet."
+              />
+            </div>
+
+            <section className="eval-section">
+              <div className="eval-section-title">Turn defense traces</div>
+              <LiveBlueTurnTraceList entries={importantTurnTraces} />
+            </section>
+
+            <Fold title="Raw live run timeline">
+              <DetailPre text={JSON.stringify(timeline || [], null, 2)} />
+            </Fold>
+          </Fold>
+        </>
+      )}
+    </section>
+  );
+}
+
+function EvaluationView({ evaluation, suiteRun, objectiveEval, regressionEval, evalHistory, onRefresh, onStartSuite, onDownloadObjective, onDownloadRegression, loading }) {
+  const objectiveSummary = objectiveEval?.payload?.summary;
+  const regressionSummary = regressionEval?.payload?.summary;
 
   return (
     <section className="evaluation-page">
       <div className="section-header">
         <div>
           <div className="section-title">Testing Suite</div>
-          <div className="section-note">Track attack pressure and blue-team defenses without burying the important signals.</div>
+          <div className="section-note">Track attack pressure and red-team suite performance from one place.</div>
         </div>
         <div className="chip-row">
           <button type="button" className="btn btn-primary" onClick={() => onStartSuite("groq")} disabled={loading || (suiteRun && !suiteRun.is_complete)}>
@@ -1386,140 +1610,6 @@ function EvaluationView({ evaluation, suiteRun, objectiveEval, regressionEval, e
           </div>
         </Fold>
       ) : null}
-
-      <section className="eval-section blue-overview-shell">
-        <SectionHeader
-          title="Blue-team defense overview"
-          note="Signal-first view of defense outcome, action mix, benchmark delta, and dominant policy patterns."
-          actions={
-            blueBenchmark?.run_metadata ? (
-              <div className="chip-row">
-                <Badge tone="info">{formatLabel(blueBenchmark.run_metadata.benchmark_label || "default")}</Badge>
-                <Badge tone="neutral">{formatTimestamp(blueBenchmark.run_metadata.generated_at)}</Badge>
-              </div>
-            ) : null
-          }
-        />
-
-        <div className="blue-hero-grid">
-          <div className="blue-hero-card">
-            <div className="blue-hero-label">Defense outcome</div>
-            <div className="blue-hero-value">{formatNumber(configuredPassRate)}</div>
-            <div className="blue-hero-note">
-              {configured?.passed_cases ?? 0} of {configured?.total_cases ?? 0} benchmark cases matched the expected blue-team outcome.
-            </div>
-          </div>
-
-          <div className="blue-hero-card">
-            <div className="blue-hero-label">Unsafe stopped</div>
-            <div className="blue-hero-value">{configured?.blocked_cases ?? 0}</div>
-            <div className="blue-hero-note">
-              Effective blocks or escalations across {configured?.total_cases ?? 0} benchmark cases.
-            </div>
-          </div>
-
-          <div className="blue-hero-card">
-            <div className="blue-hero-label">Actioned responses</div>
-            <div className="blue-hero-value">{interventionCount}</div>
-            <div className="blue-hero-note">
-              Non-allow outcomes including block, escalate, redact, and safe rewrite.
-            </div>
-          </div>
-
-          <div className="blue-hero-card">
-            <div className="blue-hero-label">Benchmark delta</div>
-            <div className={`blue-hero-value tone-${toneForDelta(passedCaseDelta)}`}>
-              {formatSignedCount(passedCaseDelta)}
-            </div>
-            <div className="blue-hero-note">
-              {formatSignedPoints(passRateDelta)} versus the rules-only baseline.
-            </div>
-          </div>
-        </div>
-
-        <div className="eval-grid">
-          <DistributionTable
-            title="Action mix"
-            entries={actionEntries}
-            total={configured?.total_cases || 0}
-            toneForKey={toneForAction}
-            emptyLabel="No blue-team action data yet."
-          />
-          <DistributionTable
-            title="Severity mix"
-            entries={severityEntries}
-            total={configured?.total_cases || 0}
-            toneForKey={toneForSeverity}
-            emptyLabel="No severity signal captured yet."
-          />
-          <PolicySpotlight entries={policyEntries} total={configured?.total_cases || 0} />
-        </div>
-
-        <Fold title="More blue-team details">
-          <div className="eval-grid">
-            <section className="eval-section">
-              <div className="eval-section-title">Confidence and detector agreement</div>
-              <KeyGrid
-                items={[
-                  { label: "Average confidence", value: formatNumber(configuredInsights.averageConfidence) },
-                  { label: "Average detector support", value: formatNumber(configuredInsights.averageSupport) },
-                  {
-                    label: "Multi-detector hits",
-                    value:
-                      configuredInsights.multiDetectorRate === null
-                        ? "n/a"
-                        : `${configuredInsights.multiDetectorHits} (${formatNumber(configuredInsights.multiDetectorRate)})`
-                  },
-                  { label: "Highest severity", value: formatLabel(configuredInsights.highestSeverity) },
-                  { label: "Generated", value: blueBenchmark?.run_metadata?.generated_at || "n/a" },
-                  { label: "Fixture", value: blueBenchmark?.run_metadata?.fixture_path || "n/a" }
-                ]}
-              />
-            </section>
-
-            <section className="eval-section">
-              <div className="eval-section-title">Benchmark comparison</div>
-              <KeyGrid
-                items={[
-                  { label: "Configured pass rate", value: formatNumber(configuredPassRate) },
-                  { label: "Baseline pass rate", value: formatNumber(baselinePassRate) },
-                  {
-                    label: "Passed case delta",
-                    value: formatSignedCount(passedCaseDelta)
-                  },
-                  { label: "Configured allowed", value: configured?.allowed_cases ?? "n/a" },
-                  { label: "Configured blocked", value: configured?.blocked_cases ?? "n/a" },
-                  { label: "Configured benchmark label", value: blueBenchmark?.config?.benchmark_label || "n/a" }
-                ]}
-              />
-            </section>
-          </div>
-
-          <div className="eval-grid">
-            <DistributionTable
-              title="Policy counts"
-              entries={sortCountEntries(configured?.policy_counts)}
-              total={configured?.total_cases || 0}
-              emptyLabel="No policy distribution available yet."
-            />
-            <DistributionTable
-              title="Benchmark metrics"
-              entries={(configured?.metrics || []).map((metric) => [metric.metric_name, metric.value])}
-              total={1}
-              emptyLabel="No benchmark metrics available yet."
-            />
-          </div>
-
-          <section className="eval-section">
-            <div className="eval-section-title">Case traces</div>
-            <BlueCaseTraceList results={importantCaseTraces} />
-          </section>
-
-          <Fold title="Raw benchmark payload">
-            <DetailPre text={JSON.stringify(blueBenchmark || {}, null, 2)} />
-          </Fold>
-        </Fold>
-      </section>
 
       <div className="stat-bar" style={{ marginBottom: 24 }}>
         <StatCard label="Objective suite" value={objectiveEval?.available ? formatNumber(safeRate(objectiveSummary)) : "Missing"} />
@@ -2002,6 +2092,13 @@ export default function App() {
                     <div className="empty-card-body">Once the backend completes the first turn, the timeline will appear here automatically.</div>
                   </div>
                 )}
+
+                {timeline.length ? (
+                  <LiveBlueBenchmarkSection
+                    key={`live-blue-results-${timeline.length}`}
+                    timeline={timeline}
+                  />
+                ) : null}
               </>
             )}
           </div>
@@ -2009,7 +2106,7 @@ export default function App() {
 
         {activeView === "evaluation" ? (
           <div className="page-body">
-            <EvaluationView evaluation={evaluation} suiteRun={suiteRun} objectiveEval={objectiveEval} regressionEval={regressionEval} evalHistory={evalHistory} blueBenchmark={blueBenchmark} onRefresh={loadEvaluationArtifacts} onStartSuite={startSuiteRun} onDownloadObjective={() => downloadReport("/api/v1/evals/red-team/objective-suite/report", "red_team_dataset_results_report.md")} onDownloadRegression={() => downloadReport("/api/v1/evals/red-team/regression/report", "red_team_regression_results_report.md")} loading={evalLoading} />
+            <EvaluationView evaluation={evaluation} suiteRun={suiteRun} objectiveEval={objectiveEval} regressionEval={regressionEval} evalHistory={evalHistory} onRefresh={loadEvaluationArtifacts} onStartSuite={startSuiteRun} onDownloadObjective={() => downloadReport("/api/v1/evals/red-team/objective-suite/report", "red_team_dataset_results_report.md")} onDownloadRegression={() => downloadReport("/api/v1/evals/red-team/regression/report", "red_team_regression_results_report.md")} loading={evalLoading} />
           </div>
         ) : null}
       </div>
