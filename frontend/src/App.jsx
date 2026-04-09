@@ -409,9 +409,9 @@ function getGateActionTone(verdict) {
 
 function labelForOutcome(value) {
   if (value === "success") return "Succeeded";
-  if (value === "blocked") return "Defended";
+  if (value === "blocked") return "Model Defended";
   if (value === "partial") return "Partial";
-  if (value === "no_success") return "No result";
+  if (value === "no_success") return "No Breach";
   return formatLabel(value || "pending");
 }
 
@@ -1489,7 +1489,6 @@ function LiveBlueBenchmarkSection({ timeline }) {
             <StatCard label="Defense outcome" value={liveInsights.defendedRate === null ? "n/a" : formatNumber(liveInsights.defendedRate)} />
             <StatCard label="Unsafe stopped" value={liveInsights.stoppedCount} />
             <StatCard label="Actioned responses" value={liveInsights.interventionCount} />
-            <StatCard label="Defense delta" value={`${formatSignedCount(turnDelta)} / ${formatSignedPoints(rateDelta)}`} />
           </div>
 
           <div className="eval-grid">
@@ -1507,7 +1506,6 @@ function LiveBlueBenchmarkSection({ timeline }) {
               toneForKey={toneForSeverity}
               emptyLabel="No severity signal captured yet."
             />
-            <PolicySpotlight entries={policyEntries} total={liveInsights.totalTurns} />
           </div>
 
           <Fold title="More blue-team details">
@@ -2032,7 +2030,7 @@ export default function App() {
           <div className="run-header-left">
             {runId ? (
               <>
-                <div className="run-header-title">{truncateText(setup.goal, 60)}</div>
+                <div className="run-header-title">{setup.goal}</div>
                 <div className="run-header-meta">
                   {setup.scenario} · {formatLabel(setup.strategyId)} · {formatLabel(setup.provider)}
                 </div>
