@@ -1901,17 +1901,19 @@ function SandboxBlueTeamEvidence({ verdict }) {
 }
 
 function SandboxTurnCard({ turn, index }) {
+  const isPending = Boolean(turn.isPending || !turn.verdict);
   const severity = turn.verdict?.severity || "low";
   const action = turn.verdict?.action || "allow";
   const [phase, setPhase] = useState(0);
 
   useEffect(() => {
+    if (isPending) return;
     if (phase === 1) { const t = setTimeout(() => setPhase(2), 350); return () => clearTimeout(t); }
     if (phase === 2) { const t = setTimeout(() => setPhase(3), 630); return () => clearTimeout(t); }
-  }, [phase]);
+  }, [phase, isPending]);
 
   return (
-    <div className={`turn-row severity-${severity}`} style={{ animationDelay: `${index * 60}ms` }}>
+    <div className={`turn-row${isPending ? "" : ` severity-${severity}`}`} style={{ animationDelay: `${index * 60}ms` }}>
       <div className="turn-node-col">
         <div className="turn-node-circle" style={{ animationDelay: `${index * 60 + 40}ms` }} />
       </div>
@@ -1925,8 +1927,14 @@ function SandboxTurnCard({ turn, index }) {
             </div>
           </div>
           <div className="turn-badges">
-            <Badge tone={toneForSeverity(severity)}>{formatLabel(severity)}</Badge>
-            <Badge tone={toneForAction(action)}>{formatLabel(action)}</Badge>
+            {isPending ? (
+              <Badge tone="neutral">Pending</Badge>
+            ) : (
+              <>
+                <Badge tone={toneForSeverity(severity)}>{formatLabel(severity)}</Badge>
+                <Badge tone={toneForAction(action)}>{formatLabel(action)}</Badge>
+              </>
+            )}
           </div>
         </div>
 
@@ -1937,7 +1945,7 @@ function SandboxTurnCard({ turn, index }) {
               <TypewriterText text={turn.prompt} speed={12} delay={150} onDone={() => setPhase(1)} />
             </div>
           </div>
-          {phase >= 2 && (
+          {!isPending && phase >= 2 && (
             <div className="turn-gate" style={{ animation: "blockIn 380ms var(--ease-out) both" }}>
               <div className="turn-gate-left">
                 <ShieldIcon size={14} strokeWidth={1.7} />
@@ -1949,7 +1957,7 @@ function SandboxTurnCard({ turn, index }) {
               </div>
             </div>
           )}
-          {phase >= 3 && (
+          {!isPending && phase >= 3 && (
             <div className="turn-speaker-block target" style={{ animation: "blockIn 380ms var(--ease-out) both" }}>
               <div className="turn-speaker-icon target"><Bot size={13} strokeWidth={1.5} /></div>
               <div className="turn-speaker-text">{turn.response}</div>
@@ -1957,7 +1965,7 @@ function SandboxTurnCard({ turn, index }) {
           )}
         </div>
 
-        {phase >= 3 && (
+        {!isPending && phase >= 3 && (
           <Fold title="Blue-team evidence">
             <SandboxBlueTeamEvidence verdict={turn.verdict} />
           </Fold>
@@ -1974,26 +1982,40 @@ function SandboxView() {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState("");
   const textareaRef = useRef(null);
+  const completedTurns = useMemo(() => turns.filter((t) => !t.isPending && t.verdict), [turns]);
 
   const blueTeamSummary = useMemo(() => {
-    if (!turns.length) return { blocked: 0, highestSeverity: "n/a" };
-    const blocked = turns.filter((t) => !t.verdict?.allowed).length;
+    if (!completedTurns.length) return { blocked: 0, highestSeverity: "n/a" };
+    const blocked = completedTurns.filter((t) => !t.verdict?.allowed).length;
     const order = ["critical", "high", "medium", "low"];
-    const highest = turns.reduce((best, t) => {
+    const highest = completedTurns.reduce((best, t) => {
       const s = t.verdict?.severity || "low";
       return order.indexOf(s) < order.indexOf(best) ? s : best;
     }, "low");
     return { blocked, highestSeverity: highest };
-  }, [turns]);
+  }, [completedTurns]);
 
   async function handleSubmit() {
     if (!currentPrompt.trim() || isRunning || turns.length >= MAX_TURNS) return;
+    const turnId = typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `turn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const promptText = currentPrompt.trim();
     setError("");
     setIsRunning(true);
-    const promptText = currentPrompt.trim();
     setCurrentPrompt("");
+    setTurns((prev) => [...prev, {
+      id: turnId,
+      prompt: promptText,
+      response: "",
+      verdict: null,
+      isPending: true,
+      timestamp: new Date().toISOString(),
+    }]);
     try {
-      const history = turns.flatMap((t) => [
+      const history = turns
+        .filter((t) => !t.isPending && !isEmpty(t.response))
+        .flatMap((t) => [
         { role: "user", content: t.prompt },
         { role: "assistant", content: t.response },
       ]);
@@ -2004,14 +2026,19 @@ function SandboxView() {
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.detail || "Run failed");
-      setTurns((prev) => [...prev, {
-        prompt: promptText,
-        response: data.response,
-        verdict: data.verdict,
-        detection_latency_ms: data.detection_latency_ms,
-        timestamp: data.timestamp,
-      }]);
+      setTurns((prev) => prev.map((turn) => {
+        if (turn.id !== turnId) return turn;
+        return {
+          ...turn,
+          response: data.response,
+          verdict: data.verdict,
+          detection_latency_ms: data.detection_latency_ms,
+          timestamp: data.timestamp || turn.timestamp,
+          isPending: false,
+        };
+      }));
     } catch (e) {
+      setTurns((prev) => prev.filter((turn) => turn.id !== turnId));
       setError(e.message);
       setCurrentPrompt(promptText);
     } finally {
@@ -2063,7 +2090,8 @@ function SandboxView() {
           <div
             className="timeline-outcome-bar"
             style={{
-              "--outcome-color": blueTeamSummary.blocked > 0 ? "var(--success)"
+              "--outcome-color": completedTurns.length === 0 ? "var(--neutral)"
+                : blueTeamSummary.blocked > 0 ? "var(--success)"
                 : blueTeamSummary.highestSeverity === "critical" ? "var(--danger)"
                   : blueTeamSummary.highestSeverity === "high" ? "var(--warning)"
                     : "var(--info)"
@@ -2084,19 +2112,8 @@ function SandboxView() {
       ) : (
         <div className="timeline-list">
           {turns.map((turn, i) => (
-            <SandboxTurnCard key={i} turn={turn} index={i} />
+            <SandboxTurnCard key={turn.id || i} turn={turn} index={i} />
           ))}
-          {isRunning && (
-            <div className="turn-row" style={{ animation: "none" }}>
-              <div className="turn-node-col">
-                <div className="turn-node-circle" style={{ opacity: 0.35 }} />
-              </div>
-              <div className="turn-row-body">
-                <div className="turn-number">Turn {turns.length + 1}</div>
-                <div className="micro-copy" style={{ marginTop: 6 }}>Waiting for model response and blue-team evaluation…</div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -2123,10 +2140,15 @@ function SandboxView() {
                 placeholder={turns.length === 0
                   ? "Write your first attack prompt. Try to get the model to bypass its guardrails."
                   : "Write your next prompt. Build on what you've learned from previous turns."}
-                onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSubmit(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
                 disabled={isRunning}
               />
-              <div className="field-hint">Ctrl + Enter to submit</div>
+              <div className="field-hint">Enter to submit · Shift + Enter for newline</div>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
