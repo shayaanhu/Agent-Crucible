@@ -140,6 +140,16 @@ function Sword(props) {
   );
 }
 
+function Terminal(props) {
+  return (
+    <IconBase {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="m7 9 3 3-3 3" />
+      <path d="M13 15h3" />
+    </IconBase>
+  );
+}
+
 function Crosshair(props) {
   return (
     <IconBase {...props}>
@@ -1215,49 +1225,38 @@ function EntryView({ onSelectMode }) {
     <div className="modal-shell">
       <div className="modal-backdrop" />
       <section className="modal-card">
-        <div style={{ padding: 56 }}>
+        <div style={{ padding: "36px 40px" }}>
           <div className="entry-header-minimal">
             <div className="entry-title-minimal">Agent Crucible</div>
-            <div className="wizard-subtitle" style={{ color: "var(--text-secondary)", fontSize: "1rem" }}>
+            <div style={{ color: "var(--text-secondary)", fontSize: "0.9375rem" }}>
               Choose your testing environment
             </div>
           </div>
 
-          <div className="scenario-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-            <button
-              type="button"
-              className="scenario-card entry-card-minimal"
-              onClick={() => onSelectMode("lab")}
-            >
-              <div className="entry-card-top">
-                <div className="entry-icon-box">
-                  <Crosshair size={22} strokeWidth={1.5} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {[
+              { mode: "lab",        Icon: Crosshair, title: "Live Attack Lab",  desc: "Multi-turn red-team simulator with strategy chains and turn-by-turn visualization." },
+              { mode: "sandbox",    Icon: Terminal,  title: "Attack Sandbox",   desc: "Write your own attack prompts and see the blue-team verdict in real time." },
+              { mode: "evaluation", Icon: BarChart3, title: "Testing Suite",    desc: "Automated benchmark. Run the full objective suite and view performance metrics." },
+            ].map(({ mode, Icon, title, desc }) => (
+              <button
+                key={mode}
+                type="button"
+                className="entry-option"
+                onClick={() => onSelectMode(mode)}
+              >
+                <div className="entry-option-icon">
+                  <Icon size={18} strokeWidth={1.5} />
                 </div>
-                <div className="entry-card-title">Live Attack Lab</div>
-              </div>
-              <div className="scenario-card-desc">
-                Interactive multi-turn red-team simulator. Target specific objectives with custom strategy chains.
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className="scenario-card entry-card-minimal"
-              onClick={() => onSelectMode("evaluation")}
-            >
-              <div className="entry-card-top">
-                <div className="entry-icon-box">
-                  <BarChart3 size={22} strokeWidth={1.5} />
+                <div className="entry-option-body">
+                  <div className="entry-option-title">{title}</div>
+                  <div className="entry-option-desc">{desc}</div>
                 </div>
-                <div className="entry-card-title">Testing Suite</div>
-              </div>
-              <div className="scenario-card-desc">
-                Comprehensive automated benchmark. Run the full red-team objective suite and view performance metrics.
-              </div>
-            </button>
+              </button>
+            ))}
           </div>
 
-          <div style={{ textAlign: "center", marginTop: 56, opacity: 0.3, fontSize: "0.75rem", letterSpacing: "0.05em" }}>
+          <div style={{ textAlign: "center", marginTop: 28, opacity: 0.25, fontSize: "0.7rem", letterSpacing: "0.08em" }}>
             AGENT CRUCIBLE V1.0.0
           </div>
         </div>
@@ -1819,6 +1818,184 @@ function EvaluationView({ suiteRun, onStartSuite, loading }) {
   );
 }
 
+function SandboxView() {
+  const [prompt, setPrompt] = useState("");
+  const [scenario, setScenario] = useState("Educational assistant");
+  const [provider, setProvider] = useState("groq");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleRun() {
+    if (!prompt.trim() || loading) return;
+    setError("");
+    setLoading(true);
+    try {
+      const resp = await fetch(`${API_BASE}/api/v1/sandbox/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, scenario, provider }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || "Run failed");
+      setResult(data);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const verdict = result?.verdict;
+  const severity = verdict?.severity || "low";
+  const action = verdict?.action || "allow";
+  const policyLabel = verdict?.policy_id
+    ? verdict.policy_id.replace(/^policy\./, "").replace(/\./g, " › ")
+    : "n/a";
+
+  return (
+    <section>
+      <SectionHeader
+        title="Attack Sandbox"
+        note="Write your own attack prompt. See the model's response and exactly how the blue-team guardrails evaluated it."
+      />
+
+      <div className="sandbox-compose">
+        <div className="sandbox-compose-row">
+          <div>
+            <label className="field-label">Target scenario</label>
+            <select
+              className="input"
+              value={scenario}
+              onChange={(e) => { setScenario(e.target.value); setResult(null); }}
+            >
+              {SCENARIO_CARDS.map((c) => (
+                <option key={c.name} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Provider</label>
+            <select
+              className="input"
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+            >
+              {PROVIDER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="field-label">Attack prompt</label>
+          <textarea
+            className="sandbox-textarea"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Write your attack prompt here. Try to get the model to bypass its guardrails."
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleRun(); }}
+          />
+          <div className="field-hint">Ctrl + Enter to run</div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!prompt.trim() || loading}
+            onClick={handleRun}
+          >
+            <PlayCircle size={14} />
+            {loading ? "Running..." : "Run attack"}
+          </button>
+        </div>
+      </div>
+
+      {error ? <div className="error-banner" style={{ marginBottom: 16 }}>{error}</div> : null}
+
+      {result ? (
+        <>
+          <div className="stat-bar">
+            <div className="stat-cell">
+              <div className="stat-cell-label">Blue-team decision</div>
+              <div className={`stat-cell-value val-${toneForAction(action)}`}>{formatLabel(action)}</div>
+            </div>
+            <div className="stat-cell">
+              <div className="stat-cell-label">Severity</div>
+              <div className={`stat-cell-value val-${toneForSeverity(severity)}`}>{formatLabel(severity)}</div>
+            </div>
+            <div className="stat-cell">
+              <div className="stat-cell-label">Confidence</div>
+              <div className="stat-cell-value">{formatNumber(verdict?.confidence)}</div>
+            </div>
+            <div className="stat-cell">
+              <div className="stat-cell-label">Detection latency</div>
+              <div className="stat-cell-value">
+                {result.detection_latency_ms != null ? `${result.detection_latency_ms}ms` : "n/a"}
+              </div>
+            </div>
+            <div className="stat-cell">
+              <div className="stat-cell-label">Policy</div>
+              <div className="stat-cell-value" style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                {policyLabel}
+              </div>
+            </div>
+          </div>
+
+          {verdict?.reason ? (
+            <div className="sandbox-rationale">
+              <span className="sandbox-rationale-label">Why: </span>{verdict.reason}
+            </div>
+          ) : null}
+
+          <div className="sandbox-exchange">
+            <div className="turn-speaker-block attacker">
+              <div className="turn-speaker-icon attacker"><Sword size={13} strokeWidth={1.5} /></div>
+              <div className="turn-speaker-text">{result.prompt}</div>
+            </div>
+            <div className="turn-gate">
+              <div className="turn-gate-left">
+                <ShieldIcon size={14} strokeWidth={1.7} />
+                <span className="turn-gate-label">Blue-team checkpoint</span>
+              </div>
+              <div className="turn-gate-status">
+                <span className={`gate-pill gate-pill-${toneForAction(action)}`}>{formatLabel(action)}</span>
+                <span className={`gate-pill gate-pill-${toneForSeverity(severity)}`}>{formatLabel(severity)}</span>
+              </div>
+            </div>
+            <div className="turn-speaker-block target">
+              <div className="turn-speaker-icon target"><Bot size={13} strokeWidth={1.5} /></div>
+              <div className="turn-speaker-text">{result.response}</div>
+            </div>
+          </div>
+
+          <Fold title="Blue-team evidence">
+            <KeyGrid
+              items={[
+                { label: "Action", value: formatLabel(action) },
+                { label: "Category", value: formatLabel(verdict?.category) },
+                { label: "Severity", value: formatLabel(severity) },
+                { label: "Confidence", value: formatNumber(verdict?.confidence) },
+                { label: "Policy", value: verdict?.policy_id },
+              ]}
+            />
+            <p className="micro-copy" style={{ marginTop: 12 }}>Reason</p>
+            <DetailPre text={verdict?.reason} />
+            <Fold title="Detector telemetry">
+              <DetailPre text={JSON.stringify(verdict?.detector_results || {}, null, 2)} />
+            </Fold>
+          </Fold>
+        </>
+      ) : !loading ? (
+        <div className="empty-card">
+          <div className="empty-card-heading">No result yet</div>
+          <div className="empty-card-body">Write a prompt above and run it to see the model response and blue-team verdict.</div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export default function App() {
   const [setup, setSetup] = useState({
     scenario: "Educational assistant",
@@ -2025,12 +2202,13 @@ export default function App() {
   }
 
   function handleSelectMode(mode) {
+    setEntryViewOpen(false);
     if (mode === "lab") {
-      setEntryViewOpen(false);
       setWizardOpen(true);
       setActiveView("lab");
+    } else if (mode === "sandbox") {
+      setActiveView("sandbox");
     } else if (mode === "evaluation") {
-      setEntryViewOpen(false);
       setActiveView("evaluation");
     }
   }
@@ -2083,6 +2261,9 @@ export default function App() {
               <button type="button" className="sidebar-new-run" onClick={() => setWizardOpen(true)}>
                 <Plus size={14} strokeWidth={1.5} /> New run
               </button>
+              <button type="button" className="sidebar-action" onClick={() => setActiveView("sandbox")}>
+                <Terminal size={14} strokeWidth={1.5} /> Attack Sandbox
+              </button>
               <button type="button" className="sidebar-action" onClick={() => setActiveView("evaluation")}>
                 <ShieldIcon size={14} strokeWidth={1.5} /> Evaluation
               </button>
@@ -2109,6 +2290,7 @@ export default function App() {
           <div className="run-header-actions">
             <div className="view-tabs">
               <button type="button" className={`view-tab${activeView === "lab" ? " is-active" : ""}`} onClick={() => setActiveView("lab")}>Live run</button>
+              <button type="button" className={`view-tab${activeView === "sandbox" ? " is-active" : ""}`} onClick={() => setActiveView("sandbox")}>Sandbox</button>
               <button type="button" className={`view-tab${activeView === "evaluation" ? " is-active" : ""}`} onClick={() => setActiveView("evaluation")}>Evaluation</button>
             </div>
           </div>
@@ -2201,6 +2383,12 @@ export default function App() {
                 ) : null}
               </>
             )}
+          </div>
+        ) : null}
+
+        {activeView === "sandbox" ? (
+          <div className="page-body">
+            <SandboxView />
           </div>
         ) : null}
 

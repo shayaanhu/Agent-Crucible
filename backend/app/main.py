@@ -28,6 +28,7 @@ from backend.app.schemas import (
     RunEventsResponse,
     RunRecord,
     RunStatusResponse,
+    SandboxRunRequest,
     SuiteRunRequest,
     SuiteRunRecord,
     SuiteRunStatusResponse,
@@ -326,6 +327,47 @@ def get_suite_run_status(suite_id: str):
         is_complete=(run.status in ["completed", "failed"]),
         case_completed_results=run.case_completed_results,
     )
+
+
+@app.post("/api/v1/sandbox/run")
+def sandbox_run(payload: SandboxRunRequest) -> dict:
+    import time as _time
+    from agents.blue_team import get_blue_team_agent
+    from agents.red_team_runtime import generate_response, get_scenario_system_prompt
+
+    system_prompt = get_scenario_system_prompt(payload.scenario) if payload.scenario else None
+    try:
+        response = generate_response(
+            payload.prompt,
+            provider=payload.provider,
+            system_prompt=system_prompt,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    blue_agent = get_blue_team_agent()
+    t0 = _time.perf_counter()
+    verdict = blue_agent.evaluate_output(response)
+    detection_latency_ms = round((_time.perf_counter() - t0) * 1000, 2)
+
+    return {
+        "prompt": payload.prompt,
+        "scenario": payload.scenario,
+        "response": response,
+        "verdict": {
+            "allowed": verdict.allowed,
+            "category": verdict.category,
+            "confidence": verdict.confidence,
+            "reason": verdict.reason,
+            "action": verdict.action,
+            "severity": verdict.severity,
+            "policy_id": verdict.policy_id,
+            "detector_results": dict(verdict.detector_results),
+        },
+        "detection_latency_ms": detection_latency_ms,
+        "provider": payload.provider,
+        "timestamp": utc_now(),
+    }
 
 
 def _load_report_text(report_file: str) -> str:

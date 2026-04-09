@@ -157,3 +157,9 @@ class SuiteRunStatusResponse(BaseModel):
 
 
 MetricMap = Dict[str, Any]
+
+
+class SandboxRunRequest(BaseModel):
+    prompt: str
+    scenario: str = ""
+    provider: str = "mock"

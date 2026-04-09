@@ -2400,71 +2400,71 @@ details[open]>summary::before {
   }
 }
 
-/* ─── Entry View Micro-Polish ────────────────────────────────────────── */
-.entry-icon-box {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--r-md);
-  background: var(--bg-surface);
+/* ─── Entry View ─────────────────────────────────────────────────────── */
+.entry-header-minimal {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.entry-title-minimal {
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.entry-option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  color: var(--text-primary);
+  transition: border-color var(--dur-instant), background var(--dur-instant);
+}
+
+.entry-option:hover {
+  border-color: var(--border-focus);
+  background: #222222;
+}
+
+.entry-option-icon {
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   color: var(--text-primary);
   flex-shrink: 0;
 }
 
-.entry-header-minimal {
-  text-align: center;
-  margin-bottom: 32px;
-}
-
-.entry-title-minimal {
-  font-size: 2.25rem;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.entry-card-minimal {
-  background: var(--bg-surface) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 20px !important;
-  padding: 48px 32px !important;
-  text-align: left !important;
+.entry-option-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  transition: all var(--dur-fast) !important;
-  height: 100%;
+  gap: 4px;
+  min-width: 0;
 }
 
-.entry-card-minimal:hover {
-  border-color: var(--border-focus) !important;
-  background: var(--bg-elevated) !important;
-  transform: translateY(-2px);
-}
-
-.entry-card-top {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.entry-card-title {
-  font-size: 1.25rem;
+.entry-option-title {
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--text-primary);
-  white-space: normal;
-  overflow-wrap: anywhere;
+  line-height: 1.3;
 }
 
-.entry-card-minimal .scenario-card-desc {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  line-height: 1.6;
-  margin: 0;
+.entry-option-desc {
+  font-size: 0.8125rem;
+  color: #b0b0b0;
+  line-height: 1.45;
 }
 
 /* ─── Premium UI Components ────────────────────────────────────────────── */
@@ -2639,6 +2639,79 @@ details[open]>summary::before {
 @media (max-width: 900px) {
   .blue-hero-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ─── Attack Sandbox ─────────────────────────────────────────────────────── */
+.sandbox-compose {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.sandbox-compose-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.sandbox-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  resize: vertical;
+  transition: border-color var(--dur-instant);
+}
+
+.sandbox-textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.06);
+}
+
+.sandbox-textarea::placeholder {
+  color: var(--text-ghost);
+  font-family: var(--font-sans);
+}
+
+.sandbox-exchange {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+  animation: turnIn 220ms var(--ease-out) both;
+}
+
+.sandbox-rationale {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  margin-bottom: 16px;
+  line-height: 1.5;
+  animation: turnIn 260ms var(--ease-out) both;
+}
+
+.sandbox-rationale-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .sandbox-compose-row {
+    grid-template-columns: 1fr;
   }
 }
 
