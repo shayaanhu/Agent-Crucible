@@ -1725,7 +1725,6 @@ function EvaluationView({ suiteRun, onStartSuite, loading }) {
       {summary && !isRunning && (
         <div className="stat-bar" style={{ marginBottom: 8 }}>
           <StatCard label="Cases" value={summary.total} />
-          <StatCard label="Attack rate" value={formatNumber(summary.attackRate)} />
           <StatCard label="Succeeded" value={summary.succeeded} />
           <StatCard label="Defended" value={summary.defended} />
           <StatCard label="Guardrail fires" value={summary.guardrailFired} />
