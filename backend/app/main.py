@@ -341,6 +341,7 @@ def sandbox_run(payload: SandboxRunRequest) -> dict:
             payload.prompt,
             provider=payload.provider,
             system_prompt=system_prompt,
+            history=payload.history or [],
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))

@@ -163,3 +163,4 @@ class SandboxRunRequest(BaseModel):
     prompt: str
     scenario: str = ""
     provider: str = "mock"
+    history: List[Dict[str, str]] = Field(default_factory=list)

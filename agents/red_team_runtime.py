@@ -72,16 +72,20 @@ def generate_response(
     provider: str = "mock",
     model_override: str | None = None,
     system_prompt: str | None = None,
+    history: list[dict] | None = None,
 ) -> str:
     if provider == "openai":
-        return _generate_openai_response(prompt, model_override=model_override, system_prompt=system_prompt)
+        return _generate_openai_response(prompt, model_override=model_override, system_prompt=system_prompt, history=history)
     if provider == "groq":
-        return _generate_groq_response(prompt, model_override=model_override, system_prompt=system_prompt)
+        return _generate_groq_response(prompt, model_override=model_override, system_prompt=system_prompt, history=history)
     return _generate_mock_response(prompt)
 
 
 def _generate_openai_response(
-    prompt: str, model_override: str | None = None, system_prompt: str | None = None
+    prompt: str,
+    model_override: str | None = None,
+    system_prompt: str | None = None,
+    history: list[dict] | None = None,
 ) -> str:
     api_key = os.getenv("OPENAI_API_KEY")
     model_name = model_override or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -93,14 +97,19 @@ def _generate_openai_response(
         raise ImportError(
             "langchain-openai is not installed. Install dependencies from backend/requirements.txt."
         ) from exc
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
     llm = ChatOpenAI(api_key=api_key, model=model_name, temperature=0)
+    messages = []
     if system_prompt:
-        from langchain_core.messages import HumanMessage, SystemMessage
-        messages = [SystemMessage(content=system_prompt), HumanMessage(content=prompt)]
-        response = _invoke_with_retries(lambda: llm.invoke(messages))
-    else:
-        response = _invoke_with_retries(lambda: llm.invoke(prompt))
+        messages.append(SystemMessage(content=system_prompt))
+    for turn in (history or []):
+        if turn.get("role") == "user":
+            messages.append(HumanMessage(content=turn["content"]))
+        elif turn.get("role") == "assistant":
+            messages.append(AIMessage(content=turn["content"]))
+    messages.append(HumanMessage(content=prompt))
+    response = _invoke_with_retries(lambda: llm.invoke(messages))
     content = response.content
     if isinstance(content, list):
         return " ".join(str(part) for part in content)
@@ -108,7 +117,10 @@ def _generate_openai_response(
 
 
 def _generate_groq_response(
-    prompt: str, model_override: str | None = None, system_prompt: str | None = None
+    prompt: str,
+    model_override: str | None = None,
+    system_prompt: str | None = None,
+    history: list[dict] | None = None,
 ) -> str:
     api_key = os.getenv("GROQ_API_KEY")
     model_name = model_override or os.getenv("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
@@ -120,14 +132,19 @@ def _generate_groq_response(
         raise ImportError(
             "langchain-groq is not installed. Install dependencies from backend/requirements.txt."
         ) from exc
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
     llm = ChatGroq(groq_api_key=api_key, model=model_name, temperature=0)
+    messages = []
     if system_prompt:
-        from langchain_core.messages import HumanMessage, SystemMessage
-        messages = [SystemMessage(content=system_prompt), HumanMessage(content=prompt)]
-        response = _invoke_with_retries(lambda: llm.invoke(messages))
-    else:
-        response = _invoke_with_retries(lambda: llm.invoke(prompt))
+        messages.append(SystemMessage(content=system_prompt))
+    for turn in (history or []):
+        if turn.get("role") == "user":
+            messages.append(HumanMessage(content=turn["content"]))
+        elif turn.get("role") == "assistant":
+            messages.append(AIMessage(content=turn["content"]))
+    messages.append(HumanMessage(content=prompt))
+    response = _invoke_with_retries(lambda: llm.invoke(messages))
     content = response.content
     if isinstance(content, list):
         return " ".join(str(part) for part in content)

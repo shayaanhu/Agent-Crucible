@@ -1993,10 +1993,14 @@ function SandboxView() {
     const promptText = currentPrompt.trim();
     setCurrentPrompt("");
     try {
+      const history = turns.flatMap((t) => [
+        { role: "user", content: t.prompt },
+        { role: "assistant", content: t.response },
+      ]);
       const resp = await fetch(`${API_BASE}/api/v1/sandbox/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: promptText, scenario: "", provider: "groq" }),
+        body: JSON.stringify({ prompt: promptText, scenario: "", provider: "groq", history }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.detail || "Run failed");

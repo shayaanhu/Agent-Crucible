@@ -166,7 +166,20 @@ class AdvancedRedTeamAgent(RedTeamContract):
             )
             if on_progress:
                 on_progress("target", max(state.turn_index - 1, 0), state.max_turns)
-            response = generate_response(prompt=prompt, provider=provider, system_prompt=target_system_prompt)
+            target_history = [
+                item
+                for h in state.history
+                for item in (
+                    {"role": "user", "content": h["prompt"]},
+                    {"role": "assistant", "content": h["response"]},
+                )
+            ]
+            response = generate_response(
+                prompt=prompt,
+                provider=provider,
+                system_prompt=target_system_prompt,
+                history=target_history,
+            )
             if on_progress:
                 on_progress("scoring", max(state.turn_index - 1, 0), state.max_turns)
             state.last_attacker_prompt = attacker_prompt
