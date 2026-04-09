@@ -2339,6 +2339,53 @@ details[open]>summary::before {
   margin: 0;
 }
 
+.stepper-v {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  height: 42px;
+}
+
+.stepper-v-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--dur-instant);
+}
+
+.stepper-v-btn:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.stepper-v-btn:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+.stepper-v-display {
+  width: 56px;
+  height: 100%;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: transparent;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  outline: none;
+}
+
 @media (max-width: 900px) {
   .blue-hero-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

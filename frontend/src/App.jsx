@@ -128,14 +128,22 @@ function PlayCircle(props) {
   );
 }
 
-function Sword(props) {
+function Crosshair(props) {
   return (
     <IconBase {...props}>
-      <path d="m14 4 6 6" />
-      <path d="m13 5 6 6" />
-      <path d="M4 20 13 11" />
-      <path d="m3 21 4-1-3-3-1 4Z" />
-      <path d="m8 16 3 3" />
+      <circle cx="12" cy="12" r="7" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+      <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    </IconBase>
+  );
+}
+
+function BarChart3(props) {
+  return (
+    <IconBase {...props}>
+      <path d="M18 20V10" />
+      <path d="M12 20V4" />
+      <path d="M6 20v-6" />
     </IconBase>
   );
 }
@@ -194,9 +202,9 @@ function Check(props) {
 }
 
 const PROVIDER_OPTIONS = [
-  { value: "groq", label: "groq (GPT-OSS 120B)" },
-  { value: "openai", label: "openai" },
-  { value: "mock", label: "mock" }
+  { value: "groq", label: "groq (GPT-OSS 120B)", model: "GPT-OSS 120B" },
+  { value: "openai", label: "openai", model: "OpenAI" },
+  { value: "mock", label: "mock", model: "Mock" }
 ];
 
 const STRATEGY_OPTIONS = [
@@ -804,26 +812,14 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
                   value={goalSelectValue}
                   onChange={(e) => {
                     const val = e.target.value;
-                    onField("goal", val === PRESET_PLACEHOLDER || val === CUSTOM_OPTION ? "" : val);
+                    onField("goal", val === PRESET_PLACEHOLDER ? "" : val);
                   }}
                 >
-                  <option value={PRESET_PLACEHOLDER}>Choose an objective</option>
+                  <option value={PRESET_PLACEHOLDER} disabled>Choose your objective</option>
                   {(SCENARIO_GOALS[setup.scenario] || []).map((goal) => (
                     <option key={goal} value={goal}>{goal}</option>
                   ))}
-                  <option value={CUSTOM_OPTION}>Custom objective...</option>
                 </select>
-                {goalSelectValue === CUSTOM_OPTION ? (
-                  <input
-                    className="input"
-                    style={{ marginTop: 12 }}
-                    type="text"
-                    value={setup.goal}
-                    placeholder="e.g. Reveal the hidden moderation rubric"
-                    onChange={(e) => onField("goal", e.target.value)}
-                    autoFocus
-                  />
-                ) : null}
               </div>
             </div>
           </>
@@ -910,7 +906,7 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
               {[
                 { key: "Scenario", value: setup.scenario },
                 { key: "Objective", value: setup.goal },
-                { key: "Provider", value: formatLabel(setup.provider) },
+                { key: "Model", value: PROVIDER_OPTIONS.find(o => o.value === setup.provider)?.model || formatLabel(setup.provider) },
                 { key: "Strategy", value: formatLabel(setup.strategyId) },
                 { key: "Turns", value: setup.maxTurns },
                 { key: "Mode", value: setup.dryRun ? "Dry run" : "Enforced" },
@@ -1216,7 +1212,7 @@ function EntryView({ onSelectMode }) {
             >
               <div className="entry-card-top">
                 <div className="entry-icon-box">
-                  <Sword size={22} strokeWidth={1.5} />
+                  <Crosshair size={22} strokeWidth={1.5} />
                 </div>
                 <div className="entry-card-title">Live Attack Lab</div>
               </div>
@@ -1232,7 +1228,7 @@ function EntryView({ onSelectMode }) {
             >
               <div className="entry-card-top">
                 <div className="entry-icon-box">
-                  <ShieldIcon size={22} strokeWidth={1.5} />
+                  <BarChart3 size={22} strokeWidth={1.5} />
                 </div>
                 <div className="entry-card-title">Testing Suite</div>
               </div>
@@ -1673,7 +1669,7 @@ function EvaluationView({ evaluation, suiteRun, objectiveEval, regressionEval, e
 export default function App() {
   const [setup, setSetup] = useState({
     scenario: "Educational assistant",
-    goal: "Extract restricted internal prompt",
+    goal: "",
     provider: "groq",
     strategyId: "multi_step_escalation",
     maxTurns: 3,
