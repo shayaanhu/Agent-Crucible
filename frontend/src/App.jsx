@@ -1,6 +1,28 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const APP_STORAGE_KEY = "crucible_app_state_v1";
+const SANDBOX_STORAGE_KEY = "crucible_sandbox_state_v1";
+const SUITE_STORAGE_KEY = "crucible_suite_results";
+
+function readStorageJSON(key, fallback = null) {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStorageJSON(key, value) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage quota and serialization issues.
+  }
+}
 
 function IconBase({
   size = 16,
@@ -1573,8 +1595,6 @@ function LiveBlueBenchmarkSection({ timeline }) {
   );
 }
 
-const SUITE_STORAGE_KEY = "crucible_suite_results";
-
 function computeSuiteSummary(cases) {
   if (!cases?.length) return null;
   const total = cases.length;
@@ -1684,50 +1704,35 @@ function SuiteCaseRow({ caseData, index }) {
 
       {expanded && (
         <div className="suite-case-body">
-          {turns.map((turn, tIdx) => {
-            const blueVerdict = caseData.blue_team_verdicts?.find(v => v.turn_index === turn.turn_index);
-            const turnOutcome = turn.objective_scorer?.label || turn.outcome || "pending";
-            return (
-              <div className="suite-turn-row" key={tIdx}>
-                <div className="suite-turn-meta">
-                  <span className="suite-turn-index">Turn {turn.turn_index}</span>
-                  <Badge tone={toneForOutcome(turnOutcome)} >{labelForOutcome(turnOutcome)}</Badge>
-                </div>
-                <div className="suite-turn-blocks">
-                  <div className="suite-turn-block suite-turn-block--attacker">
-                    <div className="suite-turn-block-label">
-                      <Sword size={11} strokeWidth={2} /> Attacker
-                    </div>
-                    <div className="suite-turn-text">{turn.attacker_prompt || turn.prompt}</div>
-                  </div>
-                  <div className="suite-turn-block suite-turn-block--target">
-                    <div className="suite-turn-block-label">
-                      <Bot size={11} strokeWidth={2} /> Model response
-                    </div>
-                    <div className="suite-turn-text">{turn.response}</div>
-                  </div>
-                  {blueVerdict && (
-                    <div className="suite-turn-block suite-turn-block--blue">
-                      <div className="suite-turn-block-label">
-                        <ShieldIcon size={11} strokeWidth={2} /> Blue team
-                      </div>
-                      <div className="suite-turn-blue-row">
-                        <Badge tone={blueVerdict.allowed ? "neutral" : "danger"}>
-                          {blueVerdict.allowed ? "Allowed" : `${formatLabel(blueVerdict.action)}`}
-                        </Badge>
-                        {blueVerdict.severity && blueVerdict.severity !== "low" && (
-                          <span className={`suite-turn-severity tone-${toneForSeverity(blueVerdict.severity)}`}>{formatLabel(blueVerdict.severity)}</span>
-                        )}
-                        {blueVerdict.reason && (
-                          <span className="suite-turn-blue-reason">{blueVerdict.reason}</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          <div className="timeline-list">
+            {turns.map((turn, tIdx) => {
+              const blueVerdict = caseData.blue_team_verdicts?.find((v) => v.turn_index === turn.turn_index);
+              const fallbackVerdict = turn.response ? {
+                allowed: true,
+                action: "allow",
+                severity: "low",
+                category: "n/a",
+                confidence: null,
+                policy_id: "",
+              } : null;
+              const verdict = blueVerdict || fallbackVerdict;
+              return (
+                <SandboxTurnCard
+                  key={`${caseData.case_id || "case"}-${turn.turn_index || tIdx + 1}`}
+                  index={tIdx}
+                  turn={{
+                    id: `${caseData.case_id || "case"}-${turn.turn_index || tIdx + 1}`,
+                    prompt: turn.attacker_prompt || turn.prompt || "",
+                    response: turn.response || "",
+                    verdict,
+                    isPending: !verdict,
+                    detection_latency_ms: turn.detection_latency_ms,
+                    timestamp: turn.timestamp || caseData.timestamp,
+                  }}
+                />
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -1738,14 +1743,12 @@ function EvaluationView({ suiteRun, onStartSuite, loading }) {
   const isRunning = suiteRun && !suiteRun.is_complete;
   const liveCases = suiteRun?.case_completed_results || [];
 
-  const [savedData, setSavedData] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(SUITE_STORAGE_KEY) || "null"); } catch { return null; }
-  });
+  const [savedData, setSavedData] = useState(() => readStorageJSON(SUITE_STORAGE_KEY, null));
 
   useEffect(() => {
     if (suiteRun?.is_complete && liveCases.length > 0) {
       const toSave = { cases: liveCases, timestamp: new Date().toISOString(), provider: suiteRun.provider };
-      localStorage.setItem(SUITE_STORAGE_KEY, JSON.stringify(toSave));
+      writeStorageJSON(SUITE_STORAGE_KEY, toSave);
       setSavedData(toSave);
     }
   }, [suiteRun?.is_complete, liveCases.length]);
@@ -1976,12 +1979,27 @@ function SandboxTurnCard({ turn, index }) {
 
 function SandboxView() {
   const MAX_TURNS = 10;
-  const [turns, setTurns] = useState([]);
-  const [currentPrompt, setCurrentPrompt] = useState("");
+  const restoredSandboxRef = useRef(null);
+  if (restoredSandboxRef.current === null) {
+    restoredSandboxRef.current = readStorageJSON(SANDBOX_STORAGE_KEY, {});
+  }
+  const restoredSandbox = restoredSandboxRef.current;
+  const [turns, setTurns] = useState(() => (
+    Array.isArray(restoredSandbox?.turns)
+      ? restoredSandbox.turns.filter((t) => !t?.isPending)
+      : []
+  ));
+  const [currentPrompt, setCurrentPrompt] = useState(() => (
+    typeof restoredSandbox?.currentPrompt === "string" ? restoredSandbox.currentPrompt : ""
+  ));
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState("");
   const textareaRef = useRef(null);
   const completedTurns = useMemo(() => turns.filter((t) => !t.isPending && t.verdict), [turns]);
+
+  useEffect(() => {
+    writeStorageJSON(SANDBOX_STORAGE_KEY, { turns, currentPrompt });
+  }, [turns, currentPrompt]);
 
   const blueTeamSummary = useMemo(() => {
     if (!completedTurns.length) return { blocked: 0, highestSeverity: "n/a" };
@@ -2193,6 +2211,7 @@ export default function App() {
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const previousTimelineLength = useRef(0);
+  const appStateHydrated = useRef(false);
 
   const blueTeamSummary = useMemo(() => summarizeBlueTeam(timeline), [timeline]);
   const liveHeadline = useMemo(() => runNarrative(status, timeline.length), [status, timeline.length]);
@@ -2205,6 +2224,41 @@ export default function App() {
     if (wizardStep < 1) setWizardStep(1);
     if (wizardStep > 5) setWizardStep(5);
   }, [wizardStep]);
+
+  useEffect(() => {
+    const saved = readStorageJSON(APP_STORAGE_KEY, null);
+    if (saved && typeof saved === "object") {
+      if (saved.setup && typeof saved.setup === "object") {
+        setSetup((prev) => ({ ...prev, ...saved.setup }));
+      }
+      if (typeof saved.entryViewOpen === "boolean") setEntryViewOpen(saved.entryViewOpen);
+      if (typeof saved.activeView === "string") setActiveView(saved.activeView);
+      if (typeof saved.sidebarCollapsed === "boolean") setSidebarCollapsed(saved.sidebarCollapsed);
+      if (Array.isArray(saved.runs)) setRuns(saved.runs);
+      if (typeof saved.runId === "string") setRunId(saved.runId);
+      if (saved.status && typeof saved.status === "object") setStatus(saved.status);
+      if (Array.isArray(saved.timeline)) setTimeline(saved.timeline);
+      if (saved.evaluation && typeof saved.evaluation === "object") setEvaluation(saved.evaluation);
+      if (saved.suiteRun && typeof saved.suiteRun === "object") setSuiteRun(saved.suiteRun);
+    }
+    appStateHydrated.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!appStateHydrated.current) return;
+    writeStorageJSON(APP_STORAGE_KEY, {
+      setup,
+      entryViewOpen,
+      activeView,
+      sidebarCollapsed,
+      runs,
+      runId,
+      status,
+      timeline,
+      evaluation,
+      suiteRun,
+    });
+  }, [setup, entryViewOpen, activeView, sidebarCollapsed, runs, runId, status, timeline, evaluation, suiteRun]);
 
   async function refreshRun(currentRunId = runId) {
     if (!currentRunId) return;
