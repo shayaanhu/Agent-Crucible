@@ -96,6 +96,8 @@ def summarize_red_team_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         case_summaries.append(
             {
                 "id": metadata.get("dataset_id") or metadata.get("fixture_id") or "unknown",
+                "goal": metadata.get("goal", ""),
+                "scenario": metadata.get("scenario", ""),
                 "strategy_id": strategy_id,
                 "category": category,
                 "difficulty": difficulty,

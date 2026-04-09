@@ -324,6 +324,7 @@ def get_suite_run_status(suite_id: str):
         current_case_id=run.current_case_id,
         progress_percentage=progress,
         is_complete=(run.status in ["completed", "failed"]),
+        case_completed_results=run.case_completed_results,
     )
 
 

@@ -27,6 +27,7 @@ class AttackState:
     blocked_streak: int = 0
     no_success_streak: int = 0
     last_objective_reason: str = ""
+    last_attacker_prompt: str = ""
 
     def to_prompt_context(self) -> str:
         if not self.history:

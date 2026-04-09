@@ -140,6 +140,26 @@ function Sword(props) {
   );
 }
 
+function Crosshair(props) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="7" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+      <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    </IconBase>
+  );
+}
+
+function BarChart3(props) {
+  return (
+    <IconBase {...props}>
+      <path d="M18 20V10" />
+      <path d="M12 20V4" />
+      <path d="M6 20v-6" />
+    </IconBase>
+  );
+}
+
 function ShieldIcon(props) {
   return (
     <IconBase {...props}>
@@ -194,9 +214,9 @@ function Check(props) {
 }
 
 const PROVIDER_OPTIONS = [
-  { value: "groq", label: "groq (GPT-OSS 120B)" },
-  { value: "openai", label: "openai" },
-  { value: "mock", label: "mock" }
+  { value: "groq", label: "groq (GPT-OSS 120B)", model: "GPT-OSS 120B" },
+  { value: "openai", label: "openai", model: "OpenAI" },
+  { value: "mock", label: "mock", model: "Mock" }
 ];
 
 const STRATEGY_OPTIONS = [
@@ -345,7 +365,7 @@ function toneForStatus(status) {
 
 function toneForOutcome(value) {
   if (value === "success") return "danger";
-  if (value === "blocked") return "safe";
+  if (value === "blocked" || value === "no_success") return "safe";
   if (value === "partial") return "warning";
   return "neutral";
 }
@@ -387,9 +407,16 @@ function getGateActionTone(verdict) {
   return toneForAction(verdict?.action);
 }
 
+function labelForOutcome(value) {
+  if (value === "success") return "Succeeded";
+  if (value === "blocked" || value === "no_success") return "Model Refused";
+  if (value === "partial") return "Partial";
+  return formatLabel(value || "pending");
+}
+
 function buildTurnBadgeLabels(entry) {
   const severity = formatLabel(entry?.verdict?.severity || "low");
-  const objective = formatLabel(entry?.event?.objective_scorer?.label || entry?.event?.outcome || "pending");
+  const objective = labelForOutcome(entry?.event?.objective_scorer?.label || entry?.event?.outcome);
   return {
     severityShort: `Sev: ${severity}`,
     objectiveShort: `Obj: ${objective}`,
@@ -536,6 +563,83 @@ function summarizeBlueBenchmarkResults(results) {
     multiDetectorHits,
     multiDetectorRate: agreementSamples ? multiDetectorHits / agreementSamples : null,
     agreementSamples
+  };
+}
+
+function summarizeLiveBlueRun(timeline) {
+  const severityRank = { low: 1, medium: 2, high: 3, critical: 4 };
+  const actionCounts = {};
+  const severityCounts = {};
+  const policyCounts = {};
+  const outcomeCounts = {};
+  let highestSeverity = "n/a";
+  let interventionCount = 0;
+  let stoppedCount = 0;
+  let dryRunTurns = 0;
+  let totalConfidence = 0;
+  let confidenceSamples = 0;
+  let supportTotal = 0;
+  let agreementSamples = 0;
+  let multiDetectorHits = 0;
+
+  (timeline || []).forEach((entry) => {
+    const verdict = entry?.verdict || {};
+    const action = verdict.action || "allow";
+    const severity = verdict.severity || "low";
+    const policyId = verdict.policy_id || "policy.safe.default";
+    const outcome = entry?.event?.objective_scorer?.label || entry?.event?.outcome || "pending";
+
+    actionCounts[action] = (actionCounts[action] || 0) + 1;
+    severityCounts[severity] = (severityCounts[severity] || 0) + 1;
+    policyCounts[policyId] = (policyCounts[policyId] || 0) + 1;
+    outcomeCounts[outcome] = (outcomeCounts[outcome] || 0) + 1;
+
+    if (action !== "allow") interventionCount += 1;
+    if (action === "block" || action === "escalate") stoppedCount += 1;
+    if (verdict.dry_run) dryRunTurns += 1;
+    if ((severityRank[severity] || 0) > (severityRank[highestSeverity] || 0)) {
+      highestSeverity = severity;
+    }
+    if (typeof verdict.confidence === "number") {
+      totalConfidence += verdict.confidence;
+      confidenceSamples += 1;
+    }
+
+    const evaluations = verdict?.detector_results?._aggregation?.policy_evaluations || [];
+    const selectedPolicy =
+      evaluations.find(
+        (item) => item.triggered && item.policy_id === verdict?.policy_id
+      ) || evaluations.find((item) => item.triggered);
+    if (selectedPolicy) {
+      const supportCount =
+        selectedPolicy.supporting_count || selectedPolicy.supporting_detectors?.length || 0;
+      agreementSamples += 1;
+      supportTotal += supportCount;
+      if (supportCount > 1) multiDetectorHits += 1;
+    }
+  });
+
+  const totalTurns = (timeline || []).length;
+  const successfulTurns = outcomeCounts.success || 0;
+  const defendedTurns = totalTurns - successfulTurns;
+
+  return {
+    totalTurns,
+    defendedTurns,
+    defendedRate: totalTurns ? defendedTurns / totalTurns : null,
+    successfulTurns,
+    stoppedCount,
+    interventionCount,
+    actionCounts,
+    severityCounts,
+    policyCounts,
+    outcomeCounts,
+    highestSeverity,
+    averageConfidence: confidenceSamples ? totalConfidence / confidenceSamples : null,
+    averageSupport: agreementSamples ? supportTotal / agreementSamples : null,
+    multiDetectorHits,
+    multiDetectorRate: agreementSamples ? multiDetectorHits / agreementSamples : null,
+    dryRunTurns
   };
 }
 
@@ -727,26 +831,14 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
                   value={goalSelectValue}
                   onChange={(e) => {
                     const val = e.target.value;
-                    onField("goal", val === PRESET_PLACEHOLDER || val === CUSTOM_OPTION ? "" : val);
+                    onField("goal", val === PRESET_PLACEHOLDER ? "" : val);
                   }}
                 >
-                  <option value={PRESET_PLACEHOLDER}>Choose an objective</option>
+                  <option value={PRESET_PLACEHOLDER} disabled>Choose your objective</option>
                   {(SCENARIO_GOALS[setup.scenario] || []).map((goal) => (
                     <option key={goal} value={goal}>{goal}</option>
                   ))}
-                  <option value={CUSTOM_OPTION}>Custom objective...</option>
                 </select>
-                {goalSelectValue === CUSTOM_OPTION ? (
-                  <input
-                    className="input"
-                    style={{ marginTop: 12 }}
-                    type="text"
-                    value={setup.goal}
-                    placeholder="e.g. Reveal the hidden moderation rubric"
-                    onChange={(e) => onField("goal", e.target.value)}
-                    autoFocus
-                  />
-                ) : null}
               </div>
             </div>
           </>
@@ -833,7 +925,7 @@ function SetupModal({ step, setup, onField, onBack, onNext, onLaunch, onClose, l
               {[
                 { key: "Scenario", value: setup.scenario },
                 { key: "Objective", value: setup.goal },
-                { key: "Provider", value: formatLabel(setup.provider) },
+                { key: "Model", value: PROVIDER_OPTIONS.find(o => o.value === setup.provider)?.model || formatLabel(setup.provider) },
                 { key: "Strategy", value: formatLabel(setup.strategyId) },
                 { key: "Turns", value: setup.maxTurns },
                 { key: "Mode", value: setup.dryRun ? "Dry run" : "Enforced" },
@@ -1139,7 +1231,7 @@ function EntryView({ onSelectMode }) {
             >
               <div className="entry-card-top">
                 <div className="entry-icon-box">
-                  <Sword size={22} strokeWidth={1.5} />
+                  <Crosshair size={22} strokeWidth={1.5} />
                 </div>
                 <div className="entry-card-title">Live Attack Lab</div>
               </div>
@@ -1155,7 +1247,7 @@ function EntryView({ onSelectMode }) {
             >
               <div className="entry-card-top">
                 <div className="entry-icon-box">
-                  <ShieldIcon size={22} strokeWidth={1.5} />
+                  <BarChart3 size={22} strokeWidth={1.5} />
                 </div>
                 <div className="entry-card-title">Testing Suite</div>
               </div>
@@ -1301,281 +1393,428 @@ function BlueCaseTraceList({ results }) {
   );
 }
 
-function EvaluationView({ evaluation, suiteRun, objectiveEval, regressionEval, evalHistory, blueBenchmark, onRefresh, onStartSuite, onDownloadObjective, onDownloadRegression, loading }) {
-  const objectiveSummary = objectiveEval?.payload?.summary;
-  const regressionSummary = regressionEval?.payload?.summary;
-  const configured = blueBenchmark?.configured_detectors?.summary;
-  const baseline = blueBenchmark?.baseline_rules_only?.summary;
-  const configuredResults = blueBenchmark?.configured_detectors?.results || [];
-  const configuredInsights = useMemo(
-    () => summarizeBlueBenchmarkResults(configuredResults),
-    [configuredResults]
+function LiveBlueTurnTraceList({ entries }) {
+  if (!entries?.length) {
+    return <p className="empty-copy">No live turn traces available yet.</p>;
+  }
+
+  return (
+    <div className="blue-trace-list">
+      {entries.map((entry) => {
+        const verdict = entry?.verdict || {};
+        const outcome = entry?.event?.objective_scorer?.label || entry?.event?.outcome || "pending";
+        return (
+          <div className="blue-trace-card" key={`${entry.event?.turn_index}-${entry.event?.timestamp}`}>
+            <div className="blue-trace-top">
+              <div>
+                <div className="blue-trace-title">Turn {entry.event?.turn_index}</div>
+                <div className="blue-trace-meta">{truncateMiddle(verdict.policy_id || "policy.safe.default", 18, 16)}</div>
+              </div>
+              <div className="chip-row">
+                <Badge tone={toneForOutcome(outcome)}>{formatLabel(outcome)}</Badge>
+                <Badge tone={toneForAction(verdict.action)}>{formatLabel(verdict.action || "allow")}</Badge>
+              </div>
+            </div>
+            <KeyGrid
+              items={[
+                { label: "Severity", value: formatLabel(verdict.severity || "low") },
+                { label: "Confidence", value: formatNumber(verdict.confidence) },
+                { label: "Dry run", value: verdict.dry_run ? "Yes" : "No" },
+                { label: "Objective", value: formatLabel(outcome) }
+              ]}
+            />
+            <Fold title="Detector trace">
+              <DetailPre text={JSON.stringify(verdict.detector_results || {}, null, 2)} />
+            </Fold>
+          </div>
+        );
+      })}
+    </div>
   );
-  const configuredPassRate = configured?.total_cases ? (configured.passed_cases || 0) / configured.total_cases : null;
-  const baselinePassRate = baseline?.total_cases ? (baseline.passed_cases || 0) / baseline.total_cases : null;
-  const passedCaseDelta =
-    typeof configured?.passed_cases === "number" && typeof baseline?.passed_cases === "number"
-      ? configured.passed_cases - baseline.passed_cases
+}
+
+function LiveBlueBenchmarkSection({ timeline }) {
+  const liveInsights = useMemo(() => summarizeLiveBlueRun(timeline), [timeline]);
+  const successRate = liveInsights.totalTurns ? liveInsights.successfulTurns / liveInsights.totalTurns : null;
+  const turnDelta =
+    typeof liveInsights.defendedTurns === "number" && typeof liveInsights.successfulTurns === "number"
+      ? liveInsights.defendedTurns - liveInsights.successfulTurns
       : null;
-  const passRateDelta =
-    typeof configuredPassRate === "number" && typeof baselinePassRate === "number"
-      ? configuredPassRate - baselinePassRate
+  const rateDelta =
+    typeof liveInsights.defendedRate === "number" && typeof successRate === "number"
+      ? liveInsights.defendedRate - successRate
       : null;
-  const interventionCount = sumBlueInterventions(configured);
   const actionEntries = useMemo(
-    () => sortCountEntries(configured?.action_counts),
-    [configured?.action_counts]
+    () => sortCountEntries(liveInsights.actionCounts),
+    [liveInsights]
   );
   const severityEntries = useMemo(
-    () => sortCountEntries(configuredInsights.severityCounts),
-    [configuredInsights]
+    () => sortCountEntries(liveInsights.severityCounts),
+    [liveInsights]
   );
   const policyEntries = useMemo(
-    () => sortCountEntries(configured?.policy_counts).slice(0, 4),
-    [configured?.policy_counts]
+    () => sortCountEntries(liveInsights.policyCounts).slice(0, 4),
+    [liveInsights]
   );
-  const importantCaseTraces = useMemo(() => {
-    const sorted = [...configuredResults].sort((left, right) => {
-      if (left.passed !== right.passed) return left.passed ? 1 : -1;
-      return (right.confidence || 0) - (left.confidence || 0);
+  const outcomeEntries = useMemo(
+    () => sortCountEntries(liveInsights.outcomeCounts),
+    [liveInsights]
+  );
+  const importantTurnTraces = useMemo(() => {
+    const severityRank = { low: 1, medium: 2, high: 3, critical: 4 };
+    const sorted = [...(timeline || [])].sort((left, right) => {
+      const leftOutcome = left?.event?.objective_scorer?.label || left?.event?.outcome || "pending";
+      const rightOutcome = right?.event?.objective_scorer?.label || right?.event?.outcome || "pending";
+      if (leftOutcome !== rightOutcome) {
+        if (leftOutcome === "success") return -1;
+        if (rightOutcome === "success") return 1;
+      }
+      return (severityRank[right?.verdict?.severity] || 0) - (severityRank[left?.verdict?.severity] || 0);
     });
     return sorted.slice(0, 6);
-  }, [configuredResults]);
+  }, [timeline]);
+
+  return (
+    <section className="live-blue-team-section">
+      <SectionHeader
+        title="Blue-team overview"
+        note="Keep defense outcome, policy patterns, and turn movement next to the live run."
+        actions={<Badge tone="neutral">{liveInsights.totalTurns} turns</Badge>}
+      />
+
+      {!!liveInsights.totalTurns && (
+        <>
+          <div className="stat-bar">
+            <StatCard label="Defense outcome" value={liveInsights.defendedRate === null ? "n/a" : formatNumber(liveInsights.defendedRate)} />
+            <StatCard label="Unsafe stopped" value={liveInsights.stoppedCount} />
+            <StatCard label="Actioned responses" value={liveInsights.interventionCount} />
+          </div>
+
+          <div className="eval-grid">
+            <DistributionTable
+              title="Action mix"
+              entries={actionEntries}
+              total={liveInsights.totalTurns}
+              toneForKey={toneForAction}
+              emptyLabel="No blue-team action data yet."
+            />
+            <DistributionTable
+              title="Severity mix"
+              entries={severityEntries}
+              total={liveInsights.totalTurns}
+              toneForKey={toneForSeverity}
+              emptyLabel="No severity signal captured yet."
+            />
+          </div>
+
+          <Fold title="More blue-team details">
+            <div className="eval-grid">
+              <section className="eval-section">
+                <div className="eval-section-title">Confidence and detector agreement</div>
+                <KeyGrid
+                  items={[
+                    { label: "Average confidence", value: formatNumber(liveInsights.averageConfidence) },
+                    { label: "Average detector support", value: formatNumber(liveInsights.averageSupport) },
+                    {
+                      label: "Multi-detector hits",
+                      value:
+                        liveInsights.multiDetectorRate === null
+                          ? "n/a"
+                          : `${liveInsights.multiDetectorHits} (${formatNumber(liveInsights.multiDetectorRate)})`
+                    },
+                    { label: "Highest severity", value: formatLabel(liveInsights.highestSeverity) },
+                    { label: "Dry-run turns", value: liveInsights.dryRunTurns },
+                    { label: "Defended turns", value: liveInsights.defendedTurns }
+                  ]}
+                />
+              </section>
+
+              <section className="eval-section">
+                <div className="eval-section-title">Run comparison</div>
+                <KeyGrid
+                  items={[
+                    { label: "Defense outcome", value: formatNumber(liveInsights.defendedRate) },
+                    { label: "Attack success rate", value: formatNumber(successRate) },
+                    { label: "Turn delta", value: formatSignedCount(turnDelta) },
+                    { label: "Allowed turns", value: liveInsights.actionCounts.allow || 0 },
+                    { label: "Stopped turns", value: liveInsights.stoppedCount },
+                    { label: "Dominant policy", value: policyEntries[0] ? formatLabel(policyEntries[0][0]) : "n/a" }
+                  ]}
+                />
+              </section>
+            </div>
+
+            <div className="eval-grid">
+              <DistributionTable
+                title="Policy counts"
+                entries={sortCountEntries(liveInsights.policyCounts)}
+                total={liveInsights.totalTurns}
+                emptyLabel="No policy distribution available yet."
+              />
+              <DistributionTable
+                title="Outcome mix"
+                entries={outcomeEntries}
+                total={liveInsights.totalTurns}
+                toneForKey={toneForOutcome}
+                emptyLabel="No outcome distribution available yet."
+              />
+            </div>
+
+            <section className="eval-section">
+              <div className="eval-section-title">Turn defense traces</div>
+              <LiveBlueTurnTraceList entries={importantTurnTraces} />
+            </section>
+
+            <Fold title="Raw live run timeline">
+              <DetailPre text={JSON.stringify(timeline || [], null, 2)} />
+            </Fold>
+          </Fold>
+        </>
+      )}
+    </section>
+  );
+}
+
+const SUITE_STORAGE_KEY = "crucible_suite_results";
+
+function computeSuiteSummary(cases) {
+  if (!cases?.length) return null;
+  const total = cases.length;
+  const succeeded = cases.filter(c => c.final_outcome === "success").length;
+  const defended = cases.filter(c => c.final_outcome === "blocked").length;
+  const guardrailFired = cases.filter(c => c.blue_team_any_blocked).length;
+  const totalTurns = cases.reduce((s, c) => s + (c.turns?.length || 0), 0);
+  return {
+    total,
+    succeeded,
+    defended,
+    guardrailFired,
+    attackRate: total ? succeeded / total : 0,
+    avgTurns: total ? Math.round((totalTurns / total) * 10) / 10 : 0,
+  };
+}
+
+function summarizeSuiteBlueTeam(cases) {
+  const severityRank = { low: 1, medium: 2, high: 3, critical: 4 };
+  const actionCounts = {};
+  const severityCounts = {};
+  let interventionCount = 0;
+  let stoppedCount = 0;
+  let highestSeverity = "n/a";
+  let totalVerdicts = 0;
+
+  (cases || []).forEach((c) => {
+    (c.blue_team_verdicts || []).forEach((v) => {
+      const action = v.action || "allow";
+      const severity = v.severity || "low";
+      actionCounts[action] = (actionCounts[action] || 0) + 1;
+      severityCounts[severity] = (severityCounts[severity] || 0) + 1;
+      if (action !== "allow") interventionCount += 1;
+      if (action === "block" || action === "escalate") stoppedCount += 1;
+      if (highestSeverity === "n/a" || (severityRank[severity] || 0) > (severityRank[highestSeverity] || 0)) {
+        highestSeverity = severity;
+      }
+      totalVerdicts += 1;
+    });
+  });
+
+  return { totalVerdicts, actionCounts, severityCounts, interventionCount, stoppedCount, highestSeverity };
+}
+
+function EvalBlueSummarySection({ cases }) {
+  const insights = useMemo(() => summarizeSuiteBlueTeam(cases), [cases]);
+  const actionEntries = useMemo(() => sortCountEntries(insights.actionCounts), [insights]);
+  const severityEntries = useMemo(() => sortCountEntries(insights.severityCounts), [insights]);
+
+  if (!insights.totalVerdicts) return null;
+
+  return (
+    <section className="live-blue-team-section">
+      <SectionHeader
+        title="Blue-team overview"
+        note="Aggregated guardrail activity across all suite cases."
+        actions={<Badge tone="neutral">{insights.totalVerdicts} verdicts</Badge>}
+      />
+      <div className="stat-bar">
+        <StatCard label="Unsafe stopped" value={insights.stoppedCount} />
+        <StatCard label="Actioned responses" value={insights.interventionCount} />
+        <StatCard label="Highest severity" value={formatLabel(insights.highestSeverity)} />
+      </div>
+      <div className="eval-grid">
+        <DistributionTable
+          title="Action mix"
+          entries={actionEntries}
+          total={insights.totalVerdicts}
+          toneForKey={toneForAction}
+          emptyLabel="No blue-team action data."
+        />
+        <DistributionTable
+          title="Severity mix"
+          entries={severityEntries}
+          total={insights.totalVerdicts}
+          toneForKey={toneForSeverity}
+          emptyLabel="No severity data."
+        />
+      </div>
+    </section>
+  );
+}
+
+function SuiteCaseRow({ caseData, index }) {
+  const [expanded, setExpanded] = useState(false);
+  const outcome = caseData.final_outcome || "no_success";
+  const turns = caseData.turns || [];
+  const blueBlocked = caseData.blue_team_any_blocked;
+
+  const outcomeTone = toneForOutcome(outcome);
+
+  return (
+    <div className={`suite-case-row${expanded ? " is-expanded" : ""}`} style={{ animationDelay: `${index * 40}ms` }}>
+      <button type="button" className="suite-case-header" onClick={() => setExpanded(e => !e)}>
+        <div className="suite-case-left">
+          <Badge tone={outcomeTone}>{labelForOutcome(outcome)}</Badge>
+          <span className="suite-case-goal">{caseData.goal || caseData.case_id}</span>
+        </div>
+        <div className="suite-case-right">
+          {caseData.scenario && <span className="suite-case-chip">{caseData.scenario}</span>}
+          {caseData.difficulty && <span className="suite-case-chip suite-case-chip-dim">{formatLabel(caseData.difficulty)}</span>}
+          {blueBlocked && <Badge tone="info">Guardrail fired</Badge>}
+          <span className="suite-case-turns">{turns.length} turn{turns.length !== 1 ? "s" : ""}</span>
+          <ChevronDown size={13} strokeWidth={2} className={`suite-case-chevron${expanded ? " is-open" : ""}`} />
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="suite-case-body">
+          {turns.map((turn, tIdx) => {
+            const blueVerdict = caseData.blue_team_verdicts?.find(v => v.turn_index === turn.turn_index);
+            const turnOutcome = turn.objective_scorer?.label || turn.outcome || "pending";
+            return (
+              <div className="suite-turn-row" key={tIdx}>
+                <div className="suite-turn-meta">
+                  <span className="suite-turn-index">Turn {turn.turn_index}</span>
+                  <Badge tone={toneForOutcome(turnOutcome)} >{labelForOutcome(turnOutcome)}</Badge>
+                </div>
+                <div className="suite-turn-blocks">
+                  <div className="suite-turn-block suite-turn-block--attacker">
+                    <div className="suite-turn-block-label">
+                      <Sword size={11} strokeWidth={2} /> Attacker
+                    </div>
+                    <div className="suite-turn-text">{turn.attacker_prompt || turn.prompt}</div>
+                  </div>
+                  <div className="suite-turn-block suite-turn-block--target">
+                    <div className="suite-turn-block-label">
+                      <Bot size={11} strokeWidth={2} /> Model response
+                    </div>
+                    <div className="suite-turn-text">{turn.response}</div>
+                  </div>
+                  {blueVerdict && (
+                    <div className="suite-turn-block suite-turn-block--blue">
+                      <div className="suite-turn-block-label">
+                        <ShieldIcon size={11} strokeWidth={2} /> Blue team
+                      </div>
+                      <div className="suite-turn-blue-row">
+                        <Badge tone={blueVerdict.allowed ? "neutral" : "danger"}>
+                          {blueVerdict.allowed ? "Allowed" : `${formatLabel(blueVerdict.action)}`}
+                        </Badge>
+                        {blueVerdict.severity && blueVerdict.severity !== "low" && (
+                          <span className={`suite-turn-severity tone-${toneForSeverity(blueVerdict.severity)}`}>{formatLabel(blueVerdict.severity)}</span>
+                        )}
+                        {blueVerdict.reason && (
+                          <span className="suite-turn-blue-reason">{blueVerdict.reason}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EvaluationView({ suiteRun, onStartSuite, loading }) {
+  const isRunning = suiteRun && !suiteRun.is_complete;
+  const liveCases = suiteRun?.case_completed_results || [];
+
+  const [savedData, setSavedData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(SUITE_STORAGE_KEY) || "null"); } catch { return null; }
+  });
+
+  useEffect(() => {
+    if (suiteRun?.is_complete && liveCases.length > 0) {
+      const toSave = { cases: liveCases, timestamp: new Date().toISOString(), provider: suiteRun.provider };
+      localStorage.setItem(SUITE_STORAGE_KEY, JSON.stringify(toSave));
+      setSavedData(toSave);
+    }
+  }, [suiteRun?.is_complete, liveCases.length]);
+
+  const cases = isRunning ? liveCases : (liveCases.length > 0 ? liveCases : (savedData?.cases || []));
+  const summary = useMemo(() => computeSuiteSummary(cases), [cases]);
+  const isFromSave = liveCases.length === 0 && cases.length > 0;
 
   return (
     <section className="evaluation-page">
       <div className="section-header">
         <div>
-          <div className="section-title">Testing Suite</div>
-          <div className="section-note">Track attack pressure and blue-team defenses without burying the important signals.</div>
+          <div className="section-title">Attack Suite</div>
+          <div className="section-note">Run automated red-team test cases against each scenario.</div>
         </div>
         <div className="chip-row">
-          <button type="button" className="btn btn-primary" onClick={() => onStartSuite("groq")} disabled={loading || (suiteRun && !suiteRun.is_complete)}>
-            {suiteRun && !suiteRun.is_complete ? "Suite Running..." : "Run Testing Suite"}
+          <button type="button" className="btn btn-primary" onClick={() => onStartSuite("groq")} disabled={loading || isRunning}>
+            {isRunning ? "Running..." : "Run attack suite"}
           </button>
-          <button type="button" className="btn btn-secondary" onClick={onRefresh} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
-          <button type="button" className="btn btn-ghost" onClick={onDownloadObjective} disabled={!objectiveEval?.available}>Objective report</button>
-          <button type="button" className="btn btn-ghost" onClick={onDownloadRegression} disabled={!regressionEval?.available}>Regression report</button>
         </div>
       </div>
 
-      {suiteRun && !suiteRun.is_complete ? (
-        <div className="card" style={{ marginBottom: 24, border: "1px solid var(--accent-gold)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ fontWeight: 600 }}>Running Testing Suite ({suiteRun.provider})</span>
-            <span>{suiteRun.completed_cases} / {suiteRun.total_cases} cases</span>
+      {isRunning && (
+        <div className="suite-progress-banner">
+          <div className="suite-progress-top">
+            <span className="suite-progress-label">Case {suiteRun.completed_cases} of {suiteRun.total_cases}</span>
+            <span className="suite-progress-pct">{suiteRun.progress_percentage}%</span>
           </div>
-          <div style={{ height: 8, background: "var(--bg-card)", borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ height: "100%", background: "var(--accent-gold)", width: `${suiteRun.progress_percentage}%`, transition: "width 0.3s ease" }}></div>
+          <div className="suite-progress-bar">
+            <div className="suite-progress-fill" style={{ width: `${suiteRun.progress_percentage}%` }} />
           </div>
-          <div style={{ marginTop: 8, fontSize: "0.8rem", color: "var(--text-muted)" }}>
-            Current objective: {suiteRun.current_case_id || "..."}
+          {suiteRun.current_case_id && (
+            <div className="suite-progress-current">{suiteRun.current_case_id}</div>
+          )}
+        </div>
+      )}
+
+      {summary && !isRunning && (
+        <>
+          {isFromSave && savedData?.timestamp && (
+            <div className="suite-saved-note">
+              Last run · {formatTimestamp(savedData.timestamp)}
+              {savedData.provider ? ` · ${formatLabel(savedData.provider)}` : ""}
+            </div>
+          )}
+          <div className="stat-bar">
+            <StatCard label="Cases" value={summary.total} />
+            <StatCard label="Breached" value={summary.succeeded} />
+            <StatCard label="Defended" value={summary.defended} />
+            <StatCard label="Guardrail fires" value={summary.guardrailFired} />
+            <StatCard label="Avg turns" value={summary.avgTurns} />
           </div>
+          <EvalBlueSummarySection cases={cases} />
+        </>
+      )}
+
+      {cases.length > 0 ? (
+        <div className="suite-case-list">
+          {cases.map((c, idx) => (
+            <SuiteCaseRow key={c.case_id || idx} caseData={c} index={idx} />
+          ))}
+        </div>
+      ) : !isRunning ? (
+        <div className="empty-state">
+          <p className="empty-copy">No results yet. Run the attack suite to see test cases appear here.</p>
         </div>
       ) : null}
-
-      {evaluation ? (
-        <Fold title="Current Run Evaluation" defaultOpen>
-          <div className="stat-bar" style={{ marginBottom: 16 }}>
-            {evaluation.metrics.map((m) => (
-              <StatCard key={m.metric_name} label={formatLabel(m.metric_name)} value={`${formatNumber(m.value)} (Goal: ${formatNumber(m.threshold)})`} />
-            ))}
-          </div>
-          <div className="eval-section">
-            <div className="eval-section-title">Verdict: <Badge tone={evaluation.overall === "pass" ? "safe" : "danger"}>{evaluation.overall.toUpperCase()}</Badge></div>
-          </div>
-        </Fold>
-      ) : null}
-
-      <section className="eval-section blue-overview-shell">
-        <SectionHeader
-          title="Blue-team defense overview"
-          note="Signal-first view of defense outcome, action mix, benchmark delta, and dominant policy patterns."
-          actions={
-            blueBenchmark?.run_metadata ? (
-              <div className="chip-row">
-                <Badge tone="info">{formatLabel(blueBenchmark.run_metadata.benchmark_label || "default")}</Badge>
-                <Badge tone="neutral">{formatTimestamp(blueBenchmark.run_metadata.generated_at)}</Badge>
-              </div>
-            ) : null
-          }
-        />
-
-        <div className="blue-hero-grid">
-          <div className="blue-hero-card">
-            <div className="blue-hero-label">Defense outcome</div>
-            <div className="blue-hero-value">{formatNumber(configuredPassRate)}</div>
-            <div className="blue-hero-note">
-              {configured?.passed_cases ?? 0} of {configured?.total_cases ?? 0} benchmark cases matched the expected blue-team outcome.
-            </div>
-          </div>
-
-          <div className="blue-hero-card">
-            <div className="blue-hero-label">Unsafe stopped</div>
-            <div className="blue-hero-value">{configured?.blocked_cases ?? 0}</div>
-            <div className="blue-hero-note">
-              Effective blocks or escalations across {configured?.total_cases ?? 0} benchmark cases.
-            </div>
-          </div>
-
-          <div className="blue-hero-card">
-            <div className="blue-hero-label">Actioned responses</div>
-            <div className="blue-hero-value">{interventionCount}</div>
-            <div className="blue-hero-note">
-              Non-allow outcomes including block, escalate, redact, and safe rewrite.
-            </div>
-          </div>
-
-          <div className="blue-hero-card">
-            <div className="blue-hero-label">Benchmark delta</div>
-            <div className={`blue-hero-value tone-${toneForDelta(passedCaseDelta)}`}>
-              {formatSignedCount(passedCaseDelta)}
-            </div>
-            <div className="blue-hero-note">
-              {formatSignedPoints(passRateDelta)} versus the rules-only baseline.
-            </div>
-          </div>
-        </div>
-
-        <div className="eval-grid">
-          <DistributionTable
-            title="Action mix"
-            entries={actionEntries}
-            total={configured?.total_cases || 0}
-            toneForKey={toneForAction}
-            emptyLabel="No blue-team action data yet."
-          />
-          <DistributionTable
-            title="Severity mix"
-            entries={severityEntries}
-            total={configured?.total_cases || 0}
-            toneForKey={toneForSeverity}
-            emptyLabel="No severity signal captured yet."
-          />
-          <PolicySpotlight entries={policyEntries} total={configured?.total_cases || 0} />
-        </div>
-
-        <Fold title="More blue-team details">
-          <div className="eval-grid">
-            <section className="eval-section">
-              <div className="eval-section-title">Confidence and detector agreement</div>
-              <KeyGrid
-                items={[
-                  { label: "Average confidence", value: formatNumber(configuredInsights.averageConfidence) },
-                  { label: "Average detector support", value: formatNumber(configuredInsights.averageSupport) },
-                  {
-                    label: "Multi-detector hits",
-                    value:
-                      configuredInsights.multiDetectorRate === null
-                        ? "n/a"
-                        : `${configuredInsights.multiDetectorHits} (${formatNumber(configuredInsights.multiDetectorRate)})`
-                  },
-                  { label: "Highest severity", value: formatLabel(configuredInsights.highestSeverity) },
-                  { label: "Generated", value: blueBenchmark?.run_metadata?.generated_at || "n/a" },
-                  { label: "Fixture", value: blueBenchmark?.run_metadata?.fixture_path || "n/a" }
-                ]}
-              />
-            </section>
-
-            <section className="eval-section">
-              <div className="eval-section-title">Benchmark comparison</div>
-              <KeyGrid
-                items={[
-                  { label: "Configured pass rate", value: formatNumber(configuredPassRate) },
-                  { label: "Baseline pass rate", value: formatNumber(baselinePassRate) },
-                  {
-                    label: "Passed case delta",
-                    value: formatSignedCount(passedCaseDelta)
-                  },
-                  { label: "Configured allowed", value: configured?.allowed_cases ?? "n/a" },
-                  { label: "Configured blocked", value: configured?.blocked_cases ?? "n/a" },
-                  { label: "Configured benchmark label", value: blueBenchmark?.config?.benchmark_label || "n/a" }
-                ]}
-              />
-            </section>
-          </div>
-
-          <div className="eval-grid">
-            <DistributionTable
-              title="Policy counts"
-              entries={sortCountEntries(configured?.policy_counts)}
-              total={configured?.total_cases || 0}
-              emptyLabel="No policy distribution available yet."
-            />
-            <DistributionTable
-              title="Benchmark metrics"
-              entries={(configured?.metrics || []).map((metric) => [metric.metric_name, metric.value])}
-              total={1}
-              emptyLabel="No benchmark metrics available yet."
-            />
-          </div>
-
-          <section className="eval-section">
-            <div className="eval-section-title">Case traces</div>
-            <BlueCaseTraceList results={importantCaseTraces} />
-          </section>
-
-          <Fold title="Raw benchmark payload">
-            <DetailPre text={JSON.stringify(blueBenchmark || {}, null, 2)} />
-          </Fold>
-        </Fold>
-      </section>
-
-      <div className="stat-bar" style={{ marginBottom: 24 }}>
-        <StatCard label="Objective suite" value={objectiveEval?.available ? formatNumber(safeRate(objectiveSummary)) : "Missing"} />
-        <StatCard label="Objective cases" value={objectiveSummary?.total_cases || 0} />
-        <StatCard label="Regression pack" value={regressionEval?.available ? formatNumber(safeRate(regressionSummary)) : "Missing"} />
-        <StatCard label="Average turns" value={objectiveSummary?.average_turns ?? "n/a"} />
-      </div>
-
-      <div className="eval-grid">
-        <section className="eval-section">
-          <div className="eval-section-title">Objective suite</div>
-          <KeyGrid items={[
-            { label: "Successes", value: objectiveSummary?.successes ?? "n/a" },
-            { label: "Blocked", value: objectiveSummary?.blocked ?? "n/a" },
-            { label: "No success", value: objectiveSummary?.no_success ?? "n/a" },
-            { label: "Partial", value: objectiveSummary?.partial ?? "n/a" },
-            { label: "Avg turns", value: objectiveSummary?.average_turns ?? "n/a" },
-            { label: "Provider", value: objectiveEval?.payload?.run_metadata?.provider ?? "n/a" }
-          ]} />
-        </section>
-        <section className="eval-section">
-          <div className="eval-section-title">Regression pack</div>
-          <KeyGrid items={[
-            { label: "Successes", value: regressionSummary?.successes ?? "n/a" },
-            { label: "Blocked", value: regressionSummary?.blocked ?? "n/a" },
-            { label: "No success", value: regressionSummary?.no_success ?? "n/a" },
-            { label: "Partial", value: regressionSummary?.partial ?? "n/a" },
-            { label: "Avg turns", value: regressionSummary?.average_turns ?? "n/a" },
-            { label: "Provider", value: regressionEval?.payload?.run_metadata?.provider ?? "n/a" }
-          ]} />
-        </section>
-      </div>
-
-      <div className="eval-grid">
-        <BreakdownTable title="Objective by strategy" rows={flattenBreakdown(objectiveSummary?.per_strategy)} />
-        <BreakdownTable title="Objective by category" rows={flattenBreakdown(objectiveSummary?.per_category)} />
-        <BreakdownTable title="Objective by difficulty" rows={flattenBreakdown(objectiveSummary?.per_difficulty)} />
-        <BreakdownTable title="Regression by strategy" rows={flattenBreakdown(regressionSummary?.per_strategy)} />
-      </div>
-
-      <Fold title="Saved artifacts">
-        {evalHistory.length ? (
-          <div className="artifact-list">
-            {evalHistory.map((entry) => (
-              <div className="artifact-card" key={entry.result_file}>
-                <div className="artifact-top">
-                  <span className="artifact-name">{formatLabel(entry.artifact_type)}</span>
-                  <Badge tone="neutral">{entry.updated_at}</Badge>
-                </div>
-                <div className="artifact-meta">{entry.result_file}</div>
-                <div className="artifact-meta">{entry.summary?.total_cases || 0} cases · {entry.summary?.successes || 0} success · {formatNumber(entry.summary?.success_rate || 0)}</div>
-              </div>
-            ))}
-          </div>
-        ) : <p className="empty-copy">No saved evaluation artifacts found yet.</p>}
-      </Fold>
     </section>
   );
 }
@@ -1583,7 +1822,7 @@ function EvaluationView({ evaluation, suiteRun, objectiveEval, regressionEval, e
 export default function App() {
   const [setup, setSetup] = useState({
     scenario: "Educational assistant",
-    goal: "Extract restricted internal prompt",
+    goal: "",
     provider: "groq",
     strategyId: "multi_step_escalation",
     maxTurns: 3,
@@ -1605,10 +1844,6 @@ export default function App() {
   const [suiteRun, setSuiteRun] = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [objectiveEval, setObjectiveEval] = useState(null);
-  const [regressionEval, setRegressionEval] = useState(null);
-  const [evalHistory, setEvalHistory] = useState([]);
-  const [blueBenchmark, setBlueBenchmark] = useState(null);
   const previousTimelineLength = useRef(0);
 
   const blueTeamSummary = useMemo(() => summarizeBlueTeam(timeline), [timeline]);
@@ -1716,19 +1951,19 @@ export default function App() {
       const resp = await fetch(`${API_BASE}/api/v1/evals/red-team/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, max_turns: 3, limit: 10 }) // Limit to 10 for better coverage
+        body: JSON.stringify({ provider, max_turns: 3, limit: 10 })
       });
       const data = await resp.json();
-      setSuiteRun({ ...data, progress_percentage: 0, is_complete: false });
+      setSuiteRun({ ...data, progress_percentage: 0, is_complete: false, case_completed_results: [] });
+      setActiveView("evaluation");
 
       const poller = setInterval(async () => {
-        const pResp = await fetch(`${API_BASE}/api/v1/evals/red-team/run/${data.suite_id}`);
-        const pData = await pResp.json();
-        setSuiteRun(pData);
-        if (pData.is_complete) {
-          clearInterval(poller);
-          loadEvaluationArtifacts();
-        }
+        try {
+          const pResp = await fetch(`${API_BASE}/api/v1/evals/red-team/run/${data.suite_id}`);
+          const pData = await pResp.json();
+          setSuiteRun(pData);
+          if (pData.is_complete) clearInterval(poller);
+        } catch (_) { /* ignore transient poll errors */ }
       }, 2000);
     } catch (err) {
       setError(err.message);
@@ -1736,51 +1971,6 @@ export default function App() {
       setEvalLoading(false);
     }
   }
-
-  async function loadEvaluationArtifacts() {
-    setError("");
-    setEvalLoading(true);
-    try {
-      const [objectiveResponse, regressionResponse, historyResponse, blueBenchmarkResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/v1/evals/red-team/objective-suite`),
-        fetch(`${API_BASE}/api/v1/evals/red-team/regression`),
-        fetch(`${API_BASE}/api/v1/evals/red-team/history`),
-        fetch(`${API_BASE}/api/v1/benchmarks/blue-team`)
-      ]);
-      const objectiveBody = await objectiveResponse.json();
-      const regressionBody = await regressionResponse.json();
-      const historyBody = await historyResponse.json();
-      const blueBenchmarkBody = await blueBenchmarkResponse.json();
-      if (!objectiveResponse.ok) throw new Error(objectiveBody.detail || "Failed to load objective suite artifacts");
-      if (!regressionResponse.ok) throw new Error(regressionBody.detail || "Failed to load regression artifacts");
-      if (!historyResponse.ok) throw new Error(historyBody.detail || "Failed to load evaluation history");
-      if (!blueBenchmarkResponse.ok) throw new Error(blueBenchmarkBody.detail || "Failed to load blue-team benchmark");
-      setObjectiveEval(objectiveBody);
-      setRegressionEval(regressionBody);
-      setEvalHistory(historyBody.history || []);
-      setBlueBenchmark(blueBenchmarkBody);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setEvalLoading(false);
-    }
-  }
-
-  async function downloadReport(path, filename) {
-    setError("");
-    try {
-      const response = await fetch(`${API_BASE}${path}`);
-      const text = await response.text();
-      if (!response.ok) throw new Error(text || "Failed to download report");
-      downloadText(filename, text);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  useEffect(() => {
-    loadEvaluationArtifacts();
-  }, []);
 
   useEffect(() => {
     if (!runId) return undefined;
@@ -1907,7 +2097,7 @@ export default function App() {
           <div className="run-header-left">
             {runId ? (
               <>
-                <div className="run-header-title">{truncateText(setup.goal, 60)}</div>
+                <div className="run-header-title">{setup.goal}</div>
                 <div className="run-header-meta">
                   {setup.scenario} · {formatLabel(setup.strategyId)} · {formatLabel(setup.provider)}
                 </div>
@@ -2002,6 +2192,13 @@ export default function App() {
                     <div className="empty-card-body">Once the backend completes the first turn, the timeline will appear here automatically.</div>
                   </div>
                 )}
+
+                {timeline.length && status?.status === "completed" ? (
+                  <LiveBlueBenchmarkSection
+                    key={`live-blue-results-${timeline.length}`}
+                    timeline={timeline}
+                  />
+                ) : null}
               </>
             )}
           </div>
@@ -2009,7 +2206,7 @@ export default function App() {
 
         {activeView === "evaluation" ? (
           <div className="page-body">
-            <EvaluationView evaluation={evaluation} suiteRun={suiteRun} objectiveEval={objectiveEval} regressionEval={regressionEval} evalHistory={evalHistory} blueBenchmark={blueBenchmark} onRefresh={loadEvaluationArtifacts} onStartSuite={startSuiteRun} onDownloadObjective={() => downloadReport("/api/v1/evals/red-team/objective-suite/report", "red_team_dataset_results_report.md")} onDownloadRegression={() => downloadReport("/api/v1/evals/red-team/regression/report", "red_team_regression_results_report.md")} loading={evalLoading} />
+            <EvaluationView suiteRun={suiteRun} onStartSuite={startSuiteRun} loading={evalLoading} />
           </div>
         ) : null}
       </div>

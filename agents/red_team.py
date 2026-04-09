@@ -169,6 +169,7 @@ class AdvancedRedTeamAgent(RedTeamContract):
             response = generate_response(prompt=prompt, provider=provider, system_prompt=target_system_prompt)
             if on_progress:
                 on_progress("scoring", max(state.turn_index - 1, 0), state.max_turns)
+            state.last_attacker_prompt = attacker_prompt
             scorer_results = self._score_response(response, state, scorers)
             objective_scorer = _extract_objective_scorer(scorer_results)
             update = strategy.on_response(state, response)
@@ -233,9 +234,7 @@ class AdvancedRedTeamAgent(RedTeamContract):
             if update.stop and not _has_objective_scorer(scorer_results):
                 stop_reason = update.stop_reason or "success_detected"
                 break
-            if outcome == "blocked":
-                state.template_index += 1
-            if outcome == "partial":
+            if outcome in {"blocked", "no_success"}:
                 state.template_index += 1
 
         trace_meta = {
@@ -467,19 +466,19 @@ def _select_template(strategy: RedTeamStrategy, state: AttackState):
 
 
 def _classify_outcome(results: list[Dict[str, object]]) -> str:
+    # LLM scorer is authoritative — pass its label through directly.
     for result in results:
         if result.get("name") == "objective_llm":
             label = str(result.get("label", "")).strip()
-            if label == "success":
-                return "success"
-            if label == "blocked":
-                return "blocked"
-            return "partial"
+            if label in {"success", "blocked", "no_success"}:
+                return label
+            return "no_success"
+    # Fallback to heuristic scorers when no LLM scorer ran.
     if any(result.get("label") == "success" for result in results):
         return "success"
     if any(result.get("label") == "blocked" for result in results):
         return "blocked"
-    return "partial"
+    return "no_success"
 
 
 def get_red_team_agent() -> RedTeamContract:
