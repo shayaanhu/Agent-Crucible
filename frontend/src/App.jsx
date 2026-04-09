@@ -365,7 +365,7 @@ function toneForStatus(status) {
 
 function toneForOutcome(value) {
   if (value === "success") return "danger";
-  if (value === "blocked") return "safe";
+  if (value === "blocked" || value === "no_success") return "safe";
   if (value === "partial") return "warning";
   return "neutral";
 }
@@ -409,9 +409,8 @@ function getGateActionTone(verdict) {
 
 function labelForOutcome(value) {
   if (value === "success") return "Succeeded";
-  if (value === "blocked") return "Model Defended";
+  if (value === "blocked" || value === "no_success") return "Model Refused";
   if (value === "partial") return "Partial";
-  if (value === "no_success") return "No Breach";
   return formatLabel(value || "pending");
 }
 
@@ -1595,13 +1594,79 @@ function computeSuiteSummary(cases) {
   };
 }
 
+function summarizeSuiteBlueTeam(cases) {
+  const severityRank = { low: 1, medium: 2, high: 3, critical: 4 };
+  const actionCounts = {};
+  const severityCounts = {};
+  let interventionCount = 0;
+  let stoppedCount = 0;
+  let highestSeverity = "n/a";
+  let totalVerdicts = 0;
+
+  (cases || []).forEach((c) => {
+    (c.blue_team_verdicts || []).forEach((v) => {
+      const action = v.action || "allow";
+      const severity = v.severity || "low";
+      actionCounts[action] = (actionCounts[action] || 0) + 1;
+      severityCounts[severity] = (severityCounts[severity] || 0) + 1;
+      if (action !== "allow") interventionCount += 1;
+      if (action === "block" || action === "escalate") stoppedCount += 1;
+      if (highestSeverity === "n/a" || (severityRank[severity] || 0) > (severityRank[highestSeverity] || 0)) {
+        highestSeverity = severity;
+      }
+      totalVerdicts += 1;
+    });
+  });
+
+  return { totalVerdicts, actionCounts, severityCounts, interventionCount, stoppedCount, highestSeverity };
+}
+
+function EvalBlueSummarySection({ cases }) {
+  const insights = useMemo(() => summarizeSuiteBlueTeam(cases), [cases]);
+  const actionEntries = useMemo(() => sortCountEntries(insights.actionCounts), [insights]);
+  const severityEntries = useMemo(() => sortCountEntries(insights.severityCounts), [insights]);
+
+  if (!insights.totalVerdicts) return null;
+
+  return (
+    <section className="live-blue-team-section">
+      <SectionHeader
+        title="Blue-team overview"
+        note="Aggregated guardrail activity across all suite cases."
+        actions={<Badge tone="neutral">{insights.totalVerdicts} verdicts</Badge>}
+      />
+      <div className="stat-bar">
+        <StatCard label="Unsafe stopped" value={insights.stoppedCount} />
+        <StatCard label="Actioned responses" value={insights.interventionCount} />
+        <StatCard label="Highest severity" value={formatLabel(insights.highestSeverity)} />
+      </div>
+      <div className="eval-grid">
+        <DistributionTable
+          title="Action mix"
+          entries={actionEntries}
+          total={insights.totalVerdicts}
+          toneForKey={toneForAction}
+          emptyLabel="No blue-team action data."
+        />
+        <DistributionTable
+          title="Severity mix"
+          entries={severityEntries}
+          total={insights.totalVerdicts}
+          toneForKey={toneForSeverity}
+          emptyLabel="No severity data."
+        />
+      </div>
+    </section>
+  );
+}
+
 function SuiteCaseRow({ caseData, index }) {
   const [expanded, setExpanded] = useState(false);
   const outcome = caseData.final_outcome || "no_success";
   const turns = caseData.turns || [];
   const blueBlocked = caseData.blue_team_any_blocked;
 
-  const outcomeTone = outcome === "success" ? "danger" : outcome === "blocked" ? "safe" : outcome === "partial" ? "warning" : "neutral";
+  const outcomeTone = toneForOutcome(outcome);
 
   return (
     <div className={`suite-case-row${expanded ? " is-expanded" : ""}`} style={{ animationDelay: `${index * 40}ms` }}>
@@ -1687,7 +1752,7 @@ function EvaluationView({ suiteRun, onStartSuite, loading }) {
     }
   }, [suiteRun?.is_complete, liveCases.length]);
 
-  const cases = liveCases.length > 0 ? liveCases : (savedData?.cases || []);
+  const cases = isRunning ? liveCases : (liveCases.length > 0 ? liveCases : (savedData?.cases || []));
   const summary = useMemo(() => computeSuiteSummary(cases), [cases]);
   const isFromSave = liveCases.length === 0 && cases.length > 0;
 
@@ -1721,20 +1786,22 @@ function EvaluationView({ suiteRun, onStartSuite, loading }) {
       )}
 
       {summary && !isRunning && (
-        <div className="stat-bar" style={{ marginBottom: 8 }}>
-          <StatCard label="Cases" value={summary.total} />
-          <StatCard label="Succeeded" value={summary.succeeded} />
-          <StatCard label="Defended" value={summary.defended} />
-          <StatCard label="Guardrail fires" value={summary.guardrailFired} />
-          <StatCard label="Avg turns" value={summary.avgTurns} />
-        </div>
-      )}
-
-      {isFromSave && savedData?.timestamp && (
-        <div className="suite-saved-note">
-          Last run · {formatTimestamp(savedData.timestamp)}
-          {savedData.provider ? ` · ${formatLabel(savedData.provider)}` : ""}
-        </div>
+        <>
+          {isFromSave && savedData?.timestamp && (
+            <div className="suite-saved-note">
+              Last run · {formatTimestamp(savedData.timestamp)}
+              {savedData.provider ? ` · ${formatLabel(savedData.provider)}` : ""}
+            </div>
+          )}
+          <div className="stat-bar">
+            <StatCard label="Cases" value={summary.total} />
+            <StatCard label="Breached" value={summary.succeeded} />
+            <StatCard label="Defended" value={summary.defended} />
+            <StatCard label="Guardrail fires" value={summary.guardrailFired} />
+            <StatCard label="Avg turns" value={summary.avgTurns} />
+          </div>
+          <EvalBlueSummarySection cases={cases} />
+        </>
       )}
 
       {cases.length > 0 ? (
