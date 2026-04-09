@@ -131,11 +131,10 @@ function PlayCircle(props) {
 function Sword(props) {
   return (
     <IconBase {...props}>
-      <path d="m14 4 6 6" />
-      <path d="m13 5 6 6" />
-      <path d="M4 20 13 11" />
-      <path d="m3 21 4-1-3-3-1 4Z" />
-      <path d="m8 16 3 3" />
+      <path d="m11 19-6-6" />
+      <path d="m5 21-2-2" />
+      <path d="m8 16-4 4" />
+      <path d="M9.5 17.5 21 6V3h-3L6.5 14.5" />
     </IconBase>
   );
 }
@@ -2576,4 +2575,3 @@ export default function App() {
     </div>
   );
 }
-
