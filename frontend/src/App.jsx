@@ -2126,7 +2126,7 @@ export default function App() {
                   </div>
                 )}
 
-                {timeline.length ? (
+                {timeline.length && status?.status === "completed" ? (
                   <LiveBlueBenchmarkSection
                     key={`live-blue-results-${timeline.length}`}
                     timeline={timeline}
