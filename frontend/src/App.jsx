@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const APP_STORAGE_KEY = "crucible_app_state_v1";
-const SANDBOX_STORAGE_KEY = "crucible_sandbox_state_v1";
 const SUITE_STORAGE_KEY = "crucible_suite_results";
 
 function readStorageJSON(key, fallback = null) {
@@ -1977,20 +1976,13 @@ function SandboxTurnCard({ turn, index }) {
   );
 }
 
-function SandboxView() {
+function SandboxView({ run, onRunChange, onCreateNewRun }) {
   const MAX_TURNS = 10;
-  const restoredSandboxRef = useRef(null);
-  if (restoredSandboxRef.current === null) {
-    restoredSandboxRef.current = readStorageJSON(SANDBOX_STORAGE_KEY, {});
-  }
-  const restoredSandbox = restoredSandboxRef.current;
   const [turns, setTurns] = useState(() => (
-    Array.isArray(restoredSandbox?.turns)
-      ? restoredSandbox.turns.filter((t) => !t?.isPending)
-      : []
+    Array.isArray(run?.turns) ? run.turns.filter((t) => !t?.isPending) : []
   ));
   const [currentPrompt, setCurrentPrompt] = useState(() => (
-    typeof restoredSandbox?.currentPrompt === "string" ? restoredSandbox.currentPrompt : ""
+    typeof run?.currentPrompt === "string" ? run.currentPrompt : ""
   ));
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState("");
@@ -1998,8 +1990,16 @@ function SandboxView() {
   const completedTurns = useMemo(() => turns.filter((t) => !t.isPending && t.verdict), [turns]);
 
   useEffect(() => {
-    writeStorageJSON(SANDBOX_STORAGE_KEY, { turns, currentPrompt });
-  }, [turns, currentPrompt]);
+    setTurns(Array.isArray(run?.turns) ? run.turns.filter((t) => !t?.isPending) : []);
+    setCurrentPrompt(typeof run?.currentPrompt === "string" ? run.currentPrompt : "");
+    setError("");
+    setIsRunning(false);
+  }, [run?.id]);
+
+  useEffect(() => {
+    if (!run?.id) return;
+    onRunChange?.(run.id, { turns, currentPrompt });
+  }, [run?.id, turns, currentPrompt]);
 
   const blueTeamSummary = useMemo(() => {
     if (!completedTurns.length) return { blocked: 0, highestSeverity: "n/a" };
@@ -2069,6 +2069,14 @@ function SandboxView() {
     setTimeout(() => textareaRef.current?.focus(), 100);
   }
 
+  function handleNewRun() {
+    if (onCreateNewRun) {
+      onCreateNewRun();
+      return;
+    }
+    handleReset();
+  }
+
   const canSubmit = Boolean(currentPrompt.trim()) && !isRunning && turns.length < MAX_TURNS;
   const reachedMax = turns.length >= MAX_TURNS;
 
@@ -2099,8 +2107,8 @@ function SandboxView() {
               </div>
             </div>
             <div className="stat-cell" style={{ marginLeft: "auto" }}>
-              <button type="button" className="btn btn-ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={handleReset}>
-                New session
+              <button type="button" className="btn btn-ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={handleNewRun}>
+                New sandbox run
               </button>
             </div>
           </div>
@@ -2143,7 +2151,7 @@ function SandboxView() {
             <div className="empty-card-body" style={{ marginBottom: 14 }}>
               Session complete — {MAX_TURNS} turns.
             </div>
-            <button type="button" className="btn btn-primary" onClick={handleReset}>New session</button>
+            <button type="button" className="btn btn-primary" onClick={handleNewRun}>New sandbox run</button>
           </div>
         ) : (
           <>
@@ -2208,6 +2216,8 @@ export default function App() {
   const [timeline, setTimeline] = useState([]);
   const [evaluation, setEvaluation] = useState(null);
   const [suiteRun, setSuiteRun] = useState(null);
+  const [sandboxRuns, setSandboxRuns] = useState([]); // [{ id, name, turns, currentPrompt, statusDot, updatedAt }]
+  const [sandboxRunId, setSandboxRunId] = useState("");
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const previousTimelineLength = useRef(0);
@@ -2219,11 +2229,81 @@ export default function App() {
   const heroSecondaryMetric = runId ? formatLabel(status?.current_phase || status?.status || "idle") : "Setup";
 
   const updateField = (key, value) => setSetup((current) => ({ ...current, [key]: value }));
+  const activeSandboxRun = useMemo(
+    () => sandboxRuns.find((item) => item.id === sandboxRunId) || null,
+    [sandboxRuns, sandboxRunId]
+  );
+
+  function sandboxStatusFromTurns(turns = []) {
+    if (!Array.isArray(turns) || turns.length === 0) return "idle";
+    const latest = turns[turns.length - 1];
+    if (latest?.isPending) return "running";
+    const anyBlocked = turns.some((t) => t?.verdict && t.verdict.allowed === false);
+    return anyBlocked ? "failed" : "complete";
+  }
+
+  function createSandboxRun() {
+    const id = typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `sandbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const now = new Date().toISOString();
+    const name = `Sandbox ${sandboxRuns.length + 1}`;
+    const run = {
+      id,
+      name,
+      turns: [],
+      currentPrompt: "",
+      statusDot: "idle",
+      createdAt: now,
+      updatedAt: now,
+    };
+    setSandboxRuns((prev) => [...prev, run]);
+    setSandboxRunId(id);
+    setActiveView("sandbox");
+    setEntryViewOpen(false);
+    return id;
+  }
+
+  function ensureSandboxRun() {
+    if (sandboxRunId && sandboxRuns.some((item) => item.id === sandboxRunId)) return sandboxRunId;
+    if (sandboxRuns.length > 0) {
+      const latest = [...sandboxRuns].sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))[0];
+      setSandboxRunId(latest.id);
+      return latest.id;
+    }
+    return createSandboxRun();
+  }
+
+  function switchSandboxRun(targetSandboxRunId) {
+    setSandboxRunId(targetSandboxRunId);
+    setActiveView("sandbox");
+    setEntryViewOpen(false);
+  }
+
+  function updateSandboxRun(runStateId, patch) {
+    if (!runStateId) return;
+    setSandboxRuns((prev) => prev.map((item) => {
+      if (item.id !== runStateId) return item;
+      const nextTurns = Array.isArray(patch.turns) ? patch.turns : item.turns || [];
+      return {
+        ...item,
+        ...patch,
+        turns: nextTurns,
+        statusDot: sandboxStatusFromTurns(nextTurns),
+        updatedAt: new Date().toISOString(),
+      };
+    }));
+  }
 
   useEffect(() => {
     if (wizardStep < 1) setWizardStep(1);
     if (wizardStep > 5) setWizardStep(5);
   }, [wizardStep]);
+
+  useEffect(() => {
+    if (!appStateHydrated.current) return;
+    if (activeView === "sandbox") ensureSandboxRun();
+  }, [activeView, sandboxRunId, sandboxRuns.length]);
 
   useEffect(() => {
     const saved = readStorageJSON(APP_STORAGE_KEY, null);
@@ -2240,6 +2320,8 @@ export default function App() {
       if (Array.isArray(saved.timeline)) setTimeline(saved.timeline);
       if (saved.evaluation && typeof saved.evaluation === "object") setEvaluation(saved.evaluation);
       if (saved.suiteRun && typeof saved.suiteRun === "object") setSuiteRun(saved.suiteRun);
+      if (Array.isArray(saved.sandboxRuns)) setSandboxRuns(saved.sandboxRuns);
+      if (typeof saved.sandboxRunId === "string") setSandboxRunId(saved.sandboxRunId);
     }
     appStateHydrated.current = true;
   }, []);
@@ -2257,8 +2339,10 @@ export default function App() {
       timeline,
       evaluation,
       suiteRun,
+      sandboxRuns,
+      sandboxRunId,
     });
-  }, [setup, entryViewOpen, activeView, sidebarCollapsed, runs, runId, status, timeline, evaluation, suiteRun]);
+  }, [setup, entryViewOpen, activeView, sidebarCollapsed, runs, runId, status, timeline, evaluation, suiteRun, sandboxRuns, sandboxRunId]);
 
   async function refreshRun(currentRunId = runId) {
     if (!currentRunId) return;
@@ -2433,6 +2517,7 @@ export default function App() {
       setActiveView("lab");
     } else if (mode === "sandbox") {
       setActiveView("sandbox");
+      ensureSandboxRun();
     } else if (mode === "evaluation") {
       setActiveView("evaluation");
     }
@@ -2461,36 +2546,52 @@ export default function App() {
         {!sidebarCollapsed && (
           <>
             <div className="sidebar-section-label">Runs</div>
-            {runs.length === 0 ? (
-              <div style={{ padding: "6px 16px", fontSize: "0.75rem", color: "var(--text-ghost)" }}>No runs yet</div>
-            ) : [...runs].reverse().map(run => (
+            {[...runs].reverse().map((run) => (
               <button
                 key={run.runId}
                 type="button"
-                className={`sidebar-run-item${run.runId === runId ? " is-active" : ""}`}
-                onClick={() => run.runId !== runId && switchRun(run.runId)}
+                className={`sidebar-run-item${run.runId === runId && activeView === "lab" ? " is-active" : ""}`}
+                onClick={() => run.runId !== runId ? switchRun(run.runId) : setActiveView("lab")}
               >
-                <span className={`run-dot run-dot-${run.statusDot}`} style={{ flexShrink: 0 }} />
+                <span className={`run-dot run-dot-${run.statusDot || "idle"}`} style={{ flexShrink: 0 }} />
                 <span style={{ minWidth: 0 }}>
                   <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {truncateText(run.goal, 26)}
                   </span>
                   <span style={{ display: "block", fontSize: "0.7rem", color: "var(--text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {run.scenario}
+                    Live run · {run.scenario}
                   </span>
                 </span>
               </button>
             ))}
+            {[...sandboxRuns].sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""))).map((run) => (
+              <button
+                key={run.id}
+                type="button"
+                className={`sidebar-run-item${run.id === sandboxRunId && activeView === "sandbox" ? " is-active" : ""}`}
+                onClick={() => switchSandboxRun(run.id)}
+              >
+                <span className={`run-dot run-dot-${run.statusDot || "idle"}`} style={{ flexShrink: 0 }} />
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {run.name || "Sandbox run"}
+                  </span>
+                  <span style={{ display: "block", fontSize: "0.7rem", color: "var(--text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    Sandbox · {(run.turns || []).length} turn{(run.turns || []).length === 1 ? "" : "s"}
+                  </span>
+                </span>
+              </button>
+            ))}
+            {runs.length === 0 && sandboxRuns.length === 0 ? (
+              <div style={{ padding: "6px 16px", fontSize: "0.75rem", color: "var(--text-ghost)" }}>No runs yet</div>
+            ) : null}
 
             <div className="sidebar-footer">
               <button type="button" className="sidebar-new-run" onClick={() => setWizardOpen(true)}>
-                <Plus size={14} strokeWidth={1.5} /> New run
+                <Plus size={14} strokeWidth={1.5} /> New live run
               </button>
-              <button type="button" className="sidebar-action" onClick={() => setActiveView("sandbox")}>
-                <Terminal size={14} strokeWidth={1.5} /> Attack Sandbox
-              </button>
-              <button type="button" className="sidebar-action" onClick={() => setActiveView("evaluation")}>
-                <ShieldIcon size={14} strokeWidth={1.5} /> Evaluation
+              <button type="button" className="sidebar-action" onClick={() => createSandboxRun()}>
+                <Plus size={14} strokeWidth={1.5} /> New sandbox run
               </button>
             </div>
           </>
@@ -2508,6 +2609,13 @@ export default function App() {
                   {setup.scenario} · {formatLabel(setup.strategyId)} · {formatLabel(setup.provider)}
                 </div>
               </>
+            ) : activeView === "sandbox" && activeSandboxRun ? (
+              <>
+                <div className="run-header-title">{activeSandboxRun.name || "Sandbox run"}</div>
+                <div className="run-header-meta">
+                  Sandbox · {(activeSandboxRun.turns || []).length} turn{(activeSandboxRun.turns || []).length === 1 ? "" : "s"}
+                </div>
+              </>
             ) : (
               <div className="run-header-title" style={{ color: "var(--text-tertiary)" }}>No active run</div>
             )}
@@ -2515,7 +2623,7 @@ export default function App() {
           <div className="run-header-actions">
             <div className="view-tabs">
               <button type="button" className={`view-tab${activeView === "lab" ? " is-active" : ""}`} onClick={() => setActiveView("lab")}>Live run</button>
-              <button type="button" className={`view-tab${activeView === "sandbox" ? " is-active" : ""}`} onClick={() => setActiveView("sandbox")}>Sandbox</button>
+              <button type="button" className={`view-tab${activeView === "sandbox" ? " is-active" : ""}`} onClick={() => { setActiveView("sandbox"); ensureSandboxRun(); }}>Sandbox</button>
               <button type="button" className={`view-tab${activeView === "evaluation" ? " is-active" : ""}`} onClick={() => setActiveView("evaluation")}>Evaluation</button>
             </div>
           </div>
@@ -2613,7 +2721,19 @@ export default function App() {
 
         {activeView === "sandbox" ? (
           <div className="page-body">
-            <SandboxView />
+            {activeSandboxRun ? (
+              <SandboxView
+                run={activeSandboxRun}
+                onRunChange={updateSandboxRun}
+                onCreateNewRun={createSandboxRun}
+              />
+            ) : (
+              <div className="empty-state">
+                <div className="empty-state-heading">No sandbox run active</div>
+                <div className="empty-state-body">Create a sandbox run to begin submitting prompts.</div>
+                <button type="button" className="btn btn-primary" onClick={createSandboxRun}>New sandbox run</button>
+              </div>
+            )}
           </div>
         ) : null}
 
