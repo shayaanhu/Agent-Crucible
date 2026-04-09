@@ -128,6 +128,18 @@ function PlayCircle(props) {
   );
 }
 
+function Sword(props) {
+  return (
+    <IconBase {...props}>
+      <path d="m14 4 6 6" />
+      <path d="m13 5 6 6" />
+      <path d="M4 20 13 11" />
+      <path d="m3 21 4-1-3-3-1 4Z" />
+      <path d="m8 16 3 3" />
+    </IconBase>
+  );
+}
+
 function Crosshair(props) {
   return (
     <IconBase {...props}>
@@ -395,9 +407,17 @@ function getGateActionTone(verdict) {
   return toneForAction(verdict?.action);
 }
 
+function labelForOutcome(value) {
+  if (value === "success") return "Succeeded";
+  if (value === "blocked") return "Defended";
+  if (value === "partial") return "Partial";
+  if (value === "no_success") return "No result";
+  return formatLabel(value || "pending");
+}
+
 function buildTurnBadgeLabels(entry) {
   const severity = formatLabel(entry?.verdict?.severity || "low");
-  const objective = formatLabel(entry?.event?.objective_scorer?.label || entry?.event?.outcome || "pending");
+  const objective = labelForOutcome(entry?.event?.objective_scorer?.label || entry?.event?.outcome);
   return {
     severityShort: `Sev: ${severity}`,
     objectiveShort: `Obj: ${objective}`,
@@ -1558,110 +1578,179 @@ function LiveBlueBenchmarkSection({ timeline }) {
   );
 }
 
-function EvaluationView({ evaluation, suiteRun, objectiveEval, regressionEval, evalHistory, onRefresh, onStartSuite, onDownloadObjective, onDownloadRegression, loading }) {
-  const objectiveSummary = objectiveEval?.payload?.summary;
-  const regressionSummary = regressionEval?.payload?.summary;
+const SUITE_STORAGE_KEY = "crucible_suite_results";
+
+function computeSuiteSummary(cases) {
+  if (!cases?.length) return null;
+  const total = cases.length;
+  const succeeded = cases.filter(c => c.final_outcome === "success").length;
+  const defended = cases.filter(c => c.final_outcome === "blocked").length;
+  const guardrailFired = cases.filter(c => c.blue_team_any_blocked).length;
+  const totalTurns = cases.reduce((s, c) => s + (c.turns?.length || 0), 0);
+  return {
+    total,
+    succeeded,
+    defended,
+    guardrailFired,
+    attackRate: total ? succeeded / total : 0,
+    avgTurns: total ? Math.round((totalTurns / total) * 10) / 10 : 0,
+  };
+}
+
+function SuiteCaseRow({ caseData, index }) {
+  const [expanded, setExpanded] = useState(false);
+  const outcome = caseData.final_outcome || "no_success";
+  const turns = caseData.turns || [];
+  const blueBlocked = caseData.blue_team_any_blocked;
+
+  const outcomeTone = outcome === "success" ? "danger" : outcome === "blocked" ? "safe" : outcome === "partial" ? "warning" : "neutral";
+
+  return (
+    <div className={`suite-case-row${expanded ? " is-expanded" : ""}`} style={{ animationDelay: `${index * 40}ms` }}>
+      <button type="button" className="suite-case-header" onClick={() => setExpanded(e => !e)}>
+        <div className="suite-case-left">
+          <Badge tone={outcomeTone}>{labelForOutcome(outcome)}</Badge>
+          <span className="suite-case-goal">{caseData.goal || caseData.case_id}</span>
+        </div>
+        <div className="suite-case-right">
+          {caseData.scenario && <span className="suite-case-chip">{caseData.scenario}</span>}
+          {caseData.difficulty && <span className="suite-case-chip suite-case-chip-dim">{formatLabel(caseData.difficulty)}</span>}
+          {blueBlocked && <Badge tone="info">Guardrail fired</Badge>}
+          <span className="suite-case-turns">{turns.length} turn{turns.length !== 1 ? "s" : ""}</span>
+          <ChevronDown size={13} strokeWidth={2} className={`suite-case-chevron${expanded ? " is-open" : ""}`} />
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="suite-case-body">
+          {turns.map((turn, tIdx) => {
+            const blueVerdict = caseData.blue_team_verdicts?.find(v => v.turn_index === turn.turn_index);
+            const turnOutcome = turn.objective_scorer?.label || turn.outcome || "pending";
+            return (
+              <div className="suite-turn-row" key={tIdx}>
+                <div className="suite-turn-meta">
+                  <span className="suite-turn-index">Turn {turn.turn_index}</span>
+                  <Badge tone={toneForOutcome(turnOutcome)} >{labelForOutcome(turnOutcome)}</Badge>
+                </div>
+                <div className="suite-turn-blocks">
+                  <div className="suite-turn-block suite-turn-block--attacker">
+                    <div className="suite-turn-block-label">
+                      <Sword size={11} strokeWidth={2} /> Attacker
+                    </div>
+                    <div className="suite-turn-text">{turn.attacker_prompt || turn.prompt}</div>
+                  </div>
+                  <div className="suite-turn-block suite-turn-block--target">
+                    <div className="suite-turn-block-label">
+                      <Bot size={11} strokeWidth={2} /> Model response
+                    </div>
+                    <div className="suite-turn-text">{turn.response}</div>
+                  </div>
+                  {blueVerdict && (
+                    <div className="suite-turn-block suite-turn-block--blue">
+                      <div className="suite-turn-block-label">
+                        <ShieldIcon size={11} strokeWidth={2} /> Blue team
+                      </div>
+                      <div className="suite-turn-blue-row">
+                        <Badge tone={blueVerdict.allowed ? "neutral" : "danger"}>
+                          {blueVerdict.allowed ? "Allowed" : `${formatLabel(blueVerdict.action)}`}
+                        </Badge>
+                        {blueVerdict.severity && blueVerdict.severity !== "low" && (
+                          <span className={`suite-turn-severity tone-${toneForSeverity(blueVerdict.severity)}`}>{formatLabel(blueVerdict.severity)}</span>
+                        )}
+                        {blueVerdict.reason && (
+                          <span className="suite-turn-blue-reason">{blueVerdict.reason}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EvaluationView({ suiteRun, onStartSuite, loading }) {
+  const isRunning = suiteRun && !suiteRun.is_complete;
+  const liveCases = suiteRun?.case_completed_results || [];
+
+  const [savedData, setSavedData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(SUITE_STORAGE_KEY) || "null"); } catch { return null; }
+  });
+
+  useEffect(() => {
+    if (suiteRun?.is_complete && liveCases.length > 0) {
+      const toSave = { cases: liveCases, timestamp: new Date().toISOString(), provider: suiteRun.provider };
+      localStorage.setItem(SUITE_STORAGE_KEY, JSON.stringify(toSave));
+      setSavedData(toSave);
+    }
+  }, [suiteRun?.is_complete, liveCases.length]);
+
+  const cases = liveCases.length > 0 ? liveCases : (savedData?.cases || []);
+  const summary = useMemo(() => computeSuiteSummary(cases), [cases]);
+  const isFromSave = liveCases.length === 0 && cases.length > 0;
 
   return (
     <section className="evaluation-page">
       <div className="section-header">
         <div>
-          <div className="section-title">Testing Suite</div>
-          <div className="section-note">Track attack pressure and red-team suite performance from one place.</div>
+          <div className="section-title">Attack Suite</div>
+          <div className="section-note">Run automated red-team test cases against each scenario.</div>
         </div>
         <div className="chip-row">
-          <button type="button" className="btn btn-primary" onClick={() => onStartSuite("groq")} disabled={loading || (suiteRun && !suiteRun.is_complete)}>
-            {suiteRun && !suiteRun.is_complete ? "Suite Running..." : "Run Testing Suite"}
+          <button type="button" className="btn btn-primary" onClick={() => onStartSuite("groq")} disabled={loading || isRunning}>
+            {isRunning ? "Running..." : "Run attack suite"}
           </button>
-          <button type="button" className="btn btn-secondary" onClick={onRefresh} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
-          <button type="button" className="btn btn-ghost" onClick={onDownloadObjective} disabled={!objectiveEval?.available}>Objective report</button>
-          <button type="button" className="btn btn-ghost" onClick={onDownloadRegression} disabled={!regressionEval?.available}>Regression report</button>
         </div>
       </div>
 
-      {suiteRun && !suiteRun.is_complete ? (
-        <div className="card" style={{ marginBottom: 24, border: "1px solid var(--accent-gold)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ fontWeight: 600 }}>Running Testing Suite ({suiteRun.provider})</span>
-            <span>{suiteRun.completed_cases} / {suiteRun.total_cases} cases</span>
+      {isRunning && (
+        <div className="suite-progress-banner">
+          <div className="suite-progress-top">
+            <span className="suite-progress-label">Case {suiteRun.completed_cases} of {suiteRun.total_cases}</span>
+            <span className="suite-progress-pct">{suiteRun.progress_percentage}%</span>
           </div>
-          <div style={{ height: 8, background: "var(--bg-card)", borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ height: "100%", background: "var(--accent-gold)", width: `${suiteRun.progress_percentage}%`, transition: "width 0.3s ease" }}></div>
+          <div className="suite-progress-bar">
+            <div className="suite-progress-fill" style={{ width: `${suiteRun.progress_percentage}%` }} />
           </div>
-          <div style={{ marginTop: 8, fontSize: "0.8rem", color: "var(--text-muted)" }}>
-            Current objective: {suiteRun.current_case_id || "..."}
-          </div>
+          {suiteRun.current_case_id && (
+            <div className="suite-progress-current">{suiteRun.current_case_id}</div>
+          )}
+        </div>
+      )}
+
+      {summary && !isRunning && (
+        <div className="stat-bar" style={{ marginBottom: 8 }}>
+          <StatCard label="Cases" value={summary.total} />
+          <StatCard label="Attack rate" value={formatNumber(summary.attackRate)} />
+          <StatCard label="Succeeded" value={summary.succeeded} />
+          <StatCard label="Defended" value={summary.defended} />
+          <StatCard label="Guardrail fires" value={summary.guardrailFired} />
+          <StatCard label="Avg turns" value={summary.avgTurns} />
+        </div>
+      )}
+
+      {isFromSave && savedData?.timestamp && (
+        <div className="suite-saved-note">
+          Last run · {formatTimestamp(savedData.timestamp)}
+          {savedData.provider ? ` · ${formatLabel(savedData.provider)}` : ""}
+        </div>
+      )}
+
+      {cases.length > 0 ? (
+        <div className="suite-case-list">
+          {cases.map((c, idx) => (
+            <SuiteCaseRow key={c.case_id || idx} caseData={c} index={idx} />
+          ))}
+        </div>
+      ) : !isRunning ? (
+        <div className="empty-state">
+          <p className="empty-copy">No results yet. Run the attack suite to see test cases appear here.</p>
         </div>
       ) : null}
-
-      {evaluation ? (
-        <Fold title="Current Run Evaluation" defaultOpen>
-          <div className="stat-bar" style={{ marginBottom: 16 }}>
-            {evaluation.metrics.map((m) => (
-              <StatCard key={m.metric_name} label={formatLabel(m.metric_name)} value={`${formatNumber(m.value)} (Goal: ${formatNumber(m.threshold)})`} />
-            ))}
-          </div>
-          <div className="eval-section">
-            <div className="eval-section-title">Verdict: <Badge tone={evaluation.overall === "pass" ? "safe" : "danger"}>{evaluation.overall.toUpperCase()}</Badge></div>
-          </div>
-        </Fold>
-      ) : null}
-
-      <div className="stat-bar" style={{ marginBottom: 24 }}>
-        <StatCard label="Objective suite" value={objectiveEval?.available ? formatNumber(safeRate(objectiveSummary)) : "Missing"} />
-        <StatCard label="Objective cases" value={objectiveSummary?.total_cases || 0} />
-        <StatCard label="Regression pack" value={regressionEval?.available ? formatNumber(safeRate(regressionSummary)) : "Missing"} />
-        <StatCard label="Average turns" value={objectiveSummary?.average_turns ?? "n/a"} />
-      </div>
-
-      <div className="eval-grid">
-        <section className="eval-section">
-          <div className="eval-section-title">Objective suite</div>
-          <KeyGrid items={[
-            { label: "Successes", value: objectiveSummary?.successes ?? "n/a" },
-            { label: "Blocked", value: objectiveSummary?.blocked ?? "n/a" },
-            { label: "No success", value: objectiveSummary?.no_success ?? "n/a" },
-            { label: "Partial", value: objectiveSummary?.partial ?? "n/a" },
-            { label: "Avg turns", value: objectiveSummary?.average_turns ?? "n/a" },
-            { label: "Provider", value: objectiveEval?.payload?.run_metadata?.provider ?? "n/a" }
-          ]} />
-        </section>
-        <section className="eval-section">
-          <div className="eval-section-title">Regression pack</div>
-          <KeyGrid items={[
-            { label: "Successes", value: regressionSummary?.successes ?? "n/a" },
-            { label: "Blocked", value: regressionSummary?.blocked ?? "n/a" },
-            { label: "No success", value: regressionSummary?.no_success ?? "n/a" },
-            { label: "Partial", value: regressionSummary?.partial ?? "n/a" },
-            { label: "Avg turns", value: regressionSummary?.average_turns ?? "n/a" },
-            { label: "Provider", value: regressionEval?.payload?.run_metadata?.provider ?? "n/a" }
-          ]} />
-        </section>
-      </div>
-
-      <div className="eval-grid">
-        <BreakdownTable title="Objective by strategy" rows={flattenBreakdown(objectiveSummary?.per_strategy)} />
-        <BreakdownTable title="Objective by category" rows={flattenBreakdown(objectiveSummary?.per_category)} />
-        <BreakdownTable title="Objective by difficulty" rows={flattenBreakdown(objectiveSummary?.per_difficulty)} />
-        <BreakdownTable title="Regression by strategy" rows={flattenBreakdown(regressionSummary?.per_strategy)} />
-      </div>
-
-      <Fold title="Saved artifacts">
-        {evalHistory.length ? (
-          <div className="artifact-list">
-            {evalHistory.map((entry) => (
-              <div className="artifact-card" key={entry.result_file}>
-                <div className="artifact-top">
-                  <span className="artifact-name">{formatLabel(entry.artifact_type)}</span>
-                  <Badge tone="neutral">{entry.updated_at}</Badge>
-                </div>
-                <div className="artifact-meta">{entry.result_file}</div>
-                <div className="artifact-meta">{entry.summary?.total_cases || 0} cases · {entry.summary?.successes || 0} success · {formatNumber(entry.summary?.success_rate || 0)}</div>
-              </div>
-            ))}
-          </div>
-        ) : <p className="empty-copy">No saved evaluation artifacts found yet.</p>}
-      </Fold>
     </section>
   );
 }
@@ -1691,10 +1780,6 @@ export default function App() {
   const [suiteRun, setSuiteRun] = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [objectiveEval, setObjectiveEval] = useState(null);
-  const [regressionEval, setRegressionEval] = useState(null);
-  const [evalHistory, setEvalHistory] = useState([]);
-  const [blueBenchmark, setBlueBenchmark] = useState(null);
   const previousTimelineLength = useRef(0);
 
   const blueTeamSummary = useMemo(() => summarizeBlueTeam(timeline), [timeline]);
@@ -1802,19 +1887,19 @@ export default function App() {
       const resp = await fetch(`${API_BASE}/api/v1/evals/red-team/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, max_turns: 3, limit: 10 }) // Limit to 10 for better coverage
+        body: JSON.stringify({ provider, max_turns: 3, limit: 10 })
       });
       const data = await resp.json();
-      setSuiteRun({ ...data, progress_percentage: 0, is_complete: false });
+      setSuiteRun({ ...data, progress_percentage: 0, is_complete: false, case_completed_results: [] });
+      setActiveView("evaluation");
 
       const poller = setInterval(async () => {
-        const pResp = await fetch(`${API_BASE}/api/v1/evals/red-team/run/${data.suite_id}`);
-        const pData = await pResp.json();
-        setSuiteRun(pData);
-        if (pData.is_complete) {
-          clearInterval(poller);
-          loadEvaluationArtifacts();
-        }
+        try {
+          const pResp = await fetch(`${API_BASE}/api/v1/evals/red-team/run/${data.suite_id}`);
+          const pData = await pResp.json();
+          setSuiteRun(pData);
+          if (pData.is_complete) clearInterval(poller);
+        } catch (_) { /* ignore transient poll errors */ }
       }, 2000);
     } catch (err) {
       setError(err.message);
@@ -1822,51 +1907,6 @@ export default function App() {
       setEvalLoading(false);
     }
   }
-
-  async function loadEvaluationArtifacts() {
-    setError("");
-    setEvalLoading(true);
-    try {
-      const [objectiveResponse, regressionResponse, historyResponse, blueBenchmarkResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/v1/evals/red-team/objective-suite`),
-        fetch(`${API_BASE}/api/v1/evals/red-team/regression`),
-        fetch(`${API_BASE}/api/v1/evals/red-team/history`),
-        fetch(`${API_BASE}/api/v1/benchmarks/blue-team`)
-      ]);
-      const objectiveBody = await objectiveResponse.json();
-      const regressionBody = await regressionResponse.json();
-      const historyBody = await historyResponse.json();
-      const blueBenchmarkBody = await blueBenchmarkResponse.json();
-      if (!objectiveResponse.ok) throw new Error(objectiveBody.detail || "Failed to load objective suite artifacts");
-      if (!regressionResponse.ok) throw new Error(regressionBody.detail || "Failed to load regression artifacts");
-      if (!historyResponse.ok) throw new Error(historyBody.detail || "Failed to load evaluation history");
-      if (!blueBenchmarkResponse.ok) throw new Error(blueBenchmarkBody.detail || "Failed to load blue-team benchmark");
-      setObjectiveEval(objectiveBody);
-      setRegressionEval(regressionBody);
-      setEvalHistory(historyBody.history || []);
-      setBlueBenchmark(blueBenchmarkBody);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setEvalLoading(false);
-    }
-  }
-
-  async function downloadReport(path, filename) {
-    setError("");
-    try {
-      const response = await fetch(`${API_BASE}${path}`);
-      const text = await response.text();
-      if (!response.ok) throw new Error(text || "Failed to download report");
-      downloadText(filename, text);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  useEffect(() => {
-    loadEvaluationArtifacts();
-  }, []);
 
   useEffect(() => {
     if (!runId) return undefined;
@@ -2102,7 +2142,7 @@ export default function App() {
 
         {activeView === "evaluation" ? (
           <div className="page-body">
-            <EvaluationView evaluation={evaluation} suiteRun={suiteRun} objectiveEval={objectiveEval} regressionEval={regressionEval} evalHistory={evalHistory} onRefresh={loadEvaluationArtifacts} onStartSuite={startSuiteRun} onDownloadObjective={() => downloadReport("/api/v1/evals/red-team/objective-suite/report", "red_team_dataset_results_report.md")} onDownloadRegression={() => downloadReport("/api/v1/evals/red-team/regression/report", "red_team_regression_results_report.md")} loading={evalLoading} />
+            <EvaluationView suiteRun={suiteRun} onStartSuite={startSuiteRun} loading={evalLoading} />
           </div>
         ) : null}
       </div>

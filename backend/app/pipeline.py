@@ -242,6 +242,22 @@ def execute_run(run_id: str) -> None:
         )
 
 
+def _get_final_outcome(trace_dict: dict) -> str:
+    if trace_dict.get("stop_reason") == "success_detected":
+        return "success"
+    turns = trace_dict.get("turns", [])
+    if turns:
+        last = turns[-1]
+        obj = last.get("objective_scorer") or {}
+        label = str(obj.get("label", "")).strip()
+        if label:
+            return label
+        outcome = str(last.get("outcome", "")).strip()
+        if outcome:
+            return outcome
+    return "no_success"
+
+
 def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int = 0) -> None:
     dataset_path = Path("eval/fixtures/red_team_objectives.json")
     if not dataset_path.exists():
@@ -253,36 +269,90 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
         cases = dataset.get("cases", [])
         if limit > 0:
             cases = cases[:limit]
-        
+
         total_cases = len(cases)
         store.update_suite_run(suite_id, status="running", total_cases=total_cases)
-        
+
         red_team_agent = get_red_team_agent()
+        blue_team_agent = get_blue_team_agent()
         results = []
-        
+
         for idx, case in enumerate(cases):
-            case_id = case.get("dataset_id") or f"case-{idx}"
+            case_id = case.get("id") or f"case-{idx}"
+            goal = case.get("goal", "")
+            scenario = case.get("scenario", "")
+
             store.update_suite_run(
-                suite_id, 
-                completed_cases=idx, 
-                current_case_id=case_id
+                suite_id,
+                completed_cases=idx,
+                current_case_id=goal or case_id,
             )
-            
+
             trace = red_team_agent.run_attack(
-                scenario=case["scenario"],
-                goal=case["goal"],
+                scenario=scenario,
+                goal=goal,
                 max_turns=max_turns,
                 provider=provider,
                 metadata={
                     "dataset_id": case_id,
                     "objective_category": case.get("category", ""),
                     "objective_difficulty": case.get("difficulty", ""),
-                    "objective_tags": ",".join(case.get("tags", [])),
+                    "objective_tags": case.get("objective_tags", ""),
                     "strategy_id": case.get("strategy_id", "direct_jailbreak"),
-                }
+                    "goal": goal,
+                    "scenario": scenario,
+                },
             )
-            results.append(trace_to_dict(trace))
-            
+
+            trace_dict = trace_to_dict(trace)
+            results.append(trace_dict)
+
+            # Blue team evaluation for each turn
+            blue_verdicts = []
+            for turn_data in trace_dict.get("turns", []):
+                response = turn_data.get("response", "")
+                if response:
+                    try:
+                        verdict = blue_team_agent.evaluate_output(response)
+                        blue_verdicts.append({
+                            "turn_index": turn_data.get("turn_index", 0),
+                            "allowed": verdict.allowed,
+                            "action": verdict.action,
+                            "severity": verdict.severity,
+                            "category": verdict.category,
+                            "reason": verdict.reason,
+                            "policy_id": verdict.policy_id,
+                        })
+                    except Exception:
+                        blue_verdicts.append({
+                            "turn_index": turn_data.get("turn_index", 0),
+                            "allowed": True, "action": "allow",
+                            "severity": "low", "category": "",
+                            "reason": "", "policy_id": "",
+                        })
+
+            any_blocked = any(not v["allowed"] for v in blue_verdicts)
+
+            case_result = {
+                **trace_dict,
+                "case_id": case_id,
+                "goal": goal,
+                "scenario": scenario,
+                "category": case.get("category", ""),
+                "difficulty": case.get("difficulty", ""),
+                "final_outcome": _get_final_outcome(trace_dict),
+                "blue_team_verdicts": blue_verdicts,
+                "blue_team_any_blocked": any_blocked,
+            }
+
+            current_run = store.get_suite_run(suite_id)
+            existing = current_run.case_completed_results if current_run else []
+            store.update_suite_run(
+                suite_id,
+                completed_cases=idx + 1,
+                case_completed_results=[*existing, case_result],
+            )
+
         summary = summarize_red_team_results(results)
         payload = {
             "metadata": {
@@ -295,18 +365,18 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
             "summary": summary,
             "results": results,
         }
-        
+
         results_path = Path("eval/results/red_team_dataset_results.json")
         results_path.parent.mkdir(parents=True, exist_ok=True)
         results_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        
+
         store.update_suite_run(
-            suite_id, 
-            status="completed", 
-            completed_cases=total_cases, 
-            results_file=str(results_path)
+            suite_id,
+            status="completed",
+            completed_cases=total_cases,
+            results_file=str(results_path),
         )
-        
+
     except Exception:
         err = traceback.format_exc()
         store.update_suite_run(suite_id, status="failed", current_case_id=f"Error: {err}")

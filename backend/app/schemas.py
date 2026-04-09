@@ -141,6 +141,7 @@ class SuiteRunRecord(BaseModel):
     total_cases: int = 0
     current_case_id: str | None = None
     results_file: str | None = None
+    case_completed_results: List[Dict[str, Any]] = []
 
 
 class SuiteRunStatusResponse(BaseModel):
@@ -152,6 +153,7 @@ class SuiteRunStatusResponse(BaseModel):
     current_case_id: str | None = None
     progress_percentage: float
     is_complete: bool
+    case_completed_results: List[Dict[str, Any]] = []
 
 
 MetricMap = Dict[str, Any]
