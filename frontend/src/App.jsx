@@ -1818,142 +1818,127 @@ function EvaluationView({ suiteRun, onStartSuite, loading }) {
   );
 }
 
-function SandboxView() {
-  const [prompt, setPrompt] = useState("");
-  const [scenario, setScenario] = useState("Educational assistant");
-  const [provider, setProvider] = useState("groq");
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  async function handleRun() {
-    if (!prompt.trim() || loading) return;
-    setError("");
-    setLoading(true);
-    try {
-      const resp = await fetch(`${API_BASE}/api/v1/sandbox/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, scenario, provider }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.detail || "Run failed");
-      setResult(data);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const verdict = result?.verdict;
-  const severity = verdict?.severity || "low";
-  const action = verdict?.action || "allow";
-  const policyLabel = verdict?.policy_id
-    ? verdict.policy_id.replace(/^policy\./, "").replace(/\./g, " › ")
-    : "n/a";
+function SandboxBlueTeamEvidence({ verdict }) {
+  if (!verdict) return null;
+  const dr = verdict.detector_results || {};
+  const decision = dr._decision || {};
+  const aggregation = dr._aggregation || {};
+  const detectorEntries = Object.entries(dr).filter(([k]) => !k.startsWith("_"));
+  const policyEvals = aggregation.policy_evaluations || [];
 
   return (
-    <section>
-      <SectionHeader
-        title="Attack Sandbox"
-        note="Write your own attack prompt. See the model's response and exactly how the blue-team guardrails evaluated it."
-      />
-
-      <div className="sandbox-compose">
-        <div className="sandbox-compose-row">
-          <div>
-            <label className="field-label">Target scenario</label>
-            <select
-              className="input"
-              value={scenario}
-              onChange={(e) => { setScenario(e.target.value); setResult(null); }}
-            >
-              {SCENARIO_CARDS.map((c) => (
-                <option key={c.name} value={c.name}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="field-label">Provider</label>
-            <select
-              className="input"
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-            >
-              {PROVIDER_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div>
-          <label className="field-label">Attack prompt</label>
-          <textarea
-            className="sandbox-textarea"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Write your attack prompt here. Try to get the model to bypass its guardrails."
-            onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleRun(); }}
-          />
-          <div className="field-hint">Ctrl + Enter to run</div>
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!prompt.trim() || loading}
-            onClick={handleRun}
-          >
-            <PlayCircle size={14} />
-            {loading ? "Running..." : "Run attack"}
-          </button>
-        </div>
-      </div>
-
-      {error ? <div className="error-banner" style={{ marginBottom: 16 }}>{error}</div> : null}
-
-      {result ? (
+    <div style={{ display: "grid", gap: 14 }}>
+      <KeyGrid items={[
+        { label: "Outcome",    value: decision.outcome === "unsafe" ? "Unsafe" : "Safe" },
+        { label: "Action",     value: formatLabel(verdict.action) },
+        { label: "Category",   value: formatLabel(verdict.category) },
+        { label: "Severity",   value: formatLabel(verdict.severity) },
+        { label: "Confidence", value: formatNumber(verdict.confidence) },
+        { label: "Policy",     value: verdict.policy_id },
+        { label: "Aggregation",value: formatLabel(decision.aggregation_strategy) },
+        { label: "Supporting", value: (decision.supporting_detectors || []).join(", ") || "none" },
+      ]} />
+      {decision.rationale && (
         <>
-          <div className="stat-bar">
-            <div className="stat-cell">
-              <div className="stat-cell-label">Blue-team decision</div>
-              <div className={`stat-cell-value val-${toneForAction(action)}`}>{formatLabel(action)}</div>
-            </div>
-            <div className="stat-cell">
-              <div className="stat-cell-label">Severity</div>
-              <div className={`stat-cell-value val-${toneForSeverity(severity)}`}>{formatLabel(severity)}</div>
-            </div>
-            <div className="stat-cell">
-              <div className="stat-cell-label">Confidence</div>
-              <div className="stat-cell-value">{formatNumber(verdict?.confidence)}</div>
-            </div>
-            <div className="stat-cell">
-              <div className="stat-cell-label">Detection latency</div>
-              <div className="stat-cell-value">
-                {result.detection_latency_ms != null ? `${result.detection_latency_ms}ms` : "n/a"}
+          <p className="micro-copy">Rationale</p>
+          <DetailPre text={decision.rationale} />
+        </>
+      )}
+
+      {detectorEntries.length > 0 && (
+        <div>
+          <p className="micro-copy" style={{ marginBottom: 8 }}>Detector breakdown</p>
+          {detectorEntries.map(([name, result]) => {
+            const signals = result.signals || [];
+            const matched = result.matched_patterns || [];
+            const flagged = signals.some((s) => s.flagged);
+            return (
+              <div key={name} className="sandbox-detector-card">
+                <div className="sandbox-detector-header">
+                  <span className="sandbox-detector-name">{formatLabel(name)}</span>
+                  <Badge tone={flagged ? "danger" : "safe"}>{flagged ? "Flagged" : "Clean"}</Badge>
+                </div>
+                {matched.length > 0 && (
+                  <div className="sandbox-detector-patterns">
+                    <p className="micro-copy" style={{ marginBottom: 4 }}>Matched patterns</p>
+                    {matched.map((p, i) => (
+                      <code key={i} className="sandbox-pattern-chip">{p}</code>
+                    ))}
+                  </div>
+                )}
+                {signals.map((sig, i) => (
+                  <div key={i} className="sandbox-signal-row">
+                    <span className="micro-copy" style={{ color: "var(--text-primary)", flex: 1 }}>
+                      {sig.policy_id ? sig.policy_id.replace(/^policy\./, "").replace(/\./g, " › ") : "signal"}
+                    </span>
+                    <span className="micro-copy">conf: {formatNumber(sig.confidence)}</span>
+                    <Badge tone={sig.flagged ? "danger" : "neutral"}>{sig.flagged ? "Flagged" : "Not flagged"}</Badge>
+                  </div>
+                ))}
               </div>
-            </div>
-            <div className="stat-cell">
-              <div className="stat-cell-label">Policy</div>
-              <div className="stat-cell-value" style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-                {policyLabel}
+            );
+          })}
+        </div>
+      )}
+
+      {policyEvals.length > 0 && (
+        <Fold title="Policy evaluation log">
+          <div style={{ display: "grid", gap: 4 }}>
+            {policyEvals.map((ev) => (
+              <div key={ev.policy_id} className="sandbox-policy-row">
+                <span className="sandbox-policy-id">{ev.policy_id}</span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <span className="micro-copy">conf: {formatNumber(ev.aggregated_confidence)}</span>
+                  <Badge tone={ev.triggered ? "danger" : "neutral"}>{ev.triggered ? "Triggered" : "Not triggered"}</Badge>
+                </div>
               </div>
+            ))}
+          </div>
+        </Fold>
+      )}
+    </div>
+  );
+}
+
+function SandboxTurnCard({ turn, index }) {
+  const severity = turn.verdict?.severity || "low";
+  const action = turn.verdict?.action || "allow";
+  const [phase, setPhase] = useState(0);
+
+  useEffect(() => {
+    if (phase === 1) { const t = setTimeout(() => setPhase(2), 350); return () => clearTimeout(t); }
+    if (phase === 2) { const t = setTimeout(() => setPhase(3), 630); return () => clearTimeout(t); }
+  }, [phase]);
+
+  return (
+    <div className={`turn-row severity-${severity}`} style={{ animationDelay: `${index * 60}ms` }}>
+      <div className="turn-node-col">
+        <div className="turn-node-circle" style={{ animationDelay: `${index * 60 + 40}ms` }} />
+      </div>
+      <div className="turn-row-body">
+        <div className="turn-row-top">
+          <div>
+            <div className="turn-number">Turn {index + 1}</div>
+            <div className="turn-meta">
+              {turn.detection_latency_ms != null ? `${turn.detection_latency_ms}ms detection · ` : ""}
+              {formatTimestamp(turn.timestamp)}
             </div>
           </div>
+          <div className="turn-badges">
+            <Badge tone={toneForSeverity(severity)}>{formatLabel(severity)}</Badge>
+            <Badge tone={toneForAction(action)}>{formatLabel(action)}</Badge>
+          </div>
+        </div>
 
-          {verdict?.reason ? (
-            <div className="sandbox-rationale">
-              <span className="sandbox-rationale-label">Why: </span>{verdict.reason}
+        <div className="turn-exchange">
+          <div className="turn-speaker-block attacker" style={{ animation: "blockIn 380ms var(--ease-out) 150ms both" }}>
+            <div className="turn-speaker-icon attacker"><Sword size={13} strokeWidth={1.5} /></div>
+            <div className="turn-speaker-text">
+              <TypewriterText text={turn.prompt} speed={12} delay={150} onDone={() => setPhase(1)} />
             </div>
-          ) : null}
-
-          <div className="sandbox-exchange">
-            <div className="turn-speaker-block attacker">
-              <div className="turn-speaker-icon attacker"><Sword size={13} strokeWidth={1.5} /></div>
-              <div className="turn-speaker-text">{result.prompt}</div>
-            </div>
-            <div className="turn-gate">
+          </div>
+          {phase >= 2 && (
+            <div className="turn-gate" style={{ animation: "blockIn 380ms var(--ease-out) both" }}>
               <div className="turn-gate-left">
                 <ShieldIcon size={14} strokeWidth={1.7} />
                 <span className="turn-gate-label">Blue-team checkpoint</span>
@@ -1963,35 +1948,196 @@ function SandboxView() {
                 <span className={`gate-pill gate-pill-${toneForSeverity(severity)}`}>{formatLabel(severity)}</span>
               </div>
             </div>
-            <div className="turn-speaker-block target">
+          )}
+          {phase >= 3 && (
+            <div className="turn-speaker-block target" style={{ animation: "blockIn 380ms var(--ease-out) both" }}>
               <div className="turn-speaker-icon target"><Bot size={13} strokeWidth={1.5} /></div>
-              <div className="turn-speaker-text">{result.response}</div>
+              <div className="turn-speaker-text">{turn.response}</div>
+            </div>
+          )}
+        </div>
+
+        {phase >= 3 && (
+          <Fold title="Blue-team evidence">
+            <SandboxBlueTeamEvidence verdict={turn.verdict} />
+          </Fold>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SandboxView() {
+  const MAX_TURNS = 10;
+  const [turns, setTurns] = useState([]);
+  const [currentPrompt, setCurrentPrompt] = useState("");
+  const [isRunning, setIsRunning] = useState(false);
+  const [error, setError] = useState("");
+  const textareaRef = useRef(null);
+
+  const blueTeamSummary = useMemo(() => {
+    if (!turns.length) return { blocked: 0, highestSeverity: "n/a" };
+    const blocked = turns.filter((t) => !t.verdict?.allowed).length;
+    const order = ["critical", "high", "medium", "low"];
+    const highest = turns.reduce((best, t) => {
+      const s = t.verdict?.severity || "low";
+      return order.indexOf(s) < order.indexOf(best) ? s : best;
+    }, "low");
+    return { blocked, highestSeverity: highest };
+  }, [turns]);
+
+  async function handleSubmit() {
+    if (!currentPrompt.trim() || isRunning || turns.length >= MAX_TURNS) return;
+    setError("");
+    setIsRunning(true);
+    const promptText = currentPrompt.trim();
+    setCurrentPrompt("");
+    try {
+      const resp = await fetch(`${API_BASE}/api/v1/sandbox/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: promptText, scenario: "", provider: "groq" }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || "Run failed");
+      setTurns((prev) => [...prev, {
+        prompt: promptText,
+        response: data.response,
+        verdict: data.verdict,
+        detection_latency_ms: data.detection_latency_ms,
+        timestamp: data.timestamp,
+      }]);
+    } catch (e) {
+      setError(e.message);
+      setCurrentPrompt(promptText);
+    } finally {
+      setIsRunning(false);
+      setTimeout(() => textareaRef.current?.focus(), 100);
+    }
+  }
+
+  function handleReset() {
+    setTurns([]); setCurrentPrompt(""); setError("");
+    setTimeout(() => textareaRef.current?.focus(), 100);
+  }
+
+  const canSubmit = Boolean(currentPrompt.trim()) && !isRunning && turns.length < MAX_TURNS;
+  const reachedMax = turns.length >= MAX_TURNS;
+
+  return (
+    <section>
+      <SectionHeader
+        title="Attack Sandbox"
+        note="Write your own attack prompts turn by turn — up to 10 turns. See exactly how the blue-team guardrails evaluated each one."
+      />
+
+      {turns.length > 0 && (
+        <>
+          <div className="stat-bar">
+            <div className="stat-cell">
+              <div className="stat-cell-label">Turns</div>
+              <div className="stat-cell-value">{turns.length} / {MAX_TURNS}</div>
+            </div>
+            <div className="stat-cell">
+              <div className="stat-cell-label">Blue-team blocked</div>
+              <div className={`stat-cell-value${blueTeamSummary.blocked > 0 ? " val-danger" : ""}`}>
+                {blueTeamSummary.blocked}
+              </div>
+            </div>
+            <div className="stat-cell">
+              <div className="stat-cell-label">Highest severity</div>
+              <div className={`stat-cell-value val-${toneForSeverity(blueTeamSummary.highestSeverity)}`}>
+                {formatLabel(blueTeamSummary.highestSeverity)}
+              </div>
+            </div>
+            <div className="stat-cell" style={{ marginLeft: "auto" }}>
+              <button type="button" className="btn btn-ghost" style={{ fontSize: "0.75rem", padding: "4px 10px" }} onClick={handleReset}>
+                New session
+              </button>
             </div>
           </div>
-
-          <Fold title="Blue-team evidence">
-            <KeyGrid
-              items={[
-                { label: "Action", value: formatLabel(action) },
-                { label: "Category", value: formatLabel(verdict?.category) },
-                { label: "Severity", value: formatLabel(severity) },
-                { label: "Confidence", value: formatNumber(verdict?.confidence) },
-                { label: "Policy", value: verdict?.policy_id },
-              ]}
-            />
-            <p className="micro-copy" style={{ marginTop: 12 }}>Reason</p>
-            <DetailPre text={verdict?.reason} />
-            <Fold title="Detector telemetry">
-              <DetailPre text={JSON.stringify(verdict?.detector_results || {}, null, 2)} />
-            </Fold>
-          </Fold>
+          <div
+            className="timeline-outcome-bar"
+            style={{
+              "--outcome-color": blueTeamSummary.blocked > 0 ? "var(--success)"
+                : blueTeamSummary.highestSeverity === "critical" ? "var(--danger)"
+                  : blueTeamSummary.highestSeverity === "high" ? "var(--warning)"
+                    : "var(--info)"
+            }}
+          />
         </>
-      ) : !loading ? (
+      )}
+
+      <div className="section-header">
+        <div className="section-title">Turn timeline</div>
+      </div>
+
+      {turns.length === 0 && !isRunning ? (
         <div className="empty-card">
-          <div className="empty-card-heading">No result yet</div>
-          <div className="empty-card-body">Write a prompt above and run it to see the model response and blue-team verdict.</div>
+          <div className="empty-card-heading">No turns yet</div>
+          <div className="empty-card-body">Write your first attack prompt below and submit to start the session.</div>
         </div>
-      ) : null}
+      ) : (
+        <div className="timeline-list">
+          {turns.map((turn, i) => (
+            <SandboxTurnCard key={i} turn={turn} index={i} />
+          ))}
+          {isRunning && (
+            <div className="turn-row" style={{ animation: "none" }}>
+              <div className="turn-node-col">
+                <div className="turn-node-circle" style={{ opacity: 0.35 }} />
+              </div>
+              <div className="turn-row-body">
+                <div className="turn-number">Turn {turns.length + 1}</div>
+                <div className="micro-copy" style={{ marginTop: 6 }}>Waiting for model response and blue-team evaluation…</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {error ? <div className="error-banner" style={{ margin: "12px 0" }}>{error}</div> : null}
+
+      <div className="sandbox-compose" style={{ marginTop: 20 }}>
+        {reachedMax ? (
+          <div style={{ textAlign: "center", padding: "8px 0" }}>
+            <div className="empty-card-heading">Maximum turns reached</div>
+            <div className="empty-card-body" style={{ marginBottom: 14 }}>
+              Session complete — {MAX_TURNS} turns.
+            </div>
+            <button type="button" className="btn btn-primary" onClick={handleReset}>New session</button>
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="field-label">Turn {turns.length + 1} · Attack prompt</label>
+              <textarea
+                ref={textareaRef}
+                className="sandbox-textarea"
+                value={currentPrompt}
+                onChange={(e) => setCurrentPrompt(e.target.value)}
+                placeholder={turns.length === 0
+                  ? "Write your first attack prompt. Try to get the model to bypass its guardrails."
+                  : "Write your next prompt. Build on what you've learned from previous turns."}
+                onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSubmit(); }}
+                disabled={isRunning}
+              />
+              <div className="field-hint">Ctrl + Enter to submit</div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!canSubmit}
+                onClick={handleSubmit}
+              >
+                <PlayCircle size={14} />
+                {isRunning ? "Running…" : `Submit turn ${turns.length + 1}`}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </section>
   );
 }
