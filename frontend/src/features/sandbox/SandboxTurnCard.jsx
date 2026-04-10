@@ -11,7 +11,7 @@ import {
   formatTimestamp,
 } from "../../utils/format";
 
-export default function SandboxTurnCard({ turn, index }) {
+export default function SandboxTurnCard({ turn, index, onSelect, selected }) {
   const isPending = Boolean(turn.isPending || !turn.verdict);
   const severity = turn.verdict?.severity || "low";
   const action = turn.verdict?.action || "allow";
@@ -31,8 +31,12 @@ export default function SandboxTurnCard({ turn, index }) {
 
   return (
     <div
-      className={`turn-row${isPending ? "" : ` severity-${severity}`}`}
-      style={{ animationDelay: `${index * 60}ms` }}
+      role={isPending ? undefined : "button"}
+      tabIndex={isPending ? undefined : 0}
+      className={`turn-row${isPending ? "" : ` severity-${severity}`}${selected ? " is-selected" : ""}${isPending ? "" : " is-clickable"}`}
+      style={{ animationDelay: `${index * 60}ms`, cursor: isPending ? "default" : "pointer" }}
+      onClick={isPending ? undefined : onSelect}
+      onKeyDown={isPending ? undefined : (e) => e.key === "Enter" && onSelect?.()}
     >
       <div className="turn-node-col">
         <div className="turn-node-circle" style={{ animationDelay: `${index * 60 + 40}ms` }} />

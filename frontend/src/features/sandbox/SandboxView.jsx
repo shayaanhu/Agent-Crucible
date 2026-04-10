@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { PlayCircle } from "../../icons";
 import SectionHeader from "../../components/SectionHeader";
 import SandboxTurnCard from "./SandboxTurnCard";
+import SandboxTurnDrawer from "./SandboxTurnDrawer";
 import { API_BASE } from "../../constants";
 import { isEmpty, toneForSeverity } from "../../utils/format";
 
@@ -16,6 +17,8 @@ export default function SandboxView({ run, onRunChange, onCreateNewRun }) {
   );
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState("");
+  const [selectedTurn, setSelectedTurn] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const textareaRef = useRef(null);
   const completedTurns = useMemo(() => turns.filter((t) => !t.isPending && t.verdict), [turns]);
 
@@ -24,6 +27,8 @@ export default function SandboxView({ run, onRunChange, onCreateNewRun }) {
     setCurrentPrompt(typeof run?.currentPrompt === "string" ? run.currentPrompt : "");
     setError("");
     setIsRunning(false);
+    setDrawerOpen(false);
+    setSelectedTurn(null);
   }, [run?.id]);
 
   useEffect(() => {
@@ -185,7 +190,13 @@ export default function SandboxView({ run, onRunChange, onCreateNewRun }) {
       ) : (
         <div className="timeline-list">
           {turns.map((turn, i) => (
-            <SandboxTurnCard key={turn.id || i} turn={turn} index={i} />
+          <SandboxTurnCard
+              key={turn.id || i}
+              turn={turn}
+              index={i}
+              selected={drawerOpen && selectedTurn?.id === turn.id}
+              onSelect={() => { setSelectedTurn(turn); setDrawerOpen(true); }}
+            />
           ))}
         </div>
       )}
@@ -247,6 +258,13 @@ export default function SandboxView({ run, onRunChange, onCreateNewRun }) {
           </>
         )}
       </div>
+      {drawerOpen && selectedTurn && (
+        <SandboxTurnDrawer
+          turn={selectedTurn}
+          index={turns.findIndex((t) => t.id === selectedTurn.id)}
+          onClose={() => setDrawerOpen(false)}
+        />
+      )}
     </section>
   );
 }

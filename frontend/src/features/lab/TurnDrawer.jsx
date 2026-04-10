@@ -83,7 +83,7 @@ export default function TurnDrawer({ entry, onClose }) {
               : <p className="empty-copy">No converter steps recorded.</p>}
           </Fold>
 
-          <Fold title="Target output" defaultOpen>
+          <Fold title="LLM output" defaultOpen>
             <DetailPre text={entry.event.model_output} />
           </Fold>
 
