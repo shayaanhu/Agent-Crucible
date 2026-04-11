@@ -65,7 +65,12 @@ export default function TurnDrawer({ entry, onClose }) {
           />
 
           <Fold title="Attacker prompt" defaultOpen>
-            <p className="micro-copy">Pre-converter prompt and rationale</p>
+            <p className="micro-copy">Final prompt sent to the model (post-converter)</p>
+            <DetailPre text={entry.event.input} />
+          </Fold>
+
+          <Fold title="Pre-converter prompt">
+            <p className="micro-copy">Raw prompt from the attacker LLM, before converters were applied</p>
             <DetailPre text={entry.event.attacker_prompt} />
             {entry.event.attacker_rationale ? (
               <p className="micro-copy" style={{ marginTop: 12 }}>Rationale: {entry.event.attacker_rationale}</p>

@@ -19,7 +19,7 @@ export default function TimelineCard({ entry, selected, onSelect, index }) {
   const blueAction = getGateActionLabel(entry.verdict);
   const blueSeverity = formatLabel(entry.verdict?.severity || "low");
   const converterCount = entry.event.converter_steps?.length || 0;
-  const attackerPreview = previewText(entry.event.attacker_prompt, 210);
+  const attackerPreview = previewText(entry.event.input, 210);
   const targetPreview = previewText(entry.event.model_output, 230);
 
   // 0: attacker typing  1: attacker done → waiting → gate  2: gate visible → waiting → target  3: target visible
