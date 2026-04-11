@@ -133,7 +133,7 @@ def execute_run(run_id: str) -> None:
                 is_complete=False,
             )
 
-        def persist_turn(turn) -> None:
+        def persist_turn(turn) -> dict:
             nonlocal unsafe_detected
             store.update_run(
                 run_id,
@@ -203,6 +203,15 @@ def execute_run(run_id: str) -> None:
                 current_phase="attacker",
                 is_complete=False,
             )
+            # Return blue-team verdict back to the red-team agent so it can
+            # update its internal state. This lets the attacker know whether
+            # its "successful" output was caught by the guardrail, enabling
+            # it to adapt strategy on the next turn.
+            override: dict = {"blue_team_verdict": effective_action}
+            if effective_output != turn.response or not effective_allowed:
+                override["effective_response"] = effective_output
+                override["blue_team_blocked"] = not effective_allowed
+            return override
 
         trace = red_team_agent.stream_attack(
             scenario=request.scenario,
