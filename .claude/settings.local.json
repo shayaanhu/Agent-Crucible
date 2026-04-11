@@ -5,7 +5,8 @@
       "Bash(python -c ':*)",
       "Bash(npm install:*)",
       "Bash(npx vite:*)",
-      "Bash(python -m pytest backend/tests/test_red_team_engine.py -v)"
+      "Bash(python -m pytest backend/tests/test_red_team_engine.py -v)",
+      "Bash(python -m pytest backend/tests/test_red_team_engine.py backend/tests/test_red_team_pipeline_components.py -v)"
     ]
   }
 }

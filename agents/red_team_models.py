@@ -34,8 +34,11 @@ class AttackState:
             return "No prior turns."
         lines: List[str] = []
         for item in self.history:
+            # Use attacker_prompt (pre-converter) so strategies see the plain
+            # language prompt, not the base64/JSON-wrapped version.
+            prompt = item.get("attacker_prompt") or item.get("prompt", "")
             lines.append(
-                f"Turn {item['turn_index']} prompt: {item['prompt']}\n"
+                f"Turn {item['turn_index']} prompt: {prompt}\n"
                 f"Turn {item['turn_index']} response: {item['response']}"
             )
         return "\n".join(lines)
