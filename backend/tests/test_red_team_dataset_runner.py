@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from agents.red_team import get_red_team_agent
+from agents.red.red_team import get_red_team_agent
 
 
 def test_dataset_objectives_run() -> None:

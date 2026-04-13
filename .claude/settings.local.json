@@ -6,7 +6,16 @@
       "Bash(npm install:*)",
       "Bash(npx vite:*)",
       "Bash(python -m pytest backend/tests/test_red_team_engine.py -v)",
-      "Bash(python -m pytest backend/tests/test_red_team_engine.py backend/tests/test_red_team_pipeline_components.py -v)"
+      "Bash(python -m pytest backend/tests/test_red_team_engine.py backend/tests/test_red_team_pipeline_components.py -v)",
+      "Bash(sed -i 's/from agents\\\\.red_team_models import/from agents.red.red_team_models import/' agents/red/red_team_strategies.py)",
+      "Bash(sed -i 's/from agents\\\\.red_team_models import/from agents.red.red_team_models import/; s/from agents\\\\.red_team_runtime import generate_response/from agents.providers import generate_response/' agents/red/red_team_converters.py)",
+      "Bash(sed -i 's/from agents\\\\.red_team_models import/from agents.red.red_team_models import/; s/from agents\\\\.red_team_runtime import generate_response/from agents.providers import generate_response/' agents/red/red_team_scorers.py)",
+      "Bash(sed -i 's/from agents\\\\.contracts/from agents.contracts/' agents/blue/blue_team_policies.py)",
+      "Bash(sed -i 's/from agents\\\\.blue_team_config/from agents.blue.blue_team_config/; s/from agents\\\\.blue_team_policies/from agents.blue.blue_team_policies/' agents/blue/blue_team_detectors.py)",
+      "Bash(sed -i 's/from agents\\\\.blue_team_detectors/from agents.blue.blue_team_detectors/; s/from agents\\\\.blue_team_policies/from agents.blue.blue_team_policies/' agents/blue/blue_team_aggregation.py)",
+      "Bash(sed -i 's/from agents\\\\.blue_team_aggregation/from agents.blue.blue_team_aggregation/; s/from agents\\\\.blue_team_config/from agents.blue.blue_team_config/; s/from agents\\\\.blue_team_detectors/from agents.blue.blue_team_detectors/; s/from agents\\\\.blue_team_policies/from agents.blue.blue_team_policies/; s/from agents\\\\.contracts/from agents.contracts/' agents/blue/blue_team.py)",
+      "Bash(python -m pytest backend/tests/ -v)",
+      "Bash(python -m pytest backend/tests/ -q)"
     ]
   }
 }

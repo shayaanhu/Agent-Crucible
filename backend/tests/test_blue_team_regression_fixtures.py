@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from agents.blue_team import get_blue_team_agent
+from agents.blue.blue_team import get_blue_team_agent
 from backend.app.pipeline import _enforce_guardrail_action
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Mapping, Sequence
 
-from agents.blue_team_policies import POLICIES
+from agents.blue.blue_team_policies import POLICIES
 
 
 def _safe_ratio(verdicts: Sequence[dict]) -> float:

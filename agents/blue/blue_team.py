@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from agents.blue_team_aggregation import evaluate_policies, policy_evaluation_priority
-from agents.blue_team_config import get_blue_team_runtime_config
-from agents.blue_team_detectors import (
+from agents.blue.blue_team_aggregation import evaluate_policies, policy_evaluation_priority
+from agents.blue.blue_team_config import get_blue_team_runtime_config
+from agents.blue.blue_team_detectors import (
     BlueTeamDetector,
     DetectorSignal,
     LlamaGuardDetector,
     NeMoGuardrailsDetector,
     RuleDetector,
 )
-from agents.blue_team_policies import POLICIES
+from agents.blue.blue_team_policies import POLICIES
 from agents.contracts import BlueTeamContract, BlueTeamVerdict
 
 

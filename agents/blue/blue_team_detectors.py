@@ -6,8 +6,8 @@ from importlib.util import find_spec
 import re
 from typing import Protocol
 
-from agents.blue_team_config import get_blue_team_runtime_config
-from agents.blue_team_policies import POLICIES, PolicyConfig
+from agents.blue.blue_team_config import get_blue_team_runtime_config
+from agents.blue.blue_team_policies import POLICIES, PolicyConfig
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from agents.red_team import get_red_team_agent
+from agents.red.red_team import get_red_team_agent
 
 
 def test_strategy_registry_has_eight_strategies() -> None:

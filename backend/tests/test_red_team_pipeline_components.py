@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from agents.red_team import (
+from agents.red.red_team import (
     _build_attacker_feedback,
     _classify_outcome,
     _response_echoes_wrapped_payload,
     _select_converters,
     get_red_team_agent,
 )
-from agents.red_team_models import AttackState
-from agents.red_team_runtime import _is_retryable_rate_limit, _retry_delay_seconds
-from agents.red_team_scorers import RefusalScorer, SuccessPatternScorer
+from agents.red.red_team_models import AttackState
+from agents.providers import _is_retryable_rate_limit, _retry_delay_seconds
+from agents.red.red_team_scorers import RefusalScorer, SuccessPatternScorer
 
 
 def test_converter_pipeline_applies() -> None:

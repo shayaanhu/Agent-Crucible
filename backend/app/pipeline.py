@@ -5,8 +5,8 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
-from agents.blue_team import get_blue_team_agent
-from agents.red_team import get_red_team_agent, trace_to_dict
+from agents.blue.blue_team import get_blue_team_agent
+from agents.red.red_team import get_red_team_agent, trace_to_dict
 from eval.red_team_eval_utils import summarize_red_team_results, timestamp_fields
 from backend.app.schemas import AttackTurn, GuardrailVerdict
 from backend.app.store import store

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from agents.blue_team_detectors import DetectorSignal
-from agents.blue_team_policies import POLICIES
+from agents.blue.blue_team_detectors import DetectorSignal
+from agents.blue.blue_team_policies import POLICIES
 
 
 def policy_evaluation_priority(evaluation: dict[str, object]) -> tuple[int, float]:

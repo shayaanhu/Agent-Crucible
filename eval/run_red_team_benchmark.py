@@ -39,7 +39,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    from agents.red_team import get_red_team_agent, trace_to_dict
+    from agents.red.red_team import get_red_team_agent, trace_to_dict
     from eval.red_team_eval_utils import summarize_red_team_results, timestamp_fields
 
     fixtures_dir = Path("eval/fixtures/red_team")

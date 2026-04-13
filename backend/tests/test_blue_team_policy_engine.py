@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from agents.blue_team import BasicBlueTeamAgent, get_blue_team_agent
-from agents.blue_team_detectors import (
+from agents.blue.blue_team import BasicBlueTeamAgent, get_blue_team_agent
+from agents.blue.blue_team_detectors import (
     DetectorSignal,
     LlamaGuardDetector,
     NeMoGuardrailsDetector,
@@ -13,7 +13,7 @@ from agents.blue_team_detectors import (
     _interpret_guardrail_output,
     _parse_guardrail_flag,
 )
-from agents.blue_team_policies import DEFAULT_POLICIES, POLICIES, load_policies
+from agents.blue.blue_team_policies import DEFAULT_POLICIES, POLICIES, load_policies
 
 
 class StubDetector:

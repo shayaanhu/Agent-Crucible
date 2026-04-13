@@ -5,12 +5,14 @@ from hashlib import sha256
 from typing import Dict
 
 from agents.contracts import RedTeamContract, RedTeamRunTrace, RedTeamTurn
-from agents.red_team_converters import build_converter_registry
-from agents.red_team_models import AttackState
-from agents.red_team_objective import Objective
-from agents.red_team_runtime import generate_attacker_prompt, generate_response, get_scenario_system_prompt
-from agents.red_team_scorers import ScorerResult, build_scorer_registry
-from agents.red_team_strategies import RedTeamStrategy, build_strategy_registry
+from agents.red.red_team_converters import build_converter_registry
+from agents.red.red_team_models import AttackState
+from agents.red.red_team_objective import Objective
+from agents.red.red_team_runtime import generate_attacker_prompt
+from agents.providers import generate_response
+from agents.red.target_runtime import get_scenario_system_prompt
+from agents.red.red_team_scorers import ScorerResult, build_scorer_registry
+from agents.red.red_team_strategies import RedTeamStrategy, build_strategy_registry
 
 
 class AdvancedRedTeamAgent(RedTeamContract):

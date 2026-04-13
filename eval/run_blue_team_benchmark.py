@@ -23,9 +23,9 @@ def _timestamp_fields() -> dict[str, str]:
 
 
 def generate_benchmark(label_override: str | None = None) -> dict:
-    from agents.blue_team import BasicBlueTeamAgent, get_blue_team_agent
-    from agents.blue_team_config import get_blue_team_runtime_config
-    from agents.blue_team_detectors import RuleDetector
+    from agents.blue.blue_team import BasicBlueTeamAgent, get_blue_team_agent
+    from agents.blue.blue_team_config import get_blue_team_runtime_config
+    from agents.blue.blue_team_detectors import RuleDetector
     from backend.app.pipeline import _enforce_guardrail_action
     from eval.blue_team_eval_utils import summarize_blue_team_results
     from eval.scorer import calculate_metrics

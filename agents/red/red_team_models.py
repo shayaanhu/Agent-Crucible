@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List
 
-from agents.red_team_objective import Objective
+from agents.red.red_team_objective import Objective
 
 
 @dataclass

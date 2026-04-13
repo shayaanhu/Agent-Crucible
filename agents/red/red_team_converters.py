@@ -4,8 +4,8 @@ import base64
 import json
 from typing import Dict, Protocol
 
-from agents.red_team_models import AttackState
-from agents.red_team_runtime import generate_response
+from agents.red.red_team_models import AttackState
+from agents.providers import generate_response
 
 
 class PromptConverter(Protocol):

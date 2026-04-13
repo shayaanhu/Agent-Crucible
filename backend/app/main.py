@@ -15,7 +15,7 @@ try:
 except ImportError:
     load_dotenv = None
 
-from agents.blue_team_config import get_blue_team_runtime_config
+from agents.blue.blue_team_config import get_blue_team_runtime_config
 from backend.app.pipeline import execute_run, execute_suite_run
 from backend.app.schemas import (
     BlueTeamBenchmarkRunRequest,
@@ -332,8 +332,9 @@ def get_suite_run_status(suite_id: str):
 @app.post("/api/v1/sandbox/run")
 def sandbox_run(payload: SandboxRunRequest) -> dict:
     import time as _time
-    from agents.blue_team import get_blue_team_agent
-    from agents.red_team_runtime import generate_response, get_scenario_system_prompt
+    from agents.blue.blue_team import get_blue_team_agent
+    from agents.providers import generate_response
+    from agents.red.target_runtime import get_scenario_system_prompt
 
     system_prompt = get_scenario_system_prompt(payload.scenario) if payload.scenario else None
     try:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from agents.blue_team import get_blue_team_agent
-from agents.red_team import get_red_team_agent
+from agents.blue.blue_team import get_blue_team_agent
+from agents.red.red_team import get_red_team_agent
 
 
 def test_red_blue_contract_integration() -> None:

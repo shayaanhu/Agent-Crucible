@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Protocol
 
-from agents.red_team_models import AttackState, AttackUpdate, StrategyMetadata, StrategyTemplate
+from agents.red.red_team_models import AttackState, AttackUpdate, StrategyMetadata, StrategyTemplate
 
 
 class RedTeamStrategy(Protocol):
