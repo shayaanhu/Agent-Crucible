@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 
-export default function TypewriterText({ text, speed = 22, delay = 0, onDone }) {
-  const [displayed, setDisplayed] = useState("");
-  const [done, setDone] = useState(false);
+export default function TypewriterText({ text, speed = 22, delay = 0, onDone, skip = false }) {
+  const [displayed, setDisplayed] = useState(skip ? (text || "") : "");
+  const [done, setDone] = useState(skip);
   const onDoneRef = useRef(onDone);
   useEffect(() => { onDoneRef.current = onDone; });
 
   useEffect(() => {
+    if (skip) {
+      setDisplayed(text || "");
+      setDone(true);
+      return;
+    }
     setDisplayed("");
     setDone(false);
     let i = 0;
@@ -27,7 +32,7 @@ export default function TypewriterText({ text, speed = 22, delay = 0, onDone }) 
       clearTimeout(timeoutId);
       if (intervalId) clearInterval(intervalId);
     };
-  }, [text, speed, delay]);
+  }, [text, speed, delay, skip]);
 
   return (
     <>

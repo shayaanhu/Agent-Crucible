@@ -75,7 +75,7 @@ export default function SandboxTurnCard({ turn, index, onSelect, selected, skipA
           >
             <div className="turn-speaker-icon attacker"><Sword size={13} strokeWidth={1.5} /></div>
             <div className="turn-speaker-text">
-              <TypewriterText text={turn.prompt} speed={12} delay={150} onDone={() => setPhase(1)} />
+              <TypewriterText text={turn.prompt} speed={12} delay={150} skip={skipAnimation} onDone={skipAnimation ? undefined : () => setPhase(1)} />
             </div>
           </div>
           {!isPending && phase >= 2 && (

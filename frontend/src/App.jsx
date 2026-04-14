@@ -45,6 +45,7 @@ export default function App() {
   const [evaluation, setEvaluation] = useState(null);
   const [suiteRun, setSuiteRun] = useState(null);
   const suitePollerRef = useRef(null);
+  const [liveActiveTurnIdx, setLiveActiveTurnIdx] = useState(0);
   const [labs, setLabs] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(LABS_STORAGE_KEY));
@@ -132,6 +133,10 @@ export default function App() {
     if (wizardStep < 1) setWizardStep(1);
     if (wizardStep > 5) setWizardStep(5);
   }, [wizardStep]);
+
+  useEffect(() => {
+    setLiveActiveTurnIdx(0);
+  }, [runId]);
 
   useEffect(() => {
     if (!appStateHydrated.current) return;
@@ -657,11 +662,13 @@ export default function App() {
 
                 {timeline.length ? (
                   <div className="timeline-list">
-                    {timeline.map((entry, index) => (
+                    {timeline.slice(0, liveActiveTurnIdx + 1).map((entry, index) => (
                       <TimelineCard
                         key={`${entry.event.turn_index}-${entry.event.timestamp}`}
                         entry={entry}
                         index={index}
+                        skipAnimation={index < liveActiveTurnIdx}
+                        onComplete={index === liveActiveTurnIdx ? () => setLiveActiveTurnIdx((n) => n + 1) : undefined}
                         selected={selectedEntry?.event?.turn_index === entry.event.turn_index && drawerOpen}
                         onSelect={() => { setSelectedEntry(entry); setDrawerOpen(true); }}
                       />

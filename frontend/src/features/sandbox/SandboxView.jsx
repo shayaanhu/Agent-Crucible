@@ -15,6 +15,7 @@ export default function SandboxView({ run, onRunChange, onCreateNewRun }) {
   const [currentPrompt, setCurrentPrompt] = useState(() =>
     typeof run?.currentPrompt === "string" ? run.currentPrompt : ""
   );
+  const [activeTurnIdx, setActiveTurnIdx] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState("");
   const [selectedTurn, setSelectedTurn] = useState(null);
@@ -25,6 +26,7 @@ export default function SandboxView({ run, onRunChange, onCreateNewRun }) {
   useEffect(() => {
     setTurns(Array.isArray(run?.turns) ? run.turns.filter((t) => !t?.isPending) : []);
     setCurrentPrompt(typeof run?.currentPrompt === "string" ? run.currentPrompt : "");
+    setActiveTurnIdx(0);
     setError("");
     setIsRunning(false);
     setDrawerOpen(false);
@@ -189,11 +191,13 @@ export default function SandboxView({ run, onRunChange, onCreateNewRun }) {
         </div>
       ) : (
         <div className="timeline-list">
-          {turns.map((turn, i) => (
-          <SandboxTurnCard
+          {turns.slice(0, activeTurnIdx + 1).map((turn, i) => (
+            <SandboxTurnCard
               key={turn.id || i}
               turn={turn}
               index={i}
+              skipAnimation={i < activeTurnIdx}
+              onComplete={i === activeTurnIdx ? () => setActiveTurnIdx((n) => n + 1) : undefined}
               selected={drawerOpen && selectedTurn?.id === turn.id}
               onSelect={() => { setSelectedTurn(turn); setDrawerOpen(true); }}
             />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Sword, ShieldIcon, Bot, ChevronRight } from "../../icons";
 import { Badge } from "../../components/Badge";
 import TypewriterText from "../../components/TypewriterText";
@@ -13,7 +13,7 @@ import {
   toneForOutcome,
 } from "../../utils/format";
 
-export default function TimelineCard({ entry, selected, onSelect, index }) {
+export default function TimelineCard({ entry, selected, onSelect, index, skipAnimation = false, onComplete }) {
   const severity = entry.verdict?.severity || "low";
   const badgeLabels = buildTurnBadgeLabels(entry);
   const blueAction = getGateActionLabel(entry.verdict);
@@ -23,17 +23,24 @@ export default function TimelineCard({ entry, selected, onSelect, index }) {
   const targetPreview = previewText(entry.event.model_output, 230);
 
   // 0: attacker typing  1: attacker done → waiting → gate  2: gate visible → waiting → target  3: target visible
-  const [phase, setPhase] = useState(0);
+  const [phase, setPhase] = useState(skipAnimation ? 3 : 0);
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; });
+
   useEffect(() => {
     if (phase === 1) {
       const t = setTimeout(() => setPhase(2), 350);
       return () => clearTimeout(t);
     }
     if (phase === 2) {
-      const t = setTimeout(() => setPhase(3), 630); // gate anim (380ms) + gap (250ms)
+      const t = setTimeout(() => setPhase(3), 630);
       return () => clearTimeout(t);
     }
-  }, [phase]);
+    if (phase === 3 && !skipAnimation) {
+      const t = setTimeout(() => onCompleteRef.current?.(), 500);
+      return () => clearTimeout(t);
+    }
+  }, [phase, skipAnimation]);
 
   return (
     <div
@@ -71,7 +78,7 @@ export default function TimelineCard({ entry, selected, onSelect, index }) {
           <div className="turn-speaker-block attacker" style={{ animation: "blockIn 380ms var(--ease-out) 150ms both" }}>
             <div className="turn-speaker-icon attacker"><Sword size={13} strokeWidth={1.5} /></div>
             <div className={`turn-speaker-text${attackerPreview.truncated ? " is-truncated" : ""}`}>
-              <TypewriterText text={attackerPreview.text} speed={12} delay={150} onDone={() => setPhase(1)} />
+              <TypewriterText text={attackerPreview.text} speed={12} delay={150} skip={skipAnimation} onDone={skipAnimation ? undefined : () => setPhase(1)} />
             </div>
           </div>
           {phase >= 2 && (
@@ -90,7 +97,7 @@ export default function TimelineCard({ entry, selected, onSelect, index }) {
             <div className="turn-speaker-block target" style={{ animation: "blockIn 380ms var(--ease-out) both" }}>
               <div className="turn-speaker-icon target"><Bot size={13} strokeWidth={1.5} /></div>
               <div className={`turn-speaker-text${targetPreview.truncated ? " is-truncated" : ""}`}>
-                <TypewriterText text={targetPreview.text} speed={12} />
+                <TypewriterText text={targetPreview.text} speed={12} skip={skipAnimation} />
               </div>
             </div>
           )}
