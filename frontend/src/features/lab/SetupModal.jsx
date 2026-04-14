@@ -215,7 +215,7 @@ export default function SetupModal({
         ) : null}
 
         <div className="modal-actions">
-          <button type="button" className="btn btn-ghost" onClick={onBack} disabled={step === 1 || loading}>
+          <button type="button" className="btn btn-ghost" onClick={onBack} disabled={loading}>
             <ArrowLeft size={14} /> Back
           </button>
           <div className="modal-actions-right">

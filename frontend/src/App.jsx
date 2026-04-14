@@ -454,6 +454,16 @@ export default function App() {
     setWizardStep(1);
   }
 
+  function handleWizardBack() {
+    if (wizardStep <= 1) {
+      setWizardOpen(false);
+      setWizardStep(1);
+      setEntryViewOpen(true);
+      return;
+    }
+    setWizardStep((current) => Math.max(1, current - 1));
+  }
+
   function handleSelectMode(mode) {
     setEntryViewOpen(false);
     if (mode === "lab") {
@@ -733,7 +743,7 @@ export default function App() {
           step={wizardStep}
           setup={setup}
           onField={updateField}
-          onBack={() => setWizardStep((c) => Math.max(1, c - 1))}
+          onBack={handleWizardBack}
           onNext={() => setWizardStep((c) => Math.min(5, c + 1))}
           onLaunch={createRun}
           onClose={() => setWizardOpen(false)}
