@@ -10,6 +10,7 @@ import {
 
 export default function SuiteCaseRow({ caseData, index }) {
   const [expanded, setExpanded] = useState(false);
+  const [activeTurnIdx, setActiveTurnIdx] = useState(0);
   const outcome = caseData.final_outcome || "no_success";
   const turns = caseData.turns || [];
   const blueBlocked = caseData.blue_team_any_blocked;
@@ -49,7 +50,7 @@ export default function SuiteCaseRow({ caseData, index }) {
       {expanded && (
         <div className="suite-case-body">
           <div className="timeline-list">
-            {turns.map((turn, tIdx) => {
+            {turns.slice(0, activeTurnIdx + 1).map((turn, tIdx) => {
               const blueVerdict = caseData.blue_team_verdicts?.find(
                 (v) => v.turn_index === turn.turn_index
               );
@@ -64,10 +65,13 @@ export default function SuiteCaseRow({ caseData, index }) {
                   }
                 : null;
               const verdict = blueVerdict || fallbackVerdict;
+              const isActive = tIdx === activeTurnIdx;
               return (
                 <SandboxTurnCard
                   key={`${caseData.case_id || "case"}-${turn.turn_index || tIdx + 1}`}
                   index={tIdx}
+                  skipAnimation={!isActive}
+                  onComplete={isActive ? () => setActiveTurnIdx((i) => i + 1) : undefined}
                   turn={{
                     id: `${caseData.case_id || "case"}-${turn.turn_index || tIdx + 1}`,
                     prompt: turn.attacker_prompt || turn.prompt || "",

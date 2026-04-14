@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Sword, ShieldIcon, Bot } from "../../icons";
 import { Badge } from "../../components/Badge";
 import TypewriterText from "../../components/TypewriterText";
@@ -11,11 +11,13 @@ import {
   formatTimestamp,
 } from "../../utils/format";
 
-export default function SandboxTurnCard({ turn, index, onSelect, selected }) {
+export default function SandboxTurnCard({ turn, index, onSelect, selected, skipAnimation = false, onComplete }) {
   const isPending = Boolean(turn.isPending || !turn.verdict);
   const severity = turn.verdict?.severity || "low";
   const action = turn.verdict?.action || "allow";
-  const [phase, setPhase] = useState(0);
+  const [phase, setPhase] = useState(skipAnimation ? 3 : 0);
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; });
 
   useEffect(() => {
     if (isPending) return;
@@ -27,7 +29,11 @@ export default function SandboxTurnCard({ turn, index, onSelect, selected }) {
       const t = setTimeout(() => setPhase(3), 630);
       return () => clearTimeout(t);
     }
-  }, [phase, isPending]);
+    if (phase === 3 && !skipAnimation) {
+      const t = setTimeout(() => onCompleteRef.current?.(), 500);
+      return () => clearTimeout(t);
+    }
+  }, [phase, isPending, skipAnimation]);
 
   return (
     <div
