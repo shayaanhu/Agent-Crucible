@@ -1,5 +1,5 @@
 import React from "react";
-import { Crosshair, Terminal, BarChart3 } from "../icons";
+import { Crosshair, Terminal, BarChart3, GraduationCap } from "../icons";
 
 export default function EntryView({ onSelectMode }) {
   return (
@@ -16,9 +16,10 @@ export default function EntryView({ onSelectMode }) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[
-              { mode: "lab",        Icon: Crosshair, title: "Live Attack Lab",  desc: "Multi-turn red-team simulator with strategy chains and turn-by-turn visualization." },
-              { mode: "sandbox",    Icon: Terminal,  title: "Attack Sandbox",   desc: "Write your own attack prompts and see the blue-team verdict in real time." },
-              { mode: "evaluation", Icon: BarChart3, title: "Testing Suite",    desc: "Automated benchmark. Run the full objective suite and view performance metrics." },
+              { mode: "lab",        Icon: Crosshair,      title: "Live Attack Lab",   desc: "Multi-turn red-team simulator with strategy chains and turn-by-turn visualization." },
+              { mode: "sandbox",    Icon: Terminal,        title: "Attack Sandbox",    desc: "Write your own attack prompts and see the blue-team verdict in real time." },
+              { mode: "labs",       Icon: GraduationCap,   title: "Lab Exercises",     desc: "Guided labs with pre-configured attacks, learning objectives, and reflection notes." },
+              { mode: "evaluation", Icon: BarChart3,       title: "Testing Suite",     desc: "Automated benchmark. Run the full objective suite and view performance metrics." },
             ].map(({ mode, Icon, title, desc }) => (
               <button
                 key={mode}

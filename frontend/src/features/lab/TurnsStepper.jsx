@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "../../icons";
 
-export default function TurnsStepper({ value, onChange }) {
+export default function TurnsStepper({ value, onChange, step = 1, min = 1, max = 10 }) {
   const [raw, setRaw] = useState(String(value));
   useEffect(() => { setRaw(String(value)); }, [value]);
 
   function commit(str) {
     const n = parseInt(str, 10);
-    onChange(isNaN(n) || n < 1 ? 1 : Math.min(n, 10));
+    if (isNaN(n)) { setRaw(String(value)); return; }
+    const clamped = Math.max(min, Math.min(max, Math.round(n / step) * step));
+    setRaw(String(clamped));
+    onChange(clamped);
   }
 
   return (
@@ -15,8 +18,8 @@ export default function TurnsStepper({ value, onChange }) {
       <button
         type="button"
         className="stepper-v-btn"
-        onClick={() => onChange(Math.max(1, value - 1))}
-        disabled={value <= 1}
+        onClick={() => onChange(Math.max(min, value - step))}
+        disabled={value <= min}
       >
         <ChevronDown size={14} strokeWidth={2} />
       </button>
@@ -32,8 +35,8 @@ export default function TurnsStepper({ value, onChange }) {
       <button
         type="button"
         className="stepper-v-btn"
-        onClick={() => onChange(Math.min(10, value + 1))}
-        disabled={value >= 10}
+        onClick={() => onChange(Math.min(max, value + step))}
+        disabled={value >= max}
       >
         <ChevronUp size={14} strokeWidth={2} />
       </button>

@@ -9,7 +9,8 @@ import TurnDrawer from "./features/lab/TurnDrawer";
 import LiveBlueBenchmarkSection from "./features/lab/LiveBlueBenchmarkSection";
 import SandboxView from "./features/sandbox/SandboxView";
 import EvaluationView from "./features/evaluation/EvaluationView";
-import { API_BASE, APP_STORAGE_KEY } from "./constants";
+import LabsView from "./features/labs/LabsView";
+import { API_BASE, APP_STORAGE_KEY, LABS_STORAGE_KEY, DEFAULT_LABS } from "./constants";
 import { readStorageJSON, writeStorageJSON } from "./utils/storage";
 import { summarizeBlueTeam } from "./utils/analysis";
 import {
@@ -44,6 +45,12 @@ export default function App() {
   const [evaluation, setEvaluation] = useState(null);
   const [suiteRun, setSuiteRun] = useState(null);
   const suitePollerRef = useRef(null);
+  const [labs, setLabs] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LABS_STORAGE_KEY));
+      return Array.isArray(saved) ? saved : DEFAULT_LABS;
+    } catch (_) { return DEFAULT_LABS; }
+  });
   const [sandboxRuns, setSandboxRuns] = useState([]); // [{ id, name, turns, currentPrompt, statusDot, updatedAt }]
   const [sandboxRunId, setSandboxRunId] = useState("");
   const [selectedEntry, setSelectedEntry] = useState(null);
@@ -317,6 +324,73 @@ export default function App() {
     setSuiteRun(null);
   }
 
+  // ── Labs ────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    try { localStorage.setItem(LABS_STORAGE_KEY, JSON.stringify(labs)); } catch (_) {}
+  }, [labs]);
+
+  function saveLab(draft) {
+    setLabs((prev) => {
+      const idx = prev.findIndex((l) => l.id === draft.id);
+      if (idx !== -1) {
+        const next = [...prev];
+        next[idx] = draft;
+        return next;
+      }
+      return [...prev, draft];
+    });
+  }
+
+  function deleteLab(labId) {
+    setLabs((prev) => prev.filter((l) => l.id !== labId));
+  }
+
+  async function launchLab(lab) {
+    const cfg = lab.pre_config || {};
+    setSetup({
+      scenario: cfg.scenario || "Educational assistant",
+      goal: cfg.goal || "",
+      provider: cfg.provider || "groq",
+      strategyId: cfg.strategy_id || "direct_jailbreak",
+      maxTurns: cfg.max_turns ?? 3,
+      dryRun: Boolean(cfg.dry_run),
+    });
+    setError("");
+    setLoading(true);
+    setEntryViewOpen(false);
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/runs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scenario: cfg.scenario || "Educational assistant",
+          goal: cfg.goal || "",
+          provider: cfg.provider || "groq",
+          max_turns: cfg.max_turns ?? 3,
+          dry_run: Boolean(cfg.dry_run),
+          metadata: { source: "lab", strategy_id: cfg.strategy_id || "direct_jailbreak", lab_id: lab.id },
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail || "Failed to launch lab");
+      setRunId(body.run_id);
+      setRuns((prev) => [
+        ...prev,
+        { runId: body.run_id, goal: cfg.goal || "", scenario: cfg.scenario || "", statusDot: "queued" },
+      ]);
+      setActiveView("lab");
+      setSelectedEntry(null);
+      setDrawerOpen(false);
+      setEvaluation(null);
+      await refreshRun(body.run_id);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // ── Polling ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -383,6 +457,8 @@ export default function App() {
     } else if (mode === "sandbox") {
       setActiveView("sandbox");
       ensureSandboxRun();
+    } else if (mode === "labs") {
+      setActiveView("labs");
     } else if (mode === "evaluation") {
       setActiveView("evaluation");
     }
@@ -467,6 +543,9 @@ export default function App() {
               <button type="button" className="sidebar-action" onClick={() => createSandboxRun()}>
                 <Plus size={14} strokeWidth={1.5} /> New sandbox run
               </button>
+              <button type="button" className="sidebar-action" onClick={() => { setActiveView("labs"); setEntryViewOpen(false); }}>
+                <Plus size={14} strokeWidth={1.5} /> New lab exercise
+              </button>
               <button type="button" className="sidebar-action" onClick={() => { setActiveView("evaluation"); setEntryViewOpen(false); }}>
                 <Plus size={14} strokeWidth={1.5} /> New eval run
               </button>
@@ -501,6 +580,7 @@ export default function App() {
             <div className="view-tabs">
               <button type="button" className={`view-tab${activeView === "lab" ? " is-active" : ""}`} onClick={() => setActiveView("lab")}>Live run</button>
               <button type="button" className={`view-tab${activeView === "sandbox" ? " is-active" : ""}`} onClick={() => { setActiveView("sandbox"); ensureSandboxRun(); }}>Sandbox</button>
+              <button type="button" className={`view-tab${activeView === "labs" ? " is-active" : ""}`} onClick={() => setActiveView("labs")}>Labs</button>
               <button type="button" className={`view-tab${activeView === "evaluation" ? " is-active" : ""}`} onClick={() => setActiveView("evaluation")}>Evaluation</button>
             </div>
           </div>
@@ -620,6 +700,17 @@ export default function App() {
                 <button type="button" className="btn btn-primary" onClick={createSandboxRun}>New sandbox run</button>
               </div>
             )}
+          </div>
+        ) : null}
+
+        {activeView === "labs" ? (
+          <div className="page-body">
+            <LabsView
+              labs={labs}
+              onSave={saveLab}
+              onDelete={deleteLab}
+              onLaunch={launchLab}
+            />
           </div>
         ) : null}
 
