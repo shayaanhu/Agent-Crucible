@@ -2851,7 +2851,8 @@ details[open]>summary::before {
 .lab-card-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  padding: 12px 14px 28px 14px;
 }
 
 .lab-objective-block {
@@ -2877,9 +2878,11 @@ details[open]>summary::before {
 }
 
 .lab-description {
-  font-size: 0.8rem;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
   line-height: 1.6;
+  padding-left: 12px;
+  max-width: 800px;
 }
 
 .lab-config-value {
@@ -2906,7 +2909,7 @@ details[open]>summary::before {
 .lab-card-actions {
   display: flex;
   gap: 8px;
-  padding-top: 4px;
+  padding-top: 8px;
 }
 
 @media (max-width: 640px) {
