@@ -43,6 +43,7 @@ export default function App() {
   const [timeline, setTimeline] = useState([]);
   const [evaluation, setEvaluation] = useState(null);
   const [suiteRun, setSuiteRun] = useState(null);
+  const suitePollerRef = useRef(null);
   const [sandboxRuns, setSandboxRuns] = useState([]); // [{ id, name, turns, currentPrompt, statusDot, updatedAt }]
   const [sandboxRunId, setSandboxRunId] = useState("");
   const [selectedEntry, setSelectedEntry] = useState(null);
@@ -265,24 +266,32 @@ export default function App() {
     }
   }
 
+  function clearSuitePoller() {
+    if (suitePollerRef.current) {
+      clearInterval(suitePollerRef.current);
+      suitePollerRef.current = null;
+    }
+  }
+
   async function startSuiteRun(provider = "groq") {
+    clearSuitePoller();
     setEvalLoading(true);
     try {
       const resp = await fetch(`${API_BASE}/api/v1/evals/red-team/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, max_turns: 3, limit: 10 }),
+        body: JSON.stringify({ provider, max_turns: 3, limit: 0 }),
       });
       const data = await resp.json();
       setSuiteRun({ ...data, progress_percentage: 0, is_complete: false, case_completed_results: [] });
       setActiveView("evaluation");
 
-      const poller = setInterval(async () => {
+      suitePollerRef.current = setInterval(async () => {
         try {
           const pResp = await fetch(`${API_BASE}/api/v1/evals/red-team/run/${data.suite_id}`);
           const pData = await pResp.json();
           setSuiteRun(pData);
-          if (pData.is_complete) clearInterval(poller);
+          if (pData.is_complete) clearSuitePoller();
         } catch (_) { /* ignore transient poll errors */ }
       }, 2000);
     } catch (err) {
@@ -290,6 +299,22 @@ export default function App() {
     } finally {
       setEvalLoading(false);
     }
+  }
+
+  async function stopSuiteRun() {
+    clearSuitePoller();
+    const id = suiteRun?.suite_id;
+    if (id) {
+      try {
+        await fetch(`${API_BASE}/api/v1/evals/red-team/run/${id}/cancel`, { method: "POST" });
+      } catch (_) { /* ignore */ }
+    }
+    setSuiteRun((prev) => prev ? { ...prev, status: "cancelled", is_complete: true } : null);
+  }
+
+  function resetSuiteRun() {
+    clearSuitePoller();
+    setSuiteRun(null);
   }
 
   // ── Polling ─────────────────────────────────────────────────────────────────
@@ -600,7 +625,7 @@ export default function App() {
 
         {activeView === "evaluation" ? (
           <div className="page-body">
-            <EvaluationView suiteRun={suiteRun} onStartSuite={startSuiteRun} loading={evalLoading} />
+            <EvaluationView suiteRun={suiteRun} onStartSuite={startSuiteRun} onStopSuite={stopSuiteRun} onResetSuite={resetSuiteRun} loading={evalLoading} />
           </div>
         ) : null}
       </div>

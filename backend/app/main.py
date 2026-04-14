@@ -324,9 +324,20 @@ def get_suite_run_status(suite_id: str):
         total_cases=run.total_cases,
         current_case_id=run.current_case_id,
         progress_percentage=progress,
-        is_complete=(run.status in ["completed", "failed"]),
+        is_complete=(run.status in ["completed", "failed", "cancelled"]),
         case_completed_results=run.case_completed_results,
     )
+
+
+@app.post("/api/v1/evals/red-team/run/{suite_id}/cancel")
+def cancel_suite_run(suite_id: str):
+    run = store.get_suite_run(suite_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Suite run not found")
+    if run.status in ["completed", "failed", "cancelled"]:
+        return {"suite_id": suite_id, "status": run.status}
+    store.update_suite_run(suite_id, status="cancelled")
+    return {"suite_id": suite_id, "status": "cancelled"}
 
 
 @app.post("/api/v1/sandbox/run")

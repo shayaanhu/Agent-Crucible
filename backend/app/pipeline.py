@@ -362,6 +362,13 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
                 case_completed_results=[*existing, case_result],
             )
 
+            if current_run and current_run.status == "cancelled":
+                break
+
+        current_run = store.get_suite_run(suite_id)
+        if current_run and current_run.status == "cancelled":
+            return
+
         summary = summarize_red_team_results(results)
         payload = {
             "metadata": {

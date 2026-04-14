@@ -1,15 +1,24 @@
 import React, { useState, useEffect, useMemo } from "react";
 import StatCard from "../../components/StatCard";
 import EvalBlueSummarySection from "./EvalBlueSummarySection";
+import EvalInsightsSection from "./EvalInsightsSection";
 import SuiteCaseRow from "./SuiteCaseRow";
 import { SUITE_STORAGE_KEY } from "../../constants";
 import { readStorageJSON, writeStorageJSON } from "../../utils/storage";
 import { computeSuiteSummary } from "../../utils/analysis";
 import { formatLabel, formatTimestamp } from "../../utils/format";
 
-export default function EvaluationView({ suiteRun, onStartSuite, loading }) {
+export default function EvaluationView({ suiteRun, onStartSuite, onStopSuite, onResetSuite, loading }) {
   const isRunning = suiteRun && !suiteRun.is_complete;
+  const isDone = suiteRun?.is_complete;
+  const isCancelled = suiteRun?.status === "cancelled";
   const liveCases = suiteRun?.case_completed_results || [];
+
+  function handleClear() {
+    writeStorageJSON(SUITE_STORAGE_KEY, null);
+    setSavedData(null);
+    onResetSuite();
+  }
 
   const [savedData, setSavedData] = useState(() =>
     readStorageJSON(SUITE_STORAGE_KEY, null)
@@ -43,14 +52,27 @@ export default function EvaluationView({ suiteRun, onStartSuite, loading }) {
           <div className="section-note">Run automated red-team test cases against each scenario.</div>
         </div>
         <div className="chip-row">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => onStartSuite("groq")}
-            disabled={loading || isRunning}
-          >
-            {isRunning ? "Running..." : "Run attack suite"}
-          </button>
+          {isRunning ? (
+            <button type="button" className="btn btn-danger" onClick={onStopSuite}>
+              Stop run
+            </button>
+          ) : (
+            <>
+              {isDone && (
+                <button type="button" className="btn btn-secondary" onClick={handleClear}>
+                  Clear
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => onStartSuite("groq")}
+                disabled={loading}
+              >
+                {isDone ? "New run" : "Run attack suite"}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -73,7 +95,12 @@ export default function EvaluationView({ suiteRun, onStartSuite, loading }) {
 
       {summary && !isRunning && (
         <>
-          {isFromSave && savedData?.timestamp && (
+          {isCancelled && (
+            <div className="suite-saved-note">
+              Run stopped · {suiteRun.completed_cases} of {suiteRun.total_cases} cases completed
+            </div>
+          )}
+          {!isCancelled && isFromSave && savedData?.timestamp && (
             <div className="suite-saved-note">
               Last run · {formatTimestamp(savedData.timestamp)}
               {savedData.provider ? ` · ${formatLabel(savedData.provider)}` : ""}
@@ -86,6 +113,7 @@ export default function EvaluationView({ suiteRun, onStartSuite, loading }) {
             <StatCard label="Guardrail fires" value={summary.guardrailFired} />
             <StatCard label="Avg turns" value={summary.avgTurns} />
           </div>
+          <EvalInsightsSection cases={cases} />
           <EvalBlueSummarySection cases={cases} />
         </>
       )}

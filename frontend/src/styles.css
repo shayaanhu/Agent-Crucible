@@ -607,6 +607,20 @@ a {
   border-color: var(--border-focus);
 }
 
+/* Danger — outlined red */
+.btn-danger {
+  height: 32px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: var(--r-md);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08);
+}
+
 /* Ghost — no border */
 .btn-ghost {
   height: 32px;
@@ -1693,6 +1707,91 @@ details[open]>summary::before {
 .evaluation-page {
   display: grid;
   gap: 24px;
+}
+
+/* ─── Eval insights ──────────────────────────────────────────────────────────── */
+.eval-insights {
+  display: grid;
+  gap: 16px;
+}
+
+.eval-insights-verdict {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+}
+
+.eval-insights-verdict-text {
+  flex: 1;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.insights-rate-list {
+  display: grid;
+  gap: 10px;
+}
+
+.insights-rate-row {
+  display: grid;
+  gap: 5px;
+}
+
+.insights-rate-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.insights-rate-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.insights-rate-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.insights-rate-value.tone-safe    { color: var(--success); }
+.insights-rate-value.tone-warning { color: var(--warning); }
+.insights-rate-value.tone-danger  { color: var(--danger); }
+
+.insights-rate-bar {
+  height: 3px;
+  background: var(--border-subtle);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.insights-rate-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 400ms var(--ease-out);
+}
+.insights-rate-fill.tone-safe    { background: var(--success); }
+.insights-rate-fill.tone-warning { background: var(--warning); }
+.insights-rate-fill.tone-danger  { background: var(--danger); }
+
+.insights-coverage-list {
+  display: grid;
+  gap: 10px;
+}
+
+.insights-coverage-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.insights-coverage-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }
 
 /* Suite progress banner */

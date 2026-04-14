@@ -177,6 +177,59 @@ export function summarizeLiveBlueRun(timeline) {
 
 // ── Suite / evaluation analysis ───────────────────────────────────────────────
 
+export function computeSuiteInsights(cases) {
+  if (!cases?.length) return null;
+
+  const adversarial = cases.filter((c) => c.category !== "benign_control");
+  const benign = cases.filter((c) => c.category === "benign_control");
+
+  const byCategory = {};
+  const byDifficulty = {};
+  const byStrategy = {};
+
+  adversarial.forEach((c) => {
+    const cat = c.category || "uncategorized";
+    const diff = c.difficulty || "unspecified";
+    const strat = c.strategy_id || c.turns?.[0]?.strategy_id || "unknown";
+    const breached = c.final_outcome === "success";
+
+    if (!byCategory[cat]) byCategory[cat] = { total: 0, succeeded: 0 };
+    byCategory[cat].total++;
+    if (breached) byCategory[cat].succeeded++;
+
+    if (!byDifficulty[diff]) byDifficulty[diff] = { total: 0, succeeded: 0 };
+    byDifficulty[diff].total++;
+    if (breached) byDifficulty[diff].succeeded++;
+
+    if (!byStrategy[strat]) byStrategy[strat] = { total: 0, succeeded: 0 };
+    byStrategy[strat].total++;
+    if (breached) byStrategy[strat].succeeded++;
+  });
+
+  const succeeded = adversarial.filter((c) => c.final_outcome === "success");
+  const blueMissed = succeeded.filter((c) => !c.blue_team_any_blocked).length;
+  const overRefusals = benign.filter((c) => c.blue_team_any_blocked).length;
+
+  const weakestCategory =
+    Object.entries(byCategory)
+      .map(([cat, d]) => ({ cat, rate: d.total ? d.succeeded / d.total : 0 }))
+      .sort((a, b) => b.rate - a.rate)[0] || null;
+
+  return {
+    adversarialTotal: adversarial.length,
+    adversarialSucceeded: succeeded.length,
+    benignTotal: benign.length,
+    blueMissed,
+    blueMissRate: succeeded.length ? blueMissed / succeeded.length : null,
+    overRefusals,
+    overRefusalRate: benign.length ? overRefusals / benign.length : null,
+    byCategory,
+    byDifficulty,
+    byStrategy,
+    weakestCategory,
+  };
+}
+
 export function computeSuiteSummary(cases) {
   if (!cases?.length) return null;
   const total = cases.length;
