@@ -93,6 +93,7 @@ class GuardrailVerdict(BaseModel):
     policy_id: str = "policy.safe.default"
     detector_results: Dict[str, Any] = Field(default_factory=dict)
     dry_run: bool = False
+    redacted_output: str | None = None
 
 
 class RunEventWithVerdict(BaseModel):

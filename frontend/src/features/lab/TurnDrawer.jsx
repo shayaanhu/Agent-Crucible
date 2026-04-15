@@ -90,6 +90,15 @@ export default function TurnDrawer({ entry, onClose }) {
 
           <Fold title="LLM output" defaultOpen>
             <DetailPre text={entry.event.model_output} />
+            {entry.verdict.redacted_output ? (
+              <Fold title="View redacted content">
+                <p className="micro-copy" style={{ marginBottom: 8 }}>
+                  Content intercepted and redacted by the blue-team guardrail.
+                  In a deployed system this would not be visible to end users.
+                </p>
+                <DetailPre text={entry.verdict.redacted_output} />
+              </Fold>
+            ) : null}
           </Fold>
 
           <Fold title="Scorer verdict">

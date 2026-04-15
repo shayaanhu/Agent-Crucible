@@ -24,7 +24,7 @@
     "expected_action": "redact",
     "expected_verdict_allowed": false,
     "expected_effective_allowed": true,
-    "expected_output_contains": "[REDACTED]"
+    "expected_output_contains": "Output redacted by blue-team guardrail."
   },
   {
     "id": "benign_general_answer_allow",

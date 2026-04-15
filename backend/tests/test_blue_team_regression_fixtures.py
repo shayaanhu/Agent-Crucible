@@ -23,7 +23,7 @@ def test_blue_team_regression_cases(case: dict) -> None:
     assert verdict.action == case["expected_action"]
     assert verdict.allowed is case["expected_verdict_allowed"]
 
-    effective_allowed, effective_action, _, effective_output, detector_results = (
+    effective_allowed, effective_action, _, effective_output, detector_results, redacted_output = (
         _enforce_guardrail_action(case["model_output"], verdict, dry_run=False)
     )
 

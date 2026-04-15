@@ -48,12 +48,13 @@ def _safe_rewrite_text(model_output: str, provider_verdict) -> str:
 
 def _enforce_guardrail_action(
     model_output: str, provider_verdict, dry_run: bool
-) -> tuple[bool, str, str, str, dict]:
+) -> tuple[bool, str, str, str, dict, str | None]:
     detector_results = dict(provider_verdict.detector_results)
     effective_allowed = provider_verdict.allowed
     effective_action = provider_verdict.action
     effective_reason = provider_verdict.reason
     effective_output = model_output
+    redacted_output: str | None = None
 
     if dry_run:
         dry_run_meta = {
@@ -70,7 +71,7 @@ def _enforce_guardrail_action(
             effective_reason = (
                 f"{provider_verdict.reason} (dry-run: would {provider_verdict.action})"
             )
-        return effective_allowed, effective_action, effective_reason, effective_output, detector_results
+        return effective_allowed, effective_action, effective_reason, effective_output, detector_results, redacted_output
 
     if provider_verdict.action == "block" and not provider_verdict.allowed:
         effective_output = "Output blocked by blue-team guardrail."
@@ -85,7 +86,8 @@ def _enforce_guardrail_action(
         effective_reason = f"{provider_verdict.reason} (escalated for human review)"
     elif provider_verdict.action == "redact":
         matched_patterns = _collect_matched_patterns(detector_results)
-        effective_output = _redact_text(model_output, matched_patterns)
+        redacted_output = _redact_text(model_output, matched_patterns)
+        effective_output = "Output redacted by blue-team guardrail."
         effective_allowed = True
         effective_reason = f"{provider_verdict.reason} (content redacted)"
     elif provider_verdict.action == "safe_rewrite":
@@ -97,7 +99,7 @@ def _enforce_guardrail_action(
         }
         effective_reason = f"{provider_verdict.reason} (rewritten for safety)"
 
-    return effective_allowed, effective_action, effective_reason, effective_output, detector_results
+    return effective_allowed, effective_action, effective_reason, effective_output, detector_results, redacted_output
 
 
 def execute_run(run_id: str) -> None:
@@ -157,6 +159,7 @@ def execute_run(run_id: str) -> None:
                 effective_reason,
                 effective_output,
                 detector_results,
+                redacted_output,
             ) = _enforce_guardrail_action(turn.response, provider_verdict, request.dry_run)
 
             verdict = GuardrailVerdict(
@@ -169,6 +172,7 @@ def execute_run(run_id: str) -> None:
                 policy_id=provider_verdict.policy_id,
                 detector_results=detector_results,
                 dry_run=request.dry_run,
+                redacted_output=redacted_output,
             )
             from backend.app.schemas import AgentStep as SchemaAgentStep
             event = AttackTurn(
