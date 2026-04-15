@@ -31,7 +31,7 @@ export default function LabCard({ lab, index, onLaunch, onEdit, onDelete }) {
         </div>
         <div className="suite-case-right">
           <span className="suite-case-chip">{lab.estimated_minutes} min</span>
-          <span className="suite-case-chip suite-case-chip-dim">{formatLabel(lab.pre_config?.strategy_id)}</span>
+          <span className="suite-case-chip suite-case-chip-dim">{formatLabel(lab.pre_config?.target_model || lab.pre_config?.strategy_id)}</span>
           <span className="suite-case-chip suite-case-chip-dim">{lab.pre_config?.scenario}</span>
           <ChevronDown
             size={13}
@@ -68,6 +68,14 @@ export default function LabCard({ lab, index, onLaunch, onEdit, onDelete }) {
                   <div className="insights-coverage-row">
                     <span className="insights-coverage-label">Max turns</span>
                     <span className="lab-config-value">{lab.pre_config?.max_turns}</span>
+                  </div>
+                  <div className="insights-coverage-row">
+                    <span className="insights-coverage-label">Attacker model</span>
+                    <span className="lab-config-value">{formatLabel(lab.pre_config?.attacker_model)}</span>
+                  </div>
+                  <div className="insights-coverage-row">
+                    <span className="insights-coverage-label">Target model</span>
+                    <span className="lab-config-value">{formatLabel(lab.pre_config?.target_model)}</span>
                   </div>
                   <div className="insights-coverage-row">
                     <span className="insights-coverage-label">Dry run</span>

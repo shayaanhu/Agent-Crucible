@@ -26,6 +26,8 @@ export default function App() {
     scenario: "Educational assistant",
     goal: "",
     provider: "groq",
+    attacker_model: "openai/gpt-oss-120b",
+    target_model: "llama-3.1-8b-instant",
     strategyId: "multi_step_escalation",
     maxTurns: 3,
     dryRun: true,
@@ -230,7 +232,12 @@ export default function App() {
           provider: setup.provider,
           max_turns: setup.maxTurns,
           dry_run: setup.dryRun,
-          metadata: { source: "frontend", strategy_id: setup.strategyId },
+          metadata: {
+            source: "frontend",
+            strategy_id: setup.strategyId,
+            attacker_model: setup.attacker_model,
+            target_model: setup.target_model,
+          },
         }),
       });
       const body = await response.json();
@@ -374,7 +381,13 @@ export default function App() {
           provider: cfg.provider || "groq",
           max_turns: cfg.max_turns ?? 3,
           dry_run: Boolean(cfg.dry_run),
-          metadata: { source: "lab", strategy_id: cfg.strategy_id || "direct_jailbreak", lab_id: lab.id },
+          metadata: {
+            source: "lab",
+            strategy_id: cfg.strategy_id || "direct_jailbreak",
+            lab_id: lab.id,
+            attacker_model: cfg.attacker_model || "gpt-oss-120b",
+            target_model: cfg.target_model || "llama-3.1-8b-instant",
+          },
         }),
       });
       const body = await response.json();

@@ -4,6 +4,7 @@ import {
   SCENARIO_CARDS,
   SCENARIO_GOALS,
   PROVIDER_OPTIONS,
+  MODEL_OPTIONS,
   STRATEGY_OPTIONS,
   PRESET_PLACEHOLDER,
   CUSTOM_OPTION,
@@ -26,6 +27,7 @@ export default function SetupModal({
   const launchReady =
     step === 1 ? Boolean(setup.scenario.trim()) :
     step === 2 ? Boolean(setup.goal.trim()) :
+    step === 3 ? (Boolean(setup.attacker_model) && Boolean(setup.target_model)) :
     true;
   const validStep = step >= 1 && step <= 5;
 
@@ -116,17 +118,31 @@ export default function SetupModal({
               <div className="wizard-subtitle">Select your model, strategy, and run length.</div>
             </div>
             <div className="wizard-body attack-form">
-              <div>
-                <label className="field-label">Provider</label>
-                <select
-                  className="input"
-                  value={setup.provider}
-                  onChange={(e) => onField("provider", e.target.value)}
-                >
-                  {PROVIDER_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
+              <div className="eval-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div>
+                  <label className="field-label">Attacker model</label>
+                  <select
+                    className="input"
+                    value={setup.attacker_model}
+                    onChange={(e) => onField("attacker_model", e.target.value)}
+                  >
+                    {(MODEL_OPTIONS.groq || []).map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label">Target LLM</label>
+                  <select
+                    className="input"
+                    value={setup.target_model}
+                    onChange={(e) => onField("target_model", e.target.value)}
+                  >
+                    {(MODEL_OPTIONS.groq || []).map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="field-label">Strategy</label>
@@ -191,7 +207,8 @@ export default function SetupModal({
               {[
                 { key: "Scenario", value: setup.scenario },
                 { key: "Objective", value: setup.goal },
-                { key: "Model", value: PROVIDER_OPTIONS.find((o) => o.value === setup.provider)?.model || formatLabel(setup.provider) },
+                { key: "Attacker", value: setup.attacker_model },
+                { key: "Target", value: setup.target_model },
                 { key: "Strategy", value: formatLabel(setup.strategyId) },
                 { key: "Turns", value: setup.maxTurns },
                 { key: "Mode", value: setup.dryRun ? "Dry run" : "Enforced" },

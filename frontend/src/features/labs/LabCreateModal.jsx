@@ -4,6 +4,7 @@ import {
   SCENARIO_CARDS,
   SCENARIO_GOALS,
   PROVIDER_OPTIONS,
+  MODEL_OPTIONS,
   STRATEGY_OPTIONS,
   DIFFICULTY_OPTIONS,
   SUCCESS_CRITERIA_OPTIONS,
@@ -35,6 +36,8 @@ function blank() {
       goal: "",
       strategy_id: "direct_jailbreak",
       provider: "groq",
+      attacker_model: "gpt-oss-120b",
+      target_model: "llama-3.1-8b-instant",
       max_turns: 3,
       dry_run: false,
     },
@@ -268,17 +271,31 @@ export default function LabCreateModal({ initialLab, onSave, onClose }) {
               <div className="wizard-subtitle">Select your model, strategy, and run length.</div>
             </div>
             <div className="wizard-body attack-form">
-              <div>
-                <label className="field-label">Provider</label>
-                <select
-                  className="input"
-                  value={draft.pre_config.provider}
-                  onChange={(e) => setConfigField("provider", e.target.value)}
-                >
-                  {PROVIDER_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
+              <div className="eval-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div>
+                  <label className="field-label">Attacker model</label>
+                  <select
+                    className="input"
+                    value={draft.pre_config.attacker_model}
+                    onChange={(e) => setConfigField("attacker_model", e.target.value)}
+                  >
+                    {(MODEL_OPTIONS.groq || []).map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label">Target LLM</label>
+                  <select
+                    className="input"
+                    value={draft.pre_config.target_model}
+                    onChange={(e) => setConfigField("target_model", e.target.value)}
+                  >
+                    {(MODEL_OPTIONS.groq || []).map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="field-label">Strategy</label>

@@ -93,6 +93,7 @@ class AdvancedRedTeamAgent(RedTeamContract):
         objective = Objective.from_metadata(goal, metadata)
         attacker_provider = metadata.get("attacker_provider", provider)
         attacker_model = metadata.get("attacker_model", "")
+        target_model = metadata.get("target_model", "")
         objective_scorer_provider = metadata.get("objective_scorer_provider", attacker_provider)
         objective_scorer_model = metadata.get("objective_scorer_model", "")
         objective_scorer_prompt = metadata.get("objective_scorer_prompt", "")
@@ -110,6 +111,7 @@ class AdvancedRedTeamAgent(RedTeamContract):
             objective=objective,
             attacker_provider=attacker_provider,
             attacker_model=attacker_model,
+            target_model=target_model,
             objective_scorer_provider=objective_scorer_provider,
             objective_scorer_model=objective_scorer_model,
             objective_scorer_prompt=objective_scorer_prompt,
@@ -187,6 +189,7 @@ class AdvancedRedTeamAgent(RedTeamContract):
             response = generate_response(
                 prompt=prompt,
                 provider=provider,
+                model_override=target_model,
                 system_prompt=target_system_prompt,
                 history=target_history,
             )
@@ -290,6 +293,7 @@ class AdvancedRedTeamAgent(RedTeamContract):
             "scorers": ",".join(scorers),
             "attacker_provider": attacker_provider,
             "attacker_model": attacker_model or "",
+            "target_model": target_model or "",
             "objective_goal": objective.goal,
             "objective_tags": ",".join(objective.tags),
             "objective_scorer_provider": objective_scorer_provider,

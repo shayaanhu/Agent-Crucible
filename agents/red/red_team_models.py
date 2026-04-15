@@ -21,6 +21,7 @@ class AttackState:
     objective: Objective | None = None
     attacker_provider: str = ""
     attacker_model: str = ""
+    target_model: str = ""
     objective_scorer_provider: str = ""
     objective_scorer_model: str = ""
     objective_scorer_prompt: str = ""
