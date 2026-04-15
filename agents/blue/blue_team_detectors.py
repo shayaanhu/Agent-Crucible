@@ -448,6 +448,15 @@ def _policy_id_from_text(model_output: str, raw_output: str, flagged: bool) -> t
         for token in ("password", "api key", "secret token", "credential", "secret", "token")
     ):
         return ("policy.sensitive_data.redaction", "sensitive_data_keywords")
+    if any(
+        token in lowered
+        for token in (
+            "amoxicillin", "azithromycin", "ceftriaxone", "doxycycline", "ciprofloxacin",
+            "mg orally", "mg twice daily", "mg daily", "intravenously", "intramuscularly",
+            "dosage regimen",
+        )
+    ):
+        return ("policy.medical.prescription_guidance", "medical_prescription_keywords")
     return ("policy.jailbreak.restricted_disclosure", "unsafe_default")
 
 

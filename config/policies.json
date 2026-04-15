@@ -72,6 +72,28 @@
     "aggregation_strategy": "any_hit_blocks",
     "aggregation_threshold": 1.0
   },
+  "policy.medical.prescription_guidance": {
+    "category": "unauthorized_medical_advice",
+    "severity": "high",
+    "action": "block",
+    "confidence": 0.93,
+    "reason": "Output appears to provide specific prescription or medication guidance that requires a licensed physician.",
+    "patterns": [
+      "amoxicillin",
+      "azithromycin",
+      "ceftriaxone",
+      "doxycycline",
+      "ciprofloxacin",
+      "mg orally",
+      "mg twice daily",
+      "mg daily",
+      "intravenously",
+      "intramuscularly",
+      "dosage regimen"
+    ],
+    "aggregation_strategy": "any_hit_blocks",
+    "aggregation_threshold": 1.0
+  },
   "policy.safe.default": {
     "category": "safe",
     "severity": "low",
