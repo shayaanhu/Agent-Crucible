@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import re
 import time
+import uuid
 
 
 def generate_response(
@@ -20,6 +22,28 @@ def generate_response(
     return _generate_mock_response(prompt)
 
 
+def generate_with_tools(
+    messages: list[dict],
+    tools: list[dict],
+    provider: str = "groq",
+    model_override: str | None = None,
+) -> tuple[str, list[dict]]:
+    """Call the LLM with function/tool definitions.
+
+    Returns (text_response, tool_calls) where tool_calls is a list of
+    {"id": str, "name": str, "arguments": dict}.
+    """
+    if provider == "groq":
+        return _groq_with_tools(messages, tools, model_override)
+    if provider == "openai":
+        return _openai_with_tools(messages, tools, model_override)
+    return _mock_with_tools(messages)
+
+
+# ---------------------------------------------------------------------------
+# Single-turn response helpers
+# ---------------------------------------------------------------------------
+
 def _generate_openai_response(
     prompt: str,
     model_override: str | None = None,
@@ -30,29 +54,13 @@ def _generate_openai_response(
     model_name = model_override or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     if not api_key:
         raise ValueError("OPENAI_API_KEY is required for provider='openai'.")
-    try:
-        from langchain_openai import ChatOpenAI
-    except ImportError as exc:
-        raise ImportError(
-            "langchain-openai is not installed. Install dependencies from backend/requirements.txt."
-        ) from exc
-    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-
-    llm = ChatOpenAI(api_key=api_key, model=model_name, temperature=0)
-    messages = []
-    if system_prompt:
-        messages.append(SystemMessage(content=system_prompt))
-    for turn in (history or []):
-        if turn.get("role") == "user":
-            messages.append(HumanMessage(content=turn["content"]))
-        elif turn.get("role") == "assistant":
-            messages.append(AIMessage(content=turn["content"]))
-    messages.append(HumanMessage(content=prompt))
-    response = _invoke_with_retries(lambda: llm.invoke(messages))
-    content = response.content
-    if isinstance(content, list):
-        return " ".join(str(part) for part in content)
-    return str(content)
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
+    messages = _build_messages(system_prompt, history, prompt)
+    response = _invoke_with_retries(lambda: client.chat.completions.create(
+        model=model_name, messages=messages, temperature=0
+    ))
+    return str(response.choices[0].message.content or "")
 
 
 def _generate_groq_response(
@@ -65,30 +73,141 @@ def _generate_groq_response(
     model_name = model_override or os.getenv("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
     if not api_key:
         raise ValueError("GROQ_API_KEY is required for provider='groq'.")
-    try:
-        from langchain_groq import ChatGroq
-    except ImportError as exc:
-        raise ImportError(
-            "langchain-groq is not installed. Install dependencies from backend/requirements.txt."
-        ) from exc
-    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+    from groq import Groq
+    client = Groq(api_key=api_key)
+    messages = _build_messages(system_prompt, history, prompt)
+    response = _invoke_with_retries(lambda: client.chat.completions.create(
+        model=model_name, messages=messages, temperature=0
+    ))
+    return str(response.choices[0].message.content or "")
 
-    llm = ChatGroq(groq_api_key=api_key, model=model_name, temperature=0)
-    messages = []
+
+def _build_messages(
+    system_prompt: str | None,
+    history: list[dict] | None,
+    prompt: str,
+) -> list[dict]:
+    messages: list[dict] = []
     if system_prompt:
-        messages.append(SystemMessage(content=system_prompt))
+        messages.append({"role": "system", "content": system_prompt})
     for turn in (history or []):
-        if turn.get("role") == "user":
-            messages.append(HumanMessage(content=turn["content"]))
-        elif turn.get("role") == "assistant":
-            messages.append(AIMessage(content=turn["content"]))
-    messages.append(HumanMessage(content=prompt))
-    response = _invoke_with_retries(lambda: llm.invoke(messages))
-    content = response.content
-    if isinstance(content, list):
-        return " ".join(str(part) for part in content)
-    return str(content)
+        role = turn.get("role", "user")
+        content = turn.get("content", "")
+        messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": prompt})
+    return messages
 
+
+# ---------------------------------------------------------------------------
+# Tool-calling helpers
+# ---------------------------------------------------------------------------
+
+def _groq_with_tools(
+    messages: list[dict],
+    tools: list[dict],
+    model_override: str | None = None,
+) -> tuple[str, list[dict]]:
+    api_key = os.getenv("GROQ_API_KEY")
+    model_name = model_override or os.getenv("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY is required for provider='groq'.")
+    from groq import Groq
+    client = Groq(api_key=api_key)
+    response = _invoke_with_retries(lambda: client.chat.completions.create(
+        model=model_name,
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+        temperature=0,
+    ))
+    msg = response.choices[0].message
+    text = msg.content or ""
+    tool_calls = []
+    if msg.tool_calls:
+        for tc in msg.tool_calls:
+            try:
+                args = json.loads(tc.function.arguments)
+            except Exception:
+                args = {}
+            tool_calls.append({
+                "id": tc.id,
+                "name": tc.function.name,
+                "arguments": args,
+            })
+    return text, tool_calls
+
+
+def _openai_with_tools(
+    messages: list[dict],
+    tools: list[dict],
+    model_override: str | None = None,
+) -> tuple[str, list[dict]]:
+    api_key = os.getenv("OPENAI_API_KEY")
+    model_name = model_override or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY is required for provider='openai'.")
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
+    response = _invoke_with_retries(lambda: client.chat.completions.create(
+        model=model_name,
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+        temperature=0,
+    ))
+    msg = response.choices[0].message
+    text = msg.content or ""
+    tool_calls = []
+    if msg.tool_calls:
+        for tc in msg.tool_calls:
+            try:
+                args = json.loads(tc.function.arguments)
+            except Exception:
+                args = {}
+            tool_calls.append({
+                "id": tc.id,
+                "name": tc.function.name,
+                "arguments": args,
+            })
+    return text, tool_calls
+
+
+def _mock_with_tools(messages: list[dict]) -> tuple[str, list[dict]]:
+    """Simulate a minimal tool-call sequence for the mock provider."""
+    def tc(name: str, args: dict) -> dict:
+        return {"id": str(uuid.uuid4()), "name": name, "arguments": args}
+
+    # Count how many of each tool have been called so far.
+    sends = sum(
+        1 for m in messages
+        if m.get("role") == "assistant" and m.get("tool_calls")
+        and any(t["function"]["name"] == "send_to_target" for t in m["tool_calls"])
+    )
+    templates = sum(
+        1 for m in messages
+        if m.get("role") == "assistant" and m.get("tool_calls")
+        and any(t["function"]["name"] == "apply_template" for t in m["tool_calls"])
+    )
+
+    if templates == 0:
+        return "", [tc("apply_template", {"template_id": "direct_jailbreak.base"})]
+
+    if sends == 0:
+        # Grab template output from last tool result message.
+        template_output = "Mock attack prompt"
+        for m in reversed(messages):
+            if m.get("role") == "tool":
+                template_output = m.get("content", template_output)
+                break
+        return "", [tc("send_to_target", {"prompt": template_output})]
+
+    # After the first send, we're done.
+    return "Mock attack complete.", []
+
+
+# ---------------------------------------------------------------------------
+# Mock single-turn
+# ---------------------------------------------------------------------------
 
 def _generate_mock_response(prompt: str) -> str:
     def is_unsafe(text: str) -> bool:
@@ -138,6 +257,10 @@ def _try_b64_decode(candidate: str) -> str | None:
         return None
     return text or None
 
+
+# ---------------------------------------------------------------------------
+# Retry logic
+# ---------------------------------------------------------------------------
 
 def _invoke_with_retries(fn, retries: int | None = None, base_delay: float | None = None):
     last_exc: Exception | None = None

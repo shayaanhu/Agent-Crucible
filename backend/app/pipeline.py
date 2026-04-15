@@ -170,6 +170,7 @@ def execute_run(run_id: str) -> None:
                 detector_results=detector_results,
                 dry_run=request.dry_run,
             )
+            from backend.app.schemas import AgentStep as SchemaAgentStep
             event = AttackTurn(
                 turn_index=turn.turn_index,
                 input=turn.prompt,
@@ -189,6 +190,15 @@ def execute_run(run_id: str) -> None:
                 attacker_provider=turn.attacker_provider,
                 target_provider=turn.target_provider,
                 objective_goal=turn.objective_goal,
+                agent_steps=[
+                    SchemaAgentStep(
+                        step_index=s.step_index,
+                        tool_name=s.tool_name,
+                        tool_input=s.tool_input,
+                        tool_output=s.tool_output,
+                    )
+                    for s in (turn.agent_steps or [])
+                ],
             )
             store.add_event(run_id, event, verdict)
             store.update_run(

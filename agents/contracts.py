@@ -7,6 +7,15 @@ BlueTeamAction = Literal["allow", "block", "redact", "safe_rewrite", "escalate"]
 BlueTeamSeverity = Literal["low", "medium", "high", "critical"]
 
 
+@dataclass
+class AgentStep:
+    """A single tool call made by the red-team agent during an attack session."""
+    step_index: int
+    tool_name: str
+    tool_input: Dict[str, Any]
+    tool_output: str
+
+
 @dataclass(frozen=True)
 class BlueTeamVerdict:
     allowed: bool
@@ -39,6 +48,7 @@ class RedTeamTurn:
     attacker_provider: str
     target_provider: str
     objective_goal: str
+    agent_steps: List[AgentStep] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

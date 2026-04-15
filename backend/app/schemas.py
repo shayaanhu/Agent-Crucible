@@ -54,6 +54,13 @@ class RunStatusResponse(BaseModel):
     dry_run: bool = False
 
 
+class AgentStep(BaseModel):
+    step_index: int
+    tool_name: str
+    tool_input: Dict[str, Any]
+    tool_output: str
+
+
 class AttackTurn(BaseModel):
     turn_index: int
     input: str
@@ -73,6 +80,7 @@ class AttackTurn(BaseModel):
     attacker_provider: str | None = None
     target_provider: str | None = None
     objective_goal: str | None = None
+    agent_steps: List[AgentStep] = Field(default_factory=list)
 
 
 class GuardrailVerdict(BaseModel):
