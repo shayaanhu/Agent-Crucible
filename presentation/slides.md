@@ -10,17 +10,17 @@ This document outlines the 11-slide narrative for the Agent Crucible framework. 
 - **Tagline**: Adversarial LLM safety testing, built for the classroom.
 - **Metadata**: **Muhammad Shayaan Qazi & Mohammad Farzam Ghouri** · CS / Habib University
 
-## Slide 2: Context / The Hook
-- **Eyebrow**: Project Motivation
-- **Title**: The Safety Gap
-- **Tagline**: Modern LLM security tools are built for researchers, not students.
-- **Metadata**: **85% of student AI projects** skip structured safety testing due to tool complexity.
+## Slide 2: The Context
+- **Eyebrow**: The Context
+- **Title**: The Visibility Gap
+- **Tagline**: LLM failures are usually invisible. You see the outcome, but not the adversarial process.
+- **Metadata**: Students lack the **tracing tools** needed to understand how a model actually fails.
 
 ## Slide 3: The Problem
-- **Eyebrow**: Problem Statement
-- **Title**: Security is Opaque
-- **Tagline**: Existing frameworks produce raw logs that are difficult to interpret.
-- **Metadata**: Students are left with **raw JSON outputs** rather than actionable safety insights.
+- **Eyebrow**: The Problem
+- **Title**: The Black Box
+- **Tagline**: Existing frameworks produce raw logs that are opaque to students.
+- **Metadata**: Seeing a **security breach** is easy; understanding the mechanics of that breach is impossible.
 
 ## Slide 4: Technical Stack
 - **Eyebrow**: Technical Blueprint
@@ -28,11 +28,11 @@ This document outlines the 11-slide narrative for the Agent Crucible framework. 
 - **Tagline**: An enterprise-grade stack optimized for rapid educational prototyping.
 - **Metadata**: **FastAPI** backend · **React** frontend · **GPT-OSS / Llama 3** inference.
 
-## Slide 5: Core Architecture
-- **Eyebrow**: Internal Logic
+## Slide 5: The Tracing Engine
+- **Eyebrow**: The Tracing Engine
 - **Title**: The Sentinel Loop
-- **Tagline**: A multi-turn agentic Red-Team loop against a layered Blue-Team policy engine.
-- **Metadata**: Native function-calling **agentic reasoning** between every attack step.
+- **Tagline**: A multi-turn agentic loop designed to expose every step of the attack/defense cycle.
+- **Metadata**: Real-time **interpretable tracing** between every adversarial decision.
 
 ## Slide 6: Offensive Engine
 - **Eyebrow**: Offensive Capabilities
