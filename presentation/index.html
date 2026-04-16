@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Agent Crucible</title>
@@ -32,33 +33,33 @@
       gap: 0;
       box-sizing: border-box;
       /* barely-there center glow — the only background treatment */
-      background: radial-gradient(
-        ellipse 55% 50% at 50% 50%,
-        rgba(255, 255, 255, 0.025) 0%,
-        transparent 70%
-      ), #0c0c0c;
+      background: radial-gradient(ellipse 55% 50% at 50% 50%,
+          rgba(255, 255, 255, 0.025) 0%,
+          transparent 70%), #0c0c0c;
     }
 
     /* ── Elements ─────────────────────────────────────────────────────── */
+    /* ── Elements ─────────────────────────────────────────────────────── */
     .eyebrow {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      letter-spacing: 0.22em;
+      font-size: 16px;
+      letter-spacing: 0.28em;
       text-transform: uppercase;
-      color: #444;
+      color: #888;
       margin-bottom: 40px;
       /* start hidden */
       opacity: 0;
     }
 
     .title {
-      font-size: 108px;
+      font-size: 124px;
       font-weight: 900;
       letter-spacing: -0.045em;
       line-height: 1;
       color: #eeeeee;
       margin-bottom: 28px;
       opacity: 0;
+      position: relative;
     }
 
     .rule {
@@ -72,18 +73,18 @@
     }
 
     .tagline {
-      font-size: 22px;
+      font-size: 28px;
       font-weight: 400;
-      color: #666;
+      color: #888;
       letter-spacing: 0.01em;
       margin-bottom: 64px;
       opacity: 0;
     }
 
     .metadata {
-      font-size: 14px;
+      font-size: 20px;
       font-weight: 400;
-      color: #444;
+      color: #666;
       letter-spacing: 0.04em;
       line-height: 1.8;
       text-align: center;
@@ -91,43 +92,115 @@
     }
 
     .metadata strong {
-      color: #888;
+      color: #aaa;
       font-weight: 500;
     }
 
     .mono {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
       letter-spacing: 0.02em;
+    }
+
+    /* ── Grid/Card System ─────────────────────────────────────────────── */
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      opacity: 0;
+    }
+
+    .feature-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 30px;
+      border-radius: 12px;
+      text-align: left;
+      backdrop-filter: blur(8px);
+    }
+
+    .feature-card .label {
+      font-family: 'JetBrains Mono', monospace;
+      color: #888;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+
+    .feature-card .value {
+      color: #eee;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .glow-bg {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .glow-bg.red {
+      background: radial-gradient(circle, rgba(239, 68, 68, 0.05) 0%, transparent 70%);
     }
 
     /* ── Animations ───────────────────────────────────────────────────── */
     @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to   { opacity: 1; transform: translateY(0);    }
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     @keyframes growIn {
-      from { opacity: 0; transform: scaleX(0); }
-      to   { opacity: 1; transform: scaleX(1); }
+      from {
+        opacity: 0;
+        transform: scaleX(0);
+      }
+
+      to {
+        opacity: 1;
+        transform: scaleX(1);
+      }
     }
 
     /* Trigger on .present — sequential delays create the "waterfall" */
     .reveal .present .eyebrow {
       animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
     }
+
     .reveal .present .title {
       animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
     }
+
     .reveal .present .rule {
       animation: growIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.75s both;
     }
+
     .reveal .present .tagline {
       animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.95s both;
     }
+
     .reveal .present .metadata {
       animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 1.2s both;
     }
+
+    .reveal .present .grid-container {
+      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.85s both;
+    }
+
     /* ── Navigation ───────────────────────────────────────────────────── */
     .reveal .controls {
       color: #333 !important;
@@ -141,173 +214,244 @@
     .reveal .progress span {
       background: linear-gradient(90deg, #ef4444, #3b82f6) !important;
     }
-
   </style>
 </head>
+
 <body>
-<div class="reveal">
-  <div class="slides">
+  <div class="reveal">
+    <div class="slides">
 
-    <!-- Slide 1: Frontispiece -->
-    <section data-background-color="#0c0c0c">
-      <div class="title-slide">
-        <div class="eyebrow">Generative AI &nbsp;·&nbsp; Spring 2026</div>
-        <div class="title">Agent Crucible</div>
-        <div class="rule"></div>
-        <div class="tagline">Adversarial LLM safety testing, built for the classroom.</div>
-        <div class="metadata">
-          <strong>Muhammad Shayaan &nbsp;·&nbsp; Mohammad Farzam Ghouri</strong><br>
-          CS &nbsp;/&nbsp; Habib University
+      <!-- Slide 1: Frontispiece -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide">
+          <div class="glow-bg"></div>
+          <div class="eyebrow">Generative AI Practices &nbsp;·&nbsp; Spring 2026</div>
+          <div class="title">Agent Crucible</div>
+          <div class="rule"></div>
+          <div class="tagline">Adversarial LLM safety testing, built for the classroom.</div>
+          <div class="metadata">
+            <strong>Muhammad Shayaan Qazi &nbsp;·&nbsp; Mohammad Farzam Ghouri</strong><br>
+            CS &nbsp;/&nbsp; Habib University
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Slide 2: The Complexity Gap -->
-    <section data-background-color="#0c0c0c">
-      <div class="title-slide">
-        <div class="eyebrow">The Problem</div>
-        <div class="title">Security is Opaque</div>
-        <div class="rule"></div>
-        <div class="tagline">Enterprise tools are built for researchers; students are left with raw logs.</div>
-        <div class="metadata">
-          <strong>85% of student AI projects</strong> skip structured safety testing due to tool complexity.
+      <!-- Slide 2: The Complexity Gap -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide">
+          <div class="eyebrow">The Problem</div>
+          <div class="title">Security is Opaque</div>
+          <div class="rule"></div>
+          <div class="tagline">Enterprise tools are built for researchers; students are left with raw logs.</div>
+          <div class="metadata">
+            <strong>85% of student AI projects</strong> skip structured safety testing due to tool complexity.
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Slide 3: Our Core Mission -->
-    <section data-background-color="#0c0c0c">
-      <div class="title-slide">
-        <div class="eyebrow">The Solution</div>
-        <div class="title">Education First</div>
-        <div class="rule"></div>
-        <div class="tagline">Making LLM failures visible, explainable, and measurable for everyone.</div>
-        <div class="metadata">
-          <strong>Visible</strong> turn-by-turn tracing &nbsp;·&nbsp; <strong>Explainable</strong> policy verdicts &nbsp;·&nbsp; <strong>Measurable</strong> resiliency.
+      <!-- Slide 3: Our Core Mission -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide">
+          <div class="eyebrow">The Solution</div>
+          <div class="title">Education First</div>
+          <div class="rule"></div>
+          <div class="tagline">Making LLM failures visible, explainable, and measurable for everyone.</div>
+          <div class="metadata">
+            <strong>Visible</strong> turn-by-turn tracing &nbsp;·&nbsp; <strong>Explainable</strong> policy verdicts
+            &nbsp;·&nbsp; <strong>Measurable</strong> resiliency.
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Slide 4: System Architecture -->
-    <section data-background-color="#0c0c0c">
-      <div class="title-slide">
-        <div class="eyebrow">Technical Blueprint</div>
-        <div class="title">The Sentinel Loop</div>
-        <div class="rule"></div>
-        <div class="tagline">An agentic red-team loop against a multi-layered blue-team policy engine.</div>
-        <div class="metadata mono">
-          <strong>FastAPI</strong> backend &nbsp;·&nbsp; <strong>React</strong> frontend &nbsp;·&nbsp; <strong>Groq / Llama 3</strong> native agentic logic.
+      <!-- Slide 4: System Architecture -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide">
+          <div class="eyebrow">Technical Blueprint</div>
+          <div class="title">The Sentinel Loop</div>
+          <div class="rule"></div>
+          <div class="tagline">An agentic red-team loop against a multi-layered blue-team policy engine.</div>
+          <div class="metadata mono">
+            <strong>FastAPI</strong> backend &nbsp;·&nbsp; <strong>React</strong> frontend &nbsp;·&nbsp;
+            <strong>GPT-OSS-120B / Llama 3</strong> native agentic logic.
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Slide 5: The Red-Team (Adversary) -->
-    <section data-background-color="#0c0c0c">
-      <div class="title-slide">
-        <div class="eyebrow">Offensive Capabilities</div>
-        <div class="title">Adaptive Attacks</div>
-        <div class="rule"></div>
-        <div class="tagline">8 strategies that reason and adapt, moving beyond static prompt injection.</div>
-        <div class="metadata mono">
-          Direct &nbsp;·&nbsp; Roleplay &nbsp;·&nbsp; Confusion &nbsp;·&nbsp; Override &nbsp;·&nbsp; Poisoning &nbsp;·&nbsp; Sandwich &nbsp;·&nbsp; Probing &nbsp;·&nbsp; Escalation
+      <!-- Slide 5: The Red-Team (Adversary) -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide">
+          <div class="glow-bg red"></div>
+          <div class="eyebrow">Offensive Capabilities</div>
+          <div class="title">Adaptive Attacks</div>
+          <div class="rule"></div>
+          <div class="tagline">Reasoning and adaptation, moving beyond static prompt injection.</div>
+
+          <div class="grid-container" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="feature-card">
+              <div class="label">Primary</div>
+              <div class="value">Direct</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Context</div>
+              <div class="value">Roleplay</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Signal</div>
+              <div class="value">Confusion</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Control</div>
+              <div class="value">Override</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Infection</div>
+              <div class="value">Poisoning</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Ordering</div>
+              <div class="value">Sandwich</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Recon</div>
+              <div class="value">Probing</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Growth</div>
+              <div class="value">Escalation</div>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Slide 6: The Blue-Team (Sentinel) -->
-    <section data-background-color="#0c0c0c">
-      <div class="title-slide">
-        <div class="eyebrow">Defensive Resilience</div>
-        <div class="title">Dynamic Guardrails</div>
-        <div class="rule"></div>
-        <div class="tagline">6 configurable policies that execute 5 distinct semantic response actions.</div>
-        <div class="metadata mono">
-          <strong>Block &nbsp;·&nbsp; Redact &nbsp;·&nbsp; Safe Rewrite &nbsp;·&nbsp; Escalate &nbsp;·&nbsp; Allow</strong><br>
-          JSON-driven policy configuration
+      <!-- Slide 6: The Blue-Team (Sentinel) -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide">
+          <div class="glow-bg"></div>
+          <div class="eyebrow">Defensive Resilience</div>
+          <div class="title">Dynamic Guardrails</div>
+          <div class="rule"></div>
+          <div class="tagline">Executing distinct semantic response actions across a unified policy engine.</div>
+
+          <div class="grid-container" style="grid-template-columns: repeat(5, 1fr); max-width: 1400px;">
+            <div class="feature-card" style="border-bottom: 2px solid #ef4444;">
+              <div class="label">Action</div>
+              <div class="value">Block</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Action</div>
+              <div class="value">Redact</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Action</div>
+              <div class="value">Rewrite</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Action</div>
+              <div class="value">Escalate</div>
+            </div>
+            <div class="feature-card" style="border-bottom: 2px solid #3b82f6;">
+              <div class="label">Action</div>
+              <div class="value">Allow</div>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Slide 7: The Lab Experience -->
-    <section data-background-color="#0c0c0c">
-      <div class="title-slide">
-        <div class="eyebrow">Interactive Learning</div>
-        <div class="title">Tangible Security</div>
-        <div class="rule"></div>
-        <div class="tagline">Scripted turns and real-time visualization turn dry theory into active labs.</div>
-        <div class="metadata">
-          <strong>Live Attack Lab</strong> &nbsp;·&nbsp; <strong>Scripted Classrooms</strong> &nbsp;·&nbsp; <strong>Freeform Sandbox Mode</strong>
+      <!-- Slide 7: The Lab Experience -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide">
+          <div class="eyebrow">Interactive Learning</div>
+          <div class="title">Tangible Security</div>
+          <div class="rule"></div>
+          <div class="tagline">Scripted turns and real-time visualization turn dry theory into active labs.</div>
+          <div class="metadata">
+            <strong>Live Attack Lab</strong> &nbsp;·&nbsp; <strong>Scripted Classrooms</strong> &nbsp;·&nbsp;
+            <strong>Freeform Sandbox Mode</strong>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Slide 8: Evaluation Suite -->
-    <section data-background-color="#0c0c0c">
-      <div class="title-slide">
-        <div class="eyebrow">Empirical Validation</div>
-        <div class="title">The Resiliency Score</div>
-        <div class="rule"></div>
-        <div class="tagline">Automated benchmarking across 20+ scenarios to quantify system safety.</div>
-        <div class="metadata">
-          <strong>Breach Rate</strong> tracking &nbsp;·&nbsp; <strong>Over-refusal</strong> measurement &nbsp;·&nbsp; <strong>Latency</strong> analysis
+      <!-- Slide 8: Evaluation Suite -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide">
+          <div class="eyebrow">Empirical Validation</div>
+          <div class="title">Resiliency Score</div>
+          <div class="rule"></div>
+          <div class="tagline">Automated benchmarking across 20+ scenarios to quantify system safety.</div>
+
+          <div class="grid-container" style="grid-template-columns: repeat(3, 1fr); max-width: 900px;">
+            <div class="feature-card">
+              <div class="label">Binary</div>
+              <div class="value">Breach Rate</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Semantic</div>
+              <div class="value">Over-refusal</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Metric</div>
+              <div class="value">Latency</div>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Slide 9: Design Philosophy -->
-    <section data-background-color="#0c0c0c">
-      <div class="title-slide">
-        <div class="eyebrow">Brand Identity</div>
-        <div class="title">Tool, Not Toy</div>
-        <div class="rule"></div>
-        <div class="tagline">A workbench aesthetic that stays quiet until something significant happens.</div>
-        <div class="metadata">
-          <strong>Satoshi Black</strong> impact &nbsp;·&nbsp; <strong>JetBrains Mono</strong> clarity &nbsp;·&nbsp; <strong>Linear</strong> inspired motion
+      <!-- Slide 9: Design Philosophy -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide">
+          <div class="eyebrow">Brand Identity</div>
+          <div class="title">Tool, Not Toy</div>
+          <div class="rule"></div>
+          <div class="tagline">A workbench aesthetic that stays quiet until something significant happens.</div>
+          <div class="metadata">
+            <strong>Satoshi Black</strong> impact &nbsp;·&nbsp; <strong>JetBrains Mono</strong> clarity &nbsp;·&nbsp;
+            <strong>Linear</strong> inspired motion
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Slide 10: Conclusion -->
-    <section data-background-color="#0c0c0c">
-      <div class="title-slide">
-        <div class="eyebrow">Closing</div>
-        <div class="title">Secure by Design</div>
-        <div class="rule"></div>
-        <div class="tagline">Empowering the next generation of AI developers to build safely.</div>
-        <div class="metadata mono">
-          github.com/shayaanhu/Agent-Crucible &nbsp;·&nbsp; v1.0
+      <!-- Slide 10: Conclusion -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide">
+          <div class="eyebrow">Closing</div>
+          <div class="title">Secure by Design</div>
+          <div class="rule"></div>
+          <div class="tagline">Empowering the next generation of AI developers to build safely.</div>
+          <div class="metadata mono">
+            github.com/shayaanhu/Agent-Crucible &nbsp;·&nbsp; v1.0
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
+    </div>
   </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
-<script>
-  Reveal.initialize({
-    width: 1600, height: 900,
-    margin: 0, minScale: 0.1, maxScale: 2,
-    controls: true, 
-    progress: true,
-    history: true, 
-    center: false,
-    transition: 'fade',
-    transitionSpeed: 'slow',
-    keyboard: true,
-    touch: true,
-    mouseWheel: true,
-    // Add click to advance
-    embedded: false,
-    help: true
-  });
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script>
+    Reveal.initialize({
+      width: 1600, height: 900,
+      margin: 0, minScale: 0.1, maxScale: 2,
+      controls: true,
+      progress: true,
+      history: true,
+      center: false,
+      transition: 'fade',
+      transitionSpeed: 'slow',
+      keyboard: true,
+      touch: true,
+      mouseWheel: true,
+      // Add click to advance
+      embedded: false,
+      help: true
+    });
 
-  // Simple click to advance functionality
-  document.addEventListener('click', function(event) {
-    if (event.target.closest('.slides')) {
-      Reveal.next();
-    }
-  }, false);
-</script>
+    // Simple click to advance functionality
+    document.addEventListener('click', function (event) {
+      if (event.target.closest('.slides')) {
+        Reveal.next();
+      }
+    }, false);
+  </script>
 </body>
+
 </html>
