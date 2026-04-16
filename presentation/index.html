@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Agent Crucible</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@900,700,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Base ─────────────────────────────────────────────────────────── */
+    .reveal-viewport,
+    .reveal,
+    .reveal .slides {
+      background: #0c0c0c !important;
+    }
+
+    .reveal .slides section {
+      font-family: 'Satoshi', -apple-system, sans-serif;
+      top: 0 !important;
+    }
+
+    /* ── Slide ────────────────────────────────────────────────────────── */
+    .title-slide {
+      width: 1600px;
+      height: 900px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      box-sizing: border-box;
+      /* barely-there center glow — the only background treatment */
+      background: radial-gradient(
+        ellipse 55% 50% at 50% 50%,
+        rgba(255, 255, 255, 0.025) 0%,
+        transparent 70%
+      ), #0c0c0c;
+    }
+
+    /* ── Elements ─────────────────────────────────────────────────────── */
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #444;
+      margin-bottom: 40px;
+      /* start hidden */
+      opacity: 0;
+    }
+
+    .title {
+      font-size: 108px;
+      font-weight: 900;
+      letter-spacing: -0.045em;
+      line-height: 1;
+      color: #eeeeee;
+      margin-bottom: 28px;
+      opacity: 0;
+    }
+
+    .rule {
+      width: 48px;
+      height: 1.5px;
+      background: linear-gradient(90deg, #ef4444, #3b82f6);
+      border-radius: 2px;
+      margin-bottom: 28px;
+      transform-origin: center;
+      opacity: 0;
+    }
+
+    .tagline {
+      font-size: 22px;
+      font-weight: 400;
+      color: #666;
+      letter-spacing: 0.01em;
+      margin-bottom: 64px;
+      opacity: 0;
+    }
+
+    .authors {
+      font-size: 14px;
+      font-weight: 400;
+      color: #444;
+      letter-spacing: 0.04em;
+      line-height: 1.8;
+      text-align: center;
+      opacity: 0;
+    }
+
+    .authors strong {
+      color: #888;
+      font-weight: 500;
+    }
+
+    /* ── Animations ───────────────────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+
+    @keyframes growIn {
+      from { opacity: 0; transform: scaleX(0); }
+      to   { opacity: 1; transform: scaleX(1); }
+    }
+
+    /* Trigger on .present — sequential delays create the "waterfall" */
+    .reveal .present .eyebrow {
+      animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+    }
+    .reveal .present .title {
+      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+    }
+    .reveal .present .rule {
+      animation: growIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.75s both;
+    }
+    .reveal .present .tagline {
+      animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.95s both;
+    }
+    .reveal .present .authors {
+      animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 1.2s both;
+    }
+  </style>
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+
+    <section>
+      <div class="title-slide">
+
+        <div class="eyebrow">Generative AI &nbsp;·&nbsp; Spring 2026</div>
+
+        <div class="title">Agent Crucible</div>
+
+        <div class="rule"></div>
+
+        <div class="tagline">Adversarial LLM safety testing, built for the classroom.</div>
+
+        <div class="authors">
+          <strong>Muhammad Shayaan &nbsp;·&nbsp; Mohammad Farzam Ghouri</strong><br>
+          CS &nbsp;/&nbsp; Habib University
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    width: 1600, height: 900,
+    margin: 0, minScale: 0.1, maxScale: 2,
+    controls: false, progress: false,
+    history: false, center: false,
+    transition: 'none',
+  });
+</script>
+</body>
+</html>
