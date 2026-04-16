@@ -10,7 +10,7 @@ import LiveBlueBenchmarkSection from "./features/lab/LiveBlueBenchmarkSection";
 import SandboxView from "./features/sandbox/SandboxView";
 import EvaluationView from "./features/evaluation/EvaluationView";
 import LabsView from "./features/labs/LabsView";
-import { API_BASE, APP_STORAGE_KEY, LABS_STORAGE_KEY, DEFAULT_LABS } from "./constants";
+import { API_BASE, APP_STORAGE_KEY, LABS_STORAGE_KEY } from "./constants";
 import { readStorageJSON, writeStorageJSON } from "./utils/storage";
 import { summarizeBlueTeam } from "./utils/analysis";
 import {
@@ -48,12 +48,7 @@ export default function App() {
   const [suiteRun, setSuiteRun] = useState(null);
   const suitePollerRef = useRef(null);
   const [liveActiveTurnIdx, setLiveActiveTurnIdx] = useState(0);
-  const [labs, setLabs] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(LABS_STORAGE_KEY));
-      return Array.isArray(saved) ? saved : DEFAULT_LABS;
-    } catch (_) { return DEFAULT_LABS; }
-  });
+  const [labs, setLabs] = useState([]);
   const [sandboxRuns, setSandboxRuns] = useState([]); // [{ id, name, turns, currentPrompt, statusDot, updatedAt }]
   const [sandboxRunId, setSandboxRunId] = useState("");
   const [selectedEntry, setSelectedEntry] = useState(null);
@@ -166,6 +161,31 @@ export default function App() {
       if (typeof saved.sandboxRunId === "string") setSandboxRunId(saved.sandboxRunId);
     }
     appStateHydrated.current = true;
+  }, []);
+
+  // Fetch system labs from the backend (labs/*.json files) and merge with any
+  // user-created labs stored in localStorage. System labs always win on id conflicts
+  // so instructors can update lab files and students see the update on next load.
+  useEffect(() => {
+    fetch(`${API_BASE}/api/v1/labs`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data.labs)) return;
+        const systemIds = new Set(data.labs.map((l) => l.id));
+        let userLabs = [];
+        try {
+          const saved = JSON.parse(localStorage.getItem(LABS_STORAGE_KEY));
+          if (Array.isArray(saved)) userLabs = saved.filter((l) => !systemIds.has(l.id));
+        } catch (_) {}
+        setLabs([...data.labs, ...userLabs]);
+      })
+      .catch(() => {
+        // API unavailable — fall back to user labs only
+        try {
+          const saved = JSON.parse(localStorage.getItem(LABS_STORAGE_KEY));
+          if (Array.isArray(saved)) setLabs(saved);
+        } catch (_) {}
+      });
   }, []);
 
   useEffect(() => {
@@ -339,22 +359,40 @@ export default function App() {
   // ── Labs ────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    try { localStorage.setItem(LABS_STORAGE_KEY, JSON.stringify(labs)); } catch (_) {}
+    // Only persist user-created labs. System labs always load fresh from the API.
+    const userLabs = labs.filter((l) => !l.id?.startsWith("lab-default-"));
+    try { localStorage.setItem(LABS_STORAGE_KEY, JSON.stringify(userLabs)); } catch (_) {}
   }, [labs]);
 
-  function saveLab(draft) {
-    setLabs((prev) => {
-      const idx = prev.findIndex((l) => l.id === draft.id);
-      if (idx !== -1) {
-        const next = [...prev];
-        next[idx] = draft;
-        return next;
-      }
-      return [...prev, draft];
-    });
+  async function saveLab(draft) {
+    const isNew = !labs.find((l) => l.id === draft.id);
+    const method = isNew ? "POST" : "PUT";
+    const url = isNew ? `${API_BASE}/api/v1/labs` : `${API_BASE}/api/v1/labs/${draft.id}`;
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      if (!res.ok) throw new Error("API save failed");
+      const saved = await res.json();
+      setLabs((prev) => {
+        const idx = prev.findIndex((l) => l.id === saved.id);
+        return idx !== -1 ? prev.map((l) => (l.id === saved.id ? saved : l)) : [...prev, saved];
+      });
+    } catch (_) {
+      // API unavailable (e.g. backend down) — fall back to local state only
+      setLabs((prev) => {
+        const idx = prev.findIndex((l) => l.id === draft.id);
+        return idx !== -1 ? prev.map((l) => (l.id === draft.id ? draft : l)) : [...prev, draft];
+      });
+    }
   }
 
-  function deleteLab(labId) {
+  async function deleteLab(labId) {
+    try {
+      await fetch(`${API_BASE}/api/v1/labs/${labId}`, { method: "DELETE" });
+    } catch (_) {}
     setLabs((prev) => prev.filter((l) => l.id !== labId));
   }
 
@@ -387,6 +425,7 @@ export default function App() {
             lab_id: lab.id,
             attacker_model: cfg.attacker_model || "gpt-oss-120b",
             target_model: cfg.target_model || "llama-3.1-8b-instant",
+            ...(cfg.scripted_turns ? { scripted_turns: JSON.stringify(cfg.scripted_turns) } : {}),
           },
         }),
       });

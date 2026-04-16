@@ -163,6 +163,54 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+LABS_DIR = Path("labs")
+
+
+@app.get("/api/v1/labs")
+def get_labs() -> dict:
+    labs: list[dict] = []
+    if LABS_DIR.exists():
+        for path in sorted(LABS_DIR.glob("*.json")):
+            try:
+                lab = json.loads(path.read_text(encoding="utf-8"))
+                labs.append(lab)
+            except Exception:
+                pass
+    return {"labs": labs}
+
+
+@app.post("/api/v1/labs", status_code=201)
+def create_lab(payload: dict) -> dict:
+    lab_id = payload.get("id")
+    if not lab_id or not isinstance(lab_id, str):
+        raise HTTPException(status_code=400, detail="Lab must have a string 'id' field")
+    LABS_DIR.mkdir(parents=True, exist_ok=True)
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in lab_id)
+    path = LABS_DIR / f"{safe_name}.json"
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    return payload
+
+
+@app.put("/api/v1/labs/{lab_id}")
+def update_lab(lab_id: str, payload: dict) -> dict:
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in lab_id)
+    path = LABS_DIR / f"{safe_name}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Lab not found")
+    payload["id"] = lab_id
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    return payload
+
+
+@app.delete("/api/v1/labs/{lab_id}", status_code=204)
+def delete_lab(lab_id: str) -> None:
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in lab_id)
+    path = LABS_DIR / f"{safe_name}.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Lab not found")
+    path.unlink()
+
+
 @app.get("/api/v1/benchmarks/blue-team")
 def get_blue_team_benchmark() -> dict:
     from eval.run_blue_team_benchmark import generate_benchmark

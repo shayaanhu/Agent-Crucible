@@ -102,9 +102,93 @@ def _enforce_guardrail_action(
     return effective_allowed, effective_action, effective_reason, effective_output, detector_results, redacted_output
 
 
+def execute_scripted_run(run_id: str) -> None:
+    """Run a lab exercise using pre-scripted turns — no LLM calls for attacker or target.
+    The blue-team guardrail still runs live on the scripted target response, making
+    the outcome deterministic and reproducible regardless of model behavior."""
+    request = store.get_request(run_id)
+    if request is None:
+        return
+
+    raw = request.metadata.get("scripted_turns", "")
+    try:
+        scripted_turns = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        scripted_turns = []
+
+    if not scripted_turns:
+        store.update_run(run_id, status="failed", summary="Scripted run has no turns defined.",
+                         is_complete=True, current_phase="failed",
+                         turns_completed=0, max_turns=0)
+        return
+
+    blue_team_agent = get_blue_team_agent()
+    max_turns = len(scripted_turns)
+
+    try:
+        store.update_run(run_id, status="running",
+                         summary="Scripted run started. Replaying pre-defined turns through blue-team.",
+                         turns_completed=0, max_turns=max_turns,
+                         current_phase="blue_team", is_complete=False)
+
+        for idx, turn_def in enumerate(scripted_turns):
+            turn_index = idx + 1
+            attacker_prompt = turn_def.get("attacker_prompt", "")
+            target_response = turn_def.get("target_response", "")
+
+            provider_verdict = blue_team_agent.evaluate_output(target_response)
+            (
+                effective_allowed, effective_action, effective_reason,
+                effective_output, detector_results, redacted_output,
+            ) = _enforce_guardrail_action(target_response, provider_verdict, request.dry_run)
+
+            verdict = GuardrailVerdict(
+                allowed=effective_allowed,
+                category=provider_verdict.category,
+                confidence=provider_verdict.confidence,
+                reason=effective_reason,
+                action=effective_action,
+                severity=provider_verdict.severity,
+                policy_id=provider_verdict.policy_id,
+                detector_results=detector_results,
+                dry_run=request.dry_run,
+                redacted_output=redacted_output,
+            )
+            event = AttackTurn(
+                turn_index=turn_index,
+                input=attacker_prompt,
+                model_output=effective_output,
+                timestamp=utc_now(),
+                strategy_id=request.metadata.get("strategy_id", "scripted"),
+                attack_tag="scripted",
+                attacker_prompt=attacker_prompt,
+                outcome="success" if effective_allowed else "blocked",
+                target_provider=request.provider,
+            )
+            store.add_event(run_id, event, verdict)
+            store.update_run(run_id, status="running",
+                             summary=f"Scripted turn {turn_index}/{max_turns} evaluated.",
+                             turns_completed=turn_index, max_turns=max_turns,
+                             current_phase="blue_team", is_complete=False)
+
+        store.update_run(run_id, status="completed",
+                         summary=f"Scripted run completed: {max_turns} turn(s) evaluated by blue-team.",
+                         turns_completed=max_turns, max_turns=max_turns,
+                         current_phase="complete", is_complete=True)
+    except Exception as exc:
+        store.update_run(run_id, status="failed", summary=f"Scripted run failed: {exc}",
+                         turns_completed=0, max_turns=max_turns,
+                         current_phase="failed", is_complete=True)
+
+
 def execute_run(run_id: str) -> None:
     request = store.get_request(run_id)
     if request is None:
+        return
+
+    # Scripted lab mode: bypass both LLMs, replay pre-defined turns through blue team only.
+    if request.metadata.get("scripted_turns"):
+        execute_scripted_run(run_id)
         return
 
     try:
