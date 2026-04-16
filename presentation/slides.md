@@ -1,64 +1,70 @@
 # Agent Crucible — Presentation Plan
 
-This document outlines the 10-slide narrative for the Agent Crucible framework. Each slide adheres to the strict 5-element typography-first design standard.
+This document outlines the 11-slide narrative for the Agent Crucible framework. Each slide adheres to the typography-first "Professional Workbench" design standard.
 
 ---
 
 ## Slide 1: Frontispiece
-- **Eyebrow**: Generative AI · Spring 2026
+- **Eyebrow**: Generative AI Practices · Spring 2026
 - **Title**: Agent Crucible
 - **Tagline**: Adversarial LLM safety testing, built for the classroom.
-- **Metadata**: **Muhammad Shayaan & Mohammad Farzam Ghouri** · CS / Habib University
+- **Metadata**: **Muhammad Shayaan Qazi & Mohammad Farzam Ghouri** · CS / Habib University
 
-## Slide 2: The Complexity Gap
-- **Eyebrow**: The Problem
-- **Title**: Security is Opaque
-- **Tagline**: Enterprise tools are built for researchers; students are left with raw logs.
+## Slide 2: Context / The Hook
+- **Eyebrow**: Project Motivation
+- **Title**: The Safety Gap
+- **Tagline**: Modern LLM security tools are built for researchers, not students.
 - **Metadata**: **85% of student AI projects** skip structured safety testing due to tool complexity.
 
-## Slide 3: Our Core Mission
-- **Eyebrow**: The Solution
-- **Title**: Education First
-- **Tagline**: Making LLM failures visible, explainable, and measurable for everyone.
-- **Metadata**: **Visible** turn-by-turn tracing · **Explainable** policy verdicts · **Measurable** resiliency.
+## Slide 3: The Problem
+- **Eyebrow**: Problem Statement
+- **Title**: Security is Opaque
+- **Tagline**: Existing frameworks produce raw logs that are difficult to interpret.
+- **Metadata**: Students are left with **raw JSON outputs** rather than actionable safety insights.
 
-## Slide 4: System Architecture
+## Slide 4: Technical Stack
 - **Eyebrow**: Technical Blueprint
-- **Title**: The Sentinel Loop
-- **Tagline**: An agentic red-team loop against a multi-layered blue-team policy engine.
-- **Metadata**: **FastAPI** backend · **React** frontend · **Groq/Llama 3** native agentic logic.
+- **Title**: The Foundation
+- **Tagline**: An enterprise-grade stack optimized for rapid educational prototyping.
+- **Metadata**: **FastAPI** backend · **React** frontend · **GPT-OSS / Llama 3** inference.
 
-## Slide 5: The Red-Team (Adversary)
+## Slide 5: Core Architecture
+- **Eyebrow**: Internal Logic
+- **Title**: The Sentinel Loop
+- **Tagline**: A multi-turn agentic Red-Team loop against a layered Blue-Team policy engine.
+- **Metadata**: Native function-calling **agentic reasoning** between every attack step.
+
+## Slide 6: Offensive Engine
 - **Eyebrow**: Offensive Capabilities
 - **Title**: Adaptive Attacks
 - **Tagline**: 8 strategies that reason and adapt, moving beyond static prompt injection.
 - **Metadata**: **Direct / Roleplay / Confusion / Override / Poisoning / Sandwich / Probing / Escalation.**
 
-## Slide 6: The Blue-Team (Sentinel)
+## Slide 7: Defensive Engine
 - **Eyebrow**: Defensive Resilience
 - **Title**: Dynamic Guardrails
 - **Tagline**: 6 configurable policies that execute 5 distinct semantic response actions.
-- **Metadata**: **Block / Redact / Safe Rewrite / Escalate / Allow** · JSON-driven configuration.
+- **Metadata**: **Block / Redact / Rewrite / Escalate / Allow** · JSON-driven configuration.
 
-## Slide 7: The Lab Experience
-- **Eyebrow**: Interactive Learning
-- **Title**: Tangible Security
-- **Tagline**: Scripted turns and real-time visualization turn dry theory into active labs.
-- **Metadata**: **Live Attack Lab** · **Scripted Classrooms** · **Freeform Sandbox Mode.**
+## Slide 8: The Lab Experience
+- **Eyebrow**: Academic Integration
+- **Title**: Interactive Learning
+- **Tagline**: Scripted turns and reproducible labs turn dry theory into tangible security.
+- **Metadata**: **Live Attack Lab** · **Scripted Mode** · **Attack Sandbox.**
 
-## Slide 8: Evaluation Suite
-- **Eyebrow**: Empirical Validation
-- **Title**: The Resiliency Score
+## Slide 9: LIVE DEMO
+- **Eyebrow**: Demonstration
+- **Title**: Live Walkthrough
+- **Tagline**: **Agent Crucible in Action**
+- **Metadata**: [Clean Transition Slide]
+
+## Slide 10: Evaluation Suite
+- **Eyebrow**: Empirical Results
+- **Title**: Resiliency Score
 - **Tagline**: Automated benchmarking across 20+ scenarios to quantify system safety.
-- **Metadata**: **Breach Rate** tracking · **Over-refusal** measurement · **Latency** analysis.
+- **Metadata**: **Breach Rate** · **Over-refusal** · **Processing Time.**
 
-## Slide 9: Design Philosophy
-- **Eyebrow**: Brand Identity
-- **Title**: Tool, Not Toy
-- **Tagline**: A workbench aesthetic that stays quiet until something significant happens.
-- **Metadata**: **Satoshi Black** impact · **JetBrains Mono** clarity · **Linear** inspired motion.
-
-## Slide 10: Conclusion
+## Slide 11: Conclusion
 - **Eyebrow**: Closing
 - **Title**: Secure by Design
 - **Tagline**: Empowering the next generation of AI developers to build safely.
