@@ -5,6 +5,25 @@ import Fold from "../../components/Fold";
 import DetailPre from "../../components/DetailPre";
 import { formatLabel, formatNumber } from "../../utils/format";
 
+const ADAPTER_META = {
+  llamaguard_detector: {
+    label: "LlamaGuard",
+    maker: "Meta",
+    weight: 0.9,
+    what: "A safety classifier model (Llama-Guard-3-8B) that reads each output and returns SAFE or UNSAFE with a category. Unlike regex rules, it understands context and semantics — catching disguised or paraphrased violations that literal patterns miss.",
+    how: "Runs as a local HuggingFace text-generation pipeline via transformers. The output label and any category hint are parsed and mapped to a policy ID before entering aggregation.",
+    why: "Adds a model-backed second opinion on top of the rule detector, substantially reducing false negatives on novel phrasing. Weighted at 0.9 in aggregation.",
+  },
+  nemo_guardrails_detector: {
+    label: "NeMo Guardrails",
+    maker: "NVIDIA",
+    weight: 0.9,
+    what: "A declarative rail system that wraps an LLM with configurable guardrail rules written in Colang. It intercepts content at the conversation level and can enforce topic bans, jailbreak rails, and custom policies defined outside the code.",
+    how: "Loads a RailsConfig from a directory of Colang + YAML files, then calls LLMRails.generate() with a classification prompt. The result is parsed identically to LlamaGuard and enters the same aggregation pipeline.",
+    why: "Provides a policy-as-config layer that teams can tune without code changes — ideal for iterating on safety rules in production. Weighted at 0.9 alongside LlamaGuard.",
+  },
+};
+
 export default function SandboxBlueTeamEvidence({ verdict }) {
   if (!verdict) return null;
   const dr = verdict.detector_results || {};
@@ -12,9 +31,107 @@ export default function SandboxBlueTeamEvidence({ verdict }) {
   const aggregation = dr._aggregation || {};
   const detectorEntries = Object.entries(dr).filter(([k]) => !k.startsWith("_"));
   const policyEvals = aggregation.policy_evaluations || [];
+  const activeDetectors = aggregation.active_detectors || [];
+
+  const adapters = Object.entries(ADAPTER_META).map(([id, meta]) => {
+    const active = activeDetectors.includes(id);
+    const result  = dr[id];
+    const flagged = active && result && (result.signals || []).some((s) => s.flagged);
+    return { id, ...meta, active, flagged };
+  });
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
+      {/* Adapter status strip */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span className="micro-copy" style={{ opacity: 0.6 }}>Adapters</span>
+        {adapters.map(({ id, label, active, flagged }) => (
+          <span
+            key={id}
+            title={active ? (flagged ? `${label}: flagged` : `${label}: active – clean`) : `${label}: inactive`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "2px 9px",
+              borderRadius: 20,
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.02em",
+              background: active
+                ? flagged
+                  ? "color-mix(in srgb, var(--badge-danger-bg, #ff4d4f33) 100%, transparent)"
+                  : "color-mix(in srgb, var(--badge-safe-bg, #52c41a33) 100%, transparent)"
+                : "var(--surface-2, #2a2a2a)",
+              color: active
+                ? flagged
+                  ? "var(--badge-danger-text, #ff7875)"
+                  : "var(--badge-safe-text, #95de64)"
+                : "var(--text-secondary, #666)",
+              border: "1px solid",
+              borderColor: active
+                ? flagged
+                  ? "var(--badge-danger-text, #ff4d4f)"
+                  : "var(--badge-safe-text, #52c41a)"
+                : "var(--border, #333)",
+            }}
+          >
+            <span style={{ fontSize: 9 }}>{active ? (flagged ? "⬤" : "⬤") : "○"}</span>
+            {label}
+            {active && <span style={{ opacity: 0.65 }}>{flagged ? "· flagged" : "· clean"}</span>}
+            {!active && <span style={{ opacity: 0.45 }}>· off</span>}
+          </span>
+        ))}
+      </div>
+
+      {/* Adapter explainer */}
+      <Fold title="About these adapters">
+        <div style={{ display: "grid", gap: 12 }}>
+          {adapters.map(({ id, label, active, flagged }) => {
+            const meta = ADAPTER_META[id];
+            return (
+              <div
+                key={id}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 6,
+                  background: "var(--surface-2, #1e1e1e)",
+                  border: "1px solid var(--border, #2e2e2e)",
+                  display: "grid",
+                  gap: 6,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 13 }}>{label}</span>
+                  <span className="micro-copy" style={{ opacity: 0.5 }}>by {meta.maker}</span>
+                  <span className="micro-copy" style={{ opacity: 0.5, marginLeft: "auto" }}>
+                    weight {meta.weight} ·{" "}
+                    <span style={{ color: active ? (flagged ? "var(--badge-danger-text,#ff7875)" : "var(--badge-safe-text,#95de64)") : "var(--text-secondary,#666)" }}>
+                      {active ? (flagged ? "flagged" : "active") : "off"}
+                    </span>
+                  </span>
+                </div>
+                <p className="micro-copy" style={{ opacity: 0.85, lineHeight: 1.6, margin: 0 }}>
+                  <strong>What: </strong>{meta.what}
+                </p>
+                <p className="micro-copy" style={{ opacity: 0.85, lineHeight: 1.6, margin: 0 }}>
+                  <strong>How: </strong>{meta.how}
+                </p>
+                <p className="micro-copy" style={{ opacity: 0.85, lineHeight: 1.6, margin: 0 }}>
+                  <strong>Why it matters: </strong>{meta.why}
+                </p>
+              </div>
+            );
+          })}
+          <p className="micro-copy" style={{ opacity: 0.5, margin: 0, lineHeight: 1.6 }}>
+            Both adapters run alongside the <strong>Rule Detector</strong> (regex/pattern matching, weight 1.0).
+            All three signals feed the aggregation engine — if any detector reaches its policy threshold,
+            the verdict is unsafe. If a dependency is missing or unconfigured, that adapter degrades
+            gracefully to a non-blocking safe signal and the rule detector remains the sole enforcer.
+          </p>
+        </div>
+      </Fold>
+
       <KeyGrid
         items={[
           { label: "Outcome",     value: decision.outcome === "unsafe" ? "Unsafe" : "Safe" },

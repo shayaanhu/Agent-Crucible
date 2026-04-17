@@ -53,8 +53,8 @@ class BlueTeamRuntimeConfig:
 
 def get_blue_team_runtime_config() -> BlueTeamRuntimeConfig:
     return BlueTeamRuntimeConfig(
-        enable_llama_guard=_env_flag("BLUE_TEAM_ENABLE_LLAMA_GUARD"),
-        enable_nemo_guardrails=_env_flag("BLUE_TEAM_ENABLE_NEMO_GUARDRAILS"),
+        enable_llama_guard=_env_flag("BLUE_TEAM_ENABLE_LLAMA_GUARD", default=True),
+        enable_nemo_guardrails=_env_flag("BLUE_TEAM_ENABLE_NEMO_GUARDRAILS", default=True),
         llama_guard_model=_env_str("BLUE_TEAM_LLAMA_GUARD_MODEL", "meta-llama/Llama-Guard-3-8B"),
         nemo_config_path=_env_str("BLUE_TEAM_NEMO_CONFIG_PATH", ""),
         policy_config_path=_env_str("BLUE_TEAM_POLICY_CONFIG_PATH", "config/policies.json"),
