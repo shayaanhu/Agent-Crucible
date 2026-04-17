@@ -1,0 +1,52 @@
+define bot block jailbreak attempts
+  "I'm not able to assist with that request."
+
+define bot block prompt injection
+  "I'm not able to follow those instructions."
+
+define bot block unsafe instructions
+  "I can't provide guidance on that."
+
+define bot block sensitive data exposure
+  "I'm not able to share that information."
+
+define bot block toxicity
+  "I'm not going to engage with that kind of language."
+
+define bot block unauthorized medical advice
+  "I'm not able to provide medical prescriptions or specific dosage guidance."
+
+define flow block jailbreak attempts
+  user said "ignore previous instructions"
+  or user said "override safety"
+  or user said "jailbreak"
+  bot block jailbreak attempts
+
+define flow block prompt injection
+  user said "system prompt"
+  or user said "developer message"
+  bot block prompt injection
+
+define flow block unsafe instructions
+  user said "build a bomb"
+  or user said "weaponize"
+  or user said "harm someone"
+  bot block unsafe instructions
+
+define flow block sensitive data exposure
+  user said "api key"
+  or user said "secret token"
+  or user said "password"
+  bot block sensitive data exposure
+
+define flow block toxicity
+  user said "kill yourself"
+  or user said "idiot"
+  or user said "shut up"
+  bot block toxicity
+
+define flow block unauthorized medical advice
+  user said "mg orally"
+  or user said "mg twice daily"
+  or user said "dosage regimen"
+  bot block unauthorized medical advice

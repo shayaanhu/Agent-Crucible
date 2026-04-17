@@ -1,0 +1,17 @@
+models:
+  - type: main
+    engine: openai
+    model: moonshotai/kimi-k2-instruct-0905
+    parameters:
+      openai_api_key: $GROQ_API_KEY
+      openai_api_base: https://api.groq.com/openai/v1
+
+rails:
+  output:
+    flows:
+      - block jailbreak attempts
+      - block prompt injection
+      - block unsafe instructions
+      - block sensitive data exposure
+      - block toxicity
+      - block unauthorized medical advice
