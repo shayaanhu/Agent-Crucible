@@ -14,20 +14,22 @@ function pct(rate) {
 }
 
 function RateRow({ label, succeeded, total }) {
-  const rate = total ? succeeded / total : 0;
-  const tone = toneForRate(rate);
+  const breachRate = total ? succeeded / total : 0;
+  const defenseRate = 1 - breachRate;
+  const defended = total - succeeded;
+  const tone = toneForRate(breachRate);
   return (
     <div className="insights-rate-row">
       <div className="insights-rate-top">
         <span className="insights-rate-label">{formatLabel(label)}</span>
         <span className={`insights-rate-value tone-${tone}`}>
-          {succeeded}/{total}
+          {defended}/{total}
         </span>
       </div>
       <div className="insights-rate-bar">
         <div
           className={`insights-rate-fill tone-${tone}`}
-          style={{ width: rate === 0 ? "2px" : pct(rate) }}
+          style={{ width: defenseRate === 0 ? "2px" : pct(defenseRate) }}
         />
       </div>
     </div>
