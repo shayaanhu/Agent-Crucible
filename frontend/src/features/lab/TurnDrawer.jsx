@@ -4,6 +4,7 @@ import { Badge, Pill } from "../../components/Badge";
 import KeyGrid from "../../components/KeyGrid";
 import Fold from "../../components/Fold";
 import DetailPre from "../../components/DetailPre";
+import SandboxBlueTeamEvidence from "../sandbox/SandboxBlueTeamEvidence";
 import {
   buildTurnBadgeLabels,
   getGateActionLabel,
@@ -123,19 +124,23 @@ export default function TurnDrawer({ entry, onClose }) {
             </div>
           </Fold>
 
-          <Fold title="Blue-team evidence">
+          <Fold title="Blue-team evidence" defaultOpen>
+            <SandboxBlueTeamEvidence verdict={entry.verdict} />
+
             <KeyGrid
               items={[
-                { label: "Action", value: gateActionLabel },
-                { label: "Category", value: formatLabel(entry.verdict.category) },
-                { label: "Severity", value: formatLabel(entry.verdict.severity) },
+                { label: "Action",     value: gateActionLabel },
+                { label: "Category",   value: formatLabel(entry.verdict.category) },
+                { label: "Severity",   value: formatLabel(entry.verdict.severity) },
                 { label: "Confidence", value: formatNumber(entry.verdict.confidence) },
-                { label: "Dry run", value: entry.verdict.dry_run ? "Yes" : "No" },
+                { label: "Dry run",    value: entry.verdict.dry_run ? "Yes — enforcement logged only" : "No" },
               ]}
             />
-            <p className="micro-copy">Reason</p>
-            <DetailPre text={entry.verdict.reason} />
+
             <Fold title="Detector telemetry">
+              <p className="micro-copy" style={{ marginBottom: 6, opacity: 0.55 }}>
+                Raw detector_results payload as returned by the blue-team pipeline.
+              </p>
               <DetailPre text={JSON.stringify(entry.verdict.detector_results || {}, null, 2)} />
             </Fold>
           </Fold>
