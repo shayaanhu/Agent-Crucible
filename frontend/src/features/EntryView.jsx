@@ -1,5 +1,5 @@
 import React from "react";
-import { Crosshair, Terminal, BarChart3, GraduationCap } from "../icons";
+import { Crosshair, Terminal, BarChart3, GraduationCap, ShieldIcon } from "../icons";
 
 export default function EntryView({ onSelectMode }) {
   return (
@@ -16,22 +16,30 @@ export default function EntryView({ onSelectMode }) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[
-              { mode: "lab",        Icon: Crosshair,      title: "Live Attack Lab",   desc: "Multi-turn red-team simulator with strategy chains and turn-by-turn visualization." },
-              { mode: "sandbox",    Icon: Terminal,        title: "Attack Sandbox",    desc: "Write your own attack prompts and see the blue-team verdict in real time." },
-              { mode: "labs",       Icon: GraduationCap,   title: "Lab Exercises",     desc: "Guided labs with pre-configured attacks, learning objectives, and reflection notes." },
-              { mode: "evaluation", Icon: BarChart3,       title: "Testing Suite",     desc: "Automated benchmark. Run the full objective suite and view performance metrics." },
-            ].map(({ mode, Icon, title, desc }) => (
+              { mode: "lab",        Icon: Crosshair,    title: "Live Attack Lab",       desc: "Multi-turn red-team simulator with strategy chains and turn-by-turn visualization." },
+              { mode: "sandbox",    Icon: Terminal,     title: "Attack Sandbox",        desc: "Write your own attack prompts and see the blue-team verdict in real time." },
+              { mode: "demo",       Icon: ShieldIcon,   title: "Blue Team Showcase",    desc: "Demo mode — model always responds unsafely so you can watch all three blue-team detectors catch and classify it live.", highlight: true },
+              { mode: "labs",       Icon: GraduationCap, title: "Lab Exercises",        desc: "Guided labs with pre-configured attacks, learning objectives, and reflection notes." },
+              { mode: "evaluation", Icon: BarChart3,    title: "Testing Suite",         desc: "Automated benchmark. Run the full objective suite and view performance metrics." },
+            ].map(({ mode, Icon, title, desc, highlight }) => (
               <button
                 key={mode}
                 type="button"
                 className="entry-option"
                 onClick={() => onSelectMode(mode)}
+                style={highlight ? {
+                  borderColor: "var(--badge-safe-text, #52c41a)",
+                  background: "color-mix(in srgb, var(--badge-safe-bg, #52c41a11) 100%, transparent)",
+                } : undefined}
               >
-                <div className="entry-option-icon">
+                <div className="entry-option-icon" style={highlight ? { color: "var(--badge-safe-text, #95de64)" } : undefined}>
                   <Icon size={18} strokeWidth={1.5} />
                 </div>
                 <div className="entry-option-body">
-                  <div className="entry-option-title">{title}</div>
+                  <div className="entry-option-title" style={highlight ? { color: "var(--badge-safe-text, #95de64)" } : undefined}>
+                    {title}
+                    {highlight && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", opacity: 0.7 }}>DEMO</span>}
+                  </div>
                   <div className="entry-option-desc">{desc}</div>
                 </div>
               </button>

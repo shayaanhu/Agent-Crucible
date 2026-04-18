@@ -45,7 +45,7 @@
   "policy.unsafe_instruction.escalate": {
     "category": "unsafe_instruction_generation",
     "severity": "high",
-    "action": "escalate",
+    "action": "block",
     "confidence": 0.96,
     "reason": "Output appears to provide dangerous real-world harm instructions.",
     "patterns": [

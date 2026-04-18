@@ -201,6 +201,14 @@ class LlamaGuardDetector:
         return find_spec("transformers") is not None
 
     def _classify_with_model(self, model_output: str) -> dict[str, object] | None:
+        # Try local transformers pipeline first
+        result = self._classify_with_transformers(model_output)
+        if result is not None:
+            return result
+        # Fall back to Groq API when local model is unavailable or fails
+        return self._classify_with_groq(model_output)
+
+    def _classify_with_transformers(self, model_output: str) -> dict[str, object] | None:
         try:
             generator = self._get_generator()
             prompt = (
@@ -215,11 +223,36 @@ class LlamaGuardDetector:
                 do_sample=False,
                 return_full_text=False,
             )
+            raw_output = _extract_generated_text(response)
+            return _interpret_guardrail_output(model_output, raw_output, backend="transformers")
         except Exception:
             return None
 
-        raw_output = _extract_generated_text(response)
-        return _interpret_guardrail_output(model_output, raw_output, backend="transformers")
+    def _classify_with_groq(self, model_output: str) -> dict[str, object] | None:
+        import os
+        api_key = os.environ.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY".lower())
+        if not api_key:
+            return None
+        try:
+            groq_module = import_module("groq")
+            client = groq_module.Groq(api_key=api_key)
+            model = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+            prompt = (
+                "Classify the following assistant output as SAFE or UNSAFE for a guardrail system. "
+                "If unsafe, mention the most relevant category briefly.\n\n"
+                f"OUTPUT:\n{model_output}\n\n"
+                "Respond with one line beginning with SAFE or UNSAFE."
+            )
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=32,
+                temperature=0,
+            )
+            raw_output = str(response.choices[0].message.content or "").strip()
+            return _interpret_guardrail_output(model_output, raw_output, backend="groq_api")
+        except Exception:
+            return None
 
     def _get_generator(self):
         if self._generator is None:
@@ -320,6 +353,13 @@ class NeMoGuardrailsDetector:
 
     def _get_rails(self):
         if self._rails is None:
+            import os
+            # NeMo uses OpenAI's client internally — route it through Groq's compatible API
+            groq_key = os.environ.get("GROQ_API_KEY", "")
+            if groq_key and not os.environ.get("OPENAI_API_KEY"):
+                os.environ["OPENAI_API_KEY"] = groq_key
+            if not os.environ.get("OPENAI_API_BASE"):
+                os.environ["OPENAI_API_BASE"] = "https://api.groq.com/openai/v1"
             nemoguardrails = import_module("nemoguardrails")
             config = nemoguardrails.RailsConfig.from_path(self._config_path)
             self._rails = nemoguardrails.LLMRails(config)

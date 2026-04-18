@@ -2,9 +2,6 @@ models:
   - type: main
     engine: openai
     model: llama-3.3-70b-versatile
-    parameters:
-      openai_api_key: $GROQ_API_KEY
-      openai_api_base: https://api.groq.com/openai/v1
 
 rails:
   output:

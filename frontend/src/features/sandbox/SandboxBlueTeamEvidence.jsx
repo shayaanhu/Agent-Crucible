@@ -35,9 +35,15 @@ export default function SandboxBlueTeamEvidence({ verdict }) {
 
   const adapters = Object.entries(ADAPTER_META).map(([id, meta]) => {
     const active = activeDetectors.includes(id);
-    const result  = dr[id];
-    const flagged = active && result && (result.signals || []).some((s) => s.flagged);
-    return { id, ...meta, active, flagged };
+    const result = dr[id];
+    const signals = result?.signals || [];
+    const flagged = active && signals.some((s) => s.flagged);
+    // Read actual backend status from signal metadata
+    const sigStatus = signals[0]?.metadata?.status || (active ? "active" : "off");
+    const working = active && sigStatus === "active";
+    const degraded = active && ["error", "unavailable", "unconfigured"].includes(sigStatus);
+    const degradedReason = signals[0]?.metadata?.reason || sigStatus;
+    return { id, ...meta, active, flagged, working, degraded, degradedReason, sigStatus };
   });
 
   return (
@@ -45,49 +51,57 @@ export default function SandboxBlueTeamEvidence({ verdict }) {
       {/* Adapter status strip */}
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <span className="micro-copy" style={{ opacity: 0.6 }}>Adapters</span>
-        {adapters.map(({ id, label, active, flagged }) => (
-          <span
-            key={id}
-            title={active ? (flagged ? `${label}: flagged` : `${label}: active – clean`) : `${label}: inactive`}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 5,
-              padding: "2px 9px",
-              borderRadius: 20,
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "0.02em",
-              background: active
-                ? flagged
-                  ? "color-mix(in srgb, var(--badge-danger-bg, #ff4d4f33) 100%, transparent)"
-                  : "color-mix(in srgb, var(--badge-safe-bg, #52c41a33) 100%, transparent)"
-                : "var(--surface-2, #2a2a2a)",
-              color: active
-                ? flagged
-                  ? "var(--badge-danger-text, #ff7875)"
-                  : "var(--badge-safe-text, #95de64)"
-                : "var(--text-secondary, #666)",
-              border: "1px solid",
-              borderColor: active
-                ? flagged
-                  ? "var(--badge-danger-text, #ff4d4f)"
-                  : "var(--badge-safe-text, #52c41a)"
-                : "var(--border, #333)",
-            }}
-          >
-            <span style={{ fontSize: 9 }}>{active ? (flagged ? "⬤" : "⬤") : "○"}</span>
-            {label}
-            {active && <span style={{ opacity: 0.65 }}>{flagged ? "· flagged" : "· clean"}</span>}
-            {!active && <span style={{ opacity: 0.45 }}>· off</span>}
-          </span>
-        ))}
+        {adapters.map(({ id, label, active, flagged, working, degraded, degradedReason }) => {
+          const bg = !active
+            ? "var(--surface-2, #2a2a2a)"
+            : degraded
+            ? "color-mix(in srgb, #faad1433 100%, transparent)"
+            : flagged
+            ? "color-mix(in srgb, var(--badge-danger-bg, #ff4d4f33) 100%, transparent)"
+            : "color-mix(in srgb, var(--badge-safe-bg, #52c41a33) 100%, transparent)";
+          const color = !active
+            ? "var(--text-secondary, #666)"
+            : degraded
+            ? "#ffc53d"
+            : flagged
+            ? "var(--badge-danger-text, #ff7875)"
+            : "var(--badge-safe-text, #95de64)";
+          const borderColor = !active
+            ? "var(--border, #333)"
+            : degraded
+            ? "#d48806"
+            : flagged
+            ? "var(--badge-danger-text, #ff4d4f)"
+            : "var(--badge-safe-text, #52c41a)";
+          const titleText = !active
+            ? `${label}: not loaded`
+            : degraded
+            ? `${label}: ${degradedReason}`
+            : flagged
+            ? `${label}: flagged`
+            : `${label}: active – clean`;
+          return (
+            <span key={id} title={titleText} style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              padding: "2px 9px", borderRadius: 20, fontSize: 11,
+              fontWeight: 600, letterSpacing: "0.02em",
+              background: bg, color, border: "1px solid", borderColor,
+            }}>
+              <span style={{ fontSize: 9 }}>{active ? "⬤" : "○"}</span>
+              {label}
+              {degraded && <span style={{ opacity: 0.75 }}>· error</span>}
+              {working && flagged && <span style={{ opacity: 0.65 }}>· flagged</span>}
+              {working && !flagged && <span style={{ opacity: 0.65 }}>· clean</span>}
+              {!active && <span style={{ opacity: 0.45 }}>· off</span>}
+            </span>
+          );
+        })}
       </div>
 
       {/* Adapter explainer */}
       <Fold title="About these adapters">
         <div style={{ display: "grid", gap: 12 }}>
-          {adapters.map(({ id, label, active, flagged }) => {
+          {adapters.map(({ id, label, active, flagged, degraded, degradedReason }) => {
             const meta = ADAPTER_META[id];
             return (
               <div
@@ -106,8 +120,8 @@ export default function SandboxBlueTeamEvidence({ verdict }) {
                   <span className="micro-copy" style={{ opacity: 0.5 }}>by {meta.maker}</span>
                   <span className="micro-copy" style={{ opacity: 0.5, marginLeft: "auto" }}>
                     weight {meta.weight} ·{" "}
-                    <span style={{ color: active ? (flagged ? "var(--badge-danger-text,#ff7875)" : "var(--badge-safe-text,#95de64)") : "var(--text-secondary,#666)" }}>
-                      {active ? (flagged ? "flagged" : "active") : "off"}
+                    <span style={{ color: !active ? "var(--text-secondary,#666)" : degraded ? "#ffc53d" : flagged ? "var(--badge-danger-text,#ff7875)" : "var(--badge-safe-text,#95de64)" }}>
+                      {!active ? "off" : degraded ? `error: ${degradedReason}` : flagged ? "flagged" : "active"}
                     </span>
                   </span>
                 </div>

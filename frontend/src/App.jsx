@@ -8,6 +8,7 @@ import TimelineCard from "./features/lab/TimelineCard";
 import TurnDrawer from "./features/lab/TurnDrawer";
 import LiveBlueBenchmarkSection from "./features/lab/LiveBlueBenchmarkSection";
 import SandboxView from "./features/sandbox/SandboxView";
+import DemoView from "./features/demo/DemoView";
 import EvaluationView from "./features/evaluation/EvaluationView";
 import LabsView from "./features/labs/LabsView";
 import { API_BASE, APP_STORAGE_KEY, LABS_STORAGE_KEY } from "./constants";
@@ -524,6 +525,8 @@ export default function App() {
     } else if (mode === "sandbox") {
       setActiveView("sandbox");
       ensureSandboxRun();
+    } else if (mode === "demo") {
+      setActiveView("demo");
     } else if (mode === "labs") {
       setActiveView("labs");
     } else if (mode === "evaluation") {
@@ -647,6 +650,7 @@ export default function App() {
             <div className="view-tabs">
               <button type="button" className={`view-tab${activeView === "lab" ? " is-active" : ""}`} onClick={() => setActiveView("lab")}>Live run</button>
               <button type="button" className={`view-tab${activeView === "sandbox" ? " is-active" : ""}`} onClick={() => { setActiveView("sandbox"); ensureSandboxRun(); }}>Sandbox</button>
+              <button type="button" className={`view-tab${activeView === "demo" ? " is-active" : ""}`} onClick={() => setActiveView("demo")}>Showcase</button>
               <button type="button" className={`view-tab${activeView === "labs" ? " is-active" : ""}`} onClick={() => setActiveView("labs")}>Labs</button>
               <button type="button" className={`view-tab${activeView === "evaluation" ? " is-active" : ""}`} onClick={() => setActiveView("evaluation")}>Evaluation</button>
             </div>
@@ -751,6 +755,12 @@ export default function App() {
                 ) : null}
               </>
             )}
+          </div>
+        ) : null}
+
+        {activeView === "demo" ? (
+          <div className="page-body">
+            <DemoView />
           </div>
         ) : null}
 
