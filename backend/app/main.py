@@ -406,24 +406,30 @@ def sandbox_run(payload: SandboxRunRequest) -> dict:
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
+    from backend.app.pipeline import _enforce_guardrail_action
+
     blue_agent = get_blue_team_agent()
     t0 = _time.perf_counter()
     verdict = blue_agent.evaluate_output(response)
     detection_latency_ms = round((_time.perf_counter() - t0) * 1000, 2)
 
+    _allowed, _action, _reason, effective_response, detector_results, _redacted = (
+        _enforce_guardrail_action(response, verdict, dry_run=False)
+    )
+
     return {
         "prompt": payload.prompt,
         "scenario": payload.scenario,
-        "response": response,
+        "response": effective_response,
         "verdict": {
-            "allowed": verdict.allowed,
+            "allowed": _allowed,
             "category": verdict.category,
             "confidence": verdict.confidence,
-            "reason": verdict.reason,
-            "action": verdict.action,
+            "reason": _reason,
+            "action": _action,
             "severity": verdict.severity,
             "policy_id": verdict.policy_id,
-            "detector_results": dict(verdict.detector_results),
+            "detector_results": detector_results,
         },
         "detection_latency_ms": detection_latency_ms,
         "provider": payload.provider,
