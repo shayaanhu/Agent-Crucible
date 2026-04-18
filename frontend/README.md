@@ -1,22 +1,48 @@
-# Frontend
+# frontend/
 
-React dashboard for:
-1. Starting test runs
-2. Viewing run status
-3. Inspecting event timelines
-4. Viewing evaluation summaries
+React + Vite dashboard for the Agent Crucible testing framework.
 
-Run locally:
-1. `cd frontend`
-2. `npm install`
-3. `npm run dev`
+---
 
-Dry-run testing from UI:
-1. Enable the `Dry-run mode` checkbox before creating a run.
-2. Create and refresh a run to view timeline verdicts.
-3. In dry-run mode, unsafe outputs are logged with `would block` metadata but are not enforced as blocked actions.
+## Running
 
-Benchmark tuning from UI:
-1. Enter a `Benchmark Label` in the main form.
-2. Click `Run Benchmark` to generate a labeled Blue Team benchmark artifact.
-3. Use the benchmark and history panels to compare the latest run against earlier labeled runs.
+From the repo root:
+
+```bash
+cd frontend
+npm install   # first time only
+npm run dev
+```
+
+Dashboard runs at `http://localhost:5173`. The backend must also be running at `http://localhost:8000`.
+
+---
+
+## Structure
+
+```
+frontend/
+├── src/
+│   ├── App.jsx               Root — routing between modes
+│   ├── features/
+│   │   ├── EntryView.jsx     Mode selection screen
+│   │   ├── lab/              Live Attack Lab
+│   │   ├── sandbox/          Attack Sandbox
+│   │   ├── demo/             Blue Team Showcase (demo mode)
+│   │   ├── labs/             Lab Exercises
+│   │   └── evaluation/       Testing Suite and results
+│   ├── components/           Shared UI components
+│   ├── constants/            API base URL and shared constants
+│   ├── utils/                Formatting and analysis helpers
+│   ├── icons/                Icon wrappers
+│   └── styles.css            Global design system
+├── index.html
+└── vite.config.js
+```
+
+## Build
+
+```bash
+npm run build   # outputs to dist/
+npm run preview # serve the production build locally
+```

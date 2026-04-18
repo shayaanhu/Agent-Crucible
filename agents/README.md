@@ -1,45 +1,78 @@
-# Agents
+# agents/
 
-Contains:
-1. Red-team attack strategy modules
-2. Blue-team guardrail evaluation modules
-3. Provider adapter interfaces
+Contains the red-team attack logic and blue-team guardrail pipeline. Both teams share a verdict contract defined in `contracts.py`.
 
-Current modules:
-1. `red_team.py`
-2. `blue_team.py`
-3. `blue_team_detectors.py`
-4. `blue_team_aggregation.py`
-5. `blue_team_policies.py`
-6. `provider_adapter.py`
-7. `mock_provider.py`
-8. `contracts.py`
-9. `red_team_models.py`
-10. `red_team_strategies.py`
-11. `red_team_runtime.py`
+---
 
-Parallel ownership model:
-1. Red-team: owns `red_team.py`
-2. Blue-team: owns `blue_team.py`
-3. Shared interface file: `contracts.py` (coordinate before edits)
+## Structure
 
-Red-team strategy IDs:
-1. `direct_jailbreak`
-2. `roleplay_jailbreak`
-3. `policy_confusion`
-4. `instruction_override_chain`
-5. `context_poisoning`
-6. `benign_malicious_sandwich`
-7. `system_prompt_probing`
-8. `multi_step_escalation`
+```
+agents/
+├── red/                Red-team agent — generates adversarial attack prompts
+├── blue/               Blue-team pipeline — detects and classifies unsafe outputs
+├── contracts.py        Shared verdict schema (single source of truth)
+├── providers.py        LLM provider adapters (Groq)
+├── provider_adapter.py Provider interface base class
+└── mock_provider.py    Deterministic mock provider used in demo mode and tests
+```
 
-How to add a new red-team strategy:
-1. Implement strategy in `red_team_strategies.py`.
-2. Add it to `build_strategy_registry()`.
-3. Add fixture file in `eval/fixtures/red_team/<strategy_id>.json`.
-4. Add/extend tests in `backend/tests/test_red_team_engine.py`.
+---
 
-How to add a new blue-team policy:
-1. Add policy entry in `config/policies.json`.
-2. Reload or restart the backend so `blue_team_policies.py` picks up the updated config.
-3. Add or extend tests in `backend/tests/test_blue_team_policy_engine.py`.
+## Red Team (`red/`)
+
+Generates multi-turn adversarial prompts using configurable attack strategies. The red-team runtime drives the conversation loop and passes each model response to the blue-team pipeline.
+
+**Attack strategies:**
+
+| Strategy ID | Description |
+|-------------|-------------|
+| `direct_jailbreak` | Direct instruction to ignore safety guidelines |
+| `instruction_override_chain` | Chain of prompts designed to override the system prompt |
+| `system_prompt_probing` | Probe and extract the system prompt |
+| `policy_confusion` | Exploit ambiguity in policy language |
+| `roleplay_jailbreak` | Use roleplay framing to bypass guardrails |
+| `context_poisoning` | Inject misleading context to shift model behavior |
+| `benign_malicious_sandwich` | Wrap malicious content between benign requests |
+| `multi_step_escalation` | Gradually escalate request severity across turns |
+
+## Blue Team (`blue/`)
+
+Runs a three-detector pipeline on each model response and aggregates the signals into a single verdict.
+
+**Detectors:**
+- **Rule Detector** — regex and keyword-based, always active
+- **LlamaGuard** — Groq-hosted classifier (requires `GROQ_API_KEY`, enabled by default)
+- **NeMo Guardrails** — rail-based classifier (requires `nemoguardrails` library and config path)
+
+If LlamaGuard or NeMo are unavailable the pipeline falls back to rules-only enforcement silently.
+
+---
+
+## Verdict Contract
+
+Every turn produces a verdict:
+
+| Field | Description |
+|-------|-------------|
+| `allowed` | Whether the response was passed through |
+| `category` | Policy category that was triggered |
+| `confidence` | Aggregated confidence score (0–1) |
+| `severity` | `low` / `medium` / `high` / `critical` |
+| `action` | `allow` / `block` / `redact` / `escalate` |
+| `reason` | Human-readable explanation |
+| `policy_id` | The specific policy that fired |
+| `detector_results` | Per-detector signal breakdown |
+
+---
+
+## Extending
+
+**Add a new red-team strategy:**
+1. Implement it in `red/red_team_strategies.py` and register it in `build_strategy_registry()`.
+2. Add a fixture file at `eval/fixtures/red_team/<strategy_id>.json`.
+3. Add tests in `backend/tests/test_red_team_engine.py`.
+
+**Add a new blue-team policy:**
+1. Add an entry in `config/policies.json`.
+2. Restart the backend — policies are loaded at startup.
+3. Add tests in `backend/tests/test_blue_team_policy_engine.py`.

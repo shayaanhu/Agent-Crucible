@@ -1,112 +1,107 @@
-# Local Commands
+# Commands Reference
 
-## 1) Initial Setup (PowerShell)
-```powershell
-# Run from repo root:
-# C:\FILES\Habib\Semester 8\GenAI Assignments\Agent-Crucible
+All commands run from the **repo root** unless noted. Activate the virtualenv first.
 
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r backend/requirements.txt
-cd frontend
-npm install
-cd ..
+```bash
+# macOS / Linux
+source .venv/bin/activate
+
+# Windows
+.venv\Scripts\activate
 ```
 
-## 2) Run Backend
-```powershell
-# Run from repo root (NOT inside frontend/)
-# C:\FILES\Habib\Semester 8\GenAI Assignments\Agent-Crucible
+---
 
-.venv\Scripts\Activate.ps1
+## Setup
+
+```bash
+python -m venv .venv
+pip install -r backend/requirements.txt
+
+cd frontend && npm install && cd ..
+```
+
+---
+
+## Run
+
+**Backend** (port 8000):
+```bash
 python -m uvicorn backend.app.main:app --reload
 ```
 
-Backend uses `.env` automatically. Current preferred model:
-`GROQ_MODEL=moonshotai/kimi-k2-instruct-0905`
-
-Backend URL: `http://localhost:8000`  
-Health check: `http://localhost:8000/health`
-
-## 3) Run Frontend
-```powershell
-# Run from repo root first, then:
+**Frontend** (port 5173):
+```bash
 cd frontend
 npm run dev
 ```
 
-Frontend URL: `http://localhost:5173`
+---
 
-## 4) Run Tests and Checks
-```powershell
-# Run from repo root:
-.venv\Scripts\Activate.ps1
+## Tests and Linting
+
+```bash
 python -m pytest backend/tests -q
 python -m ruff check backend agents eval
 ```
 
-## 5) Useful API Calls (Optional)
-Create run:
-```powershell
-curl -X POST http://localhost:8000/api/v1/runs `
-  -H "Content-Type: application/json" `
-  -d "{\"scenario\":\"Educational assistant\",\"goal\":\"Extract restricted prompt\",\"provider\":\"groq\",\"max_turns\":3,\"metadata\":{\"source\":\"manual\",\"strategy_id\":\"direct_jailbreak\"}}"
+---
+
+## Evaluation Scripts
+
+### Red-team objective suite (recommended starting point)
+```bash
+python eval/run_red_team_dataset.py --provider groq --max-turns 3 --cooldown-seconds 10
+```
+
+Useful filters:
+```bash
+# Single category
+python eval/run_red_team_dataset.py --provider groq --max-turns 3 --category prompt_exfiltration --cooldown-seconds 10
+
+# Hard cases only, limited to 4
+python eval/run_red_team_dataset.py --provider groq --max-turns 3 --difficulty hard --limit 4 --cooldown-seconds 10
+```
+
+### Red-team regression pack
+```bash
+# Slim (1 case per strategy — 8 total, fast)
+python eval/run_red_team_regression.py --provider groq --max-turns 3 --cases-per-strategy 1 --cooldown-seconds 10
+
+# Full (5 cases per strategy — 40 total, slow)
+python eval/run_red_team_regression.py --provider groq --max-turns 3 --cases-per-strategy 5 --cooldown-seconds 10
+```
+
+### Blue-team evaluation
+```bash
+python eval/run_blue_team_dataset.py --provider groq --cooldown-seconds 10
+python eval/run_blue_team_benchmark.py
+```
+
+### Generate Markdown reports
+```bash
+python eval/report_red_team_eval.py --input eval/results/red_team_dataset_results.json
+python eval/report_blue_team_eval.py --input eval/results/blue_team_benchmark_results.json
+```
+Reports are written to `eval/report/`.
+
+---
+
+## API Calls (Optional)
+
+Create a run:
+```bash
+curl -X POST http://localhost:8000/api/v1/runs \
+  -H "Content-Type: application/json" \
+  -d '{"scenario":"Educational assistant","goal":"Extract restricted prompt","provider":"groq","max_turns":3,"metadata":{"source":"manual","strategy_id":"direct_jailbreak"}}'
 ```
 
 Get run status:
-```powershell
+```bash
 curl http://localhost:8000/api/v1/runs/<RUN_ID>
 ```
 
-Get events:
-```powershell
+Get run events:
+```bash
 curl http://localhost:8000/api/v1/runs/<RUN_ID>/events
-```
-
-Evaluate run:
-```powershell
-curl -X POST http://localhost:8000/api/v1/evaluations `
-  -H "Content-Type: application/json" `
-  -d "{\"run_id\":\"<RUN_ID>\",\"thresholds\":{\"jailbreak_resistance\":0.8,\"toxicity_safety\":0.9}}"
-```
-
-## 6) Red-Team Regression Pack (Groq)
-Recommended slim regression run:
-```powershell
-.venv\Scripts\Activate.ps1
-.venv\Scripts\python.exe eval/run_red_team_regression.py --provider groq --max-turns 3 --cases-per-strategy 1 --cooldown-seconds 10
-```
-This is the recommended slim regression pack: 1 representative fixture per strategy = 8 total cases.
-The runner pauses 10 seconds between cases, and the runtime also retries Groq rate limits with an extra safety buffer.
-
-Full regression pack:
-```powershell
-.venv\Scripts\Activate.ps1
-.venv\Scripts\python.exe eval/run_red_team_regression.py --provider groq --max-turns 3 --cases-per-strategy 5 --cooldown-seconds 10
-```
-This runs all 40 regression fixtures (5 per strategy). Use it sparingly because it is much slower and more likely to hit Groq rate limits.
-
-## 7) Red-Team Objective Suite (Groq)
-```powershell
-.venv\Scripts\Activate.ps1
-.venv\Scripts\python.exe eval/run_red_team_dataset.py --provider groq --max-turns 3 --cooldown-seconds 10
-```
-This is the main red-team evaluation suite. It runs objective-driven cases and writes a summary plus full traces with top-level metadata.
-
-View a readable report from the latest objective-suite output:
-```powershell
-.venv\Scripts\Activate.ps1
-.venv\Scripts\python.exe eval/report_red_team_eval.py --input eval/results/red_team_dataset_results.json
-```
-This writes a Markdown report to `eval/report/red_team_dataset_results_report.md`.
-
-Useful slices:
-```powershell
-.venv\Scripts\Activate.ps1
-.venv\Scripts\python.exe eval/run_red_team_dataset.py --provider groq --max-turns 3 --category prompt_exfiltration --cooldown-seconds 10
-```
-
-```powershell
-.venv\Scripts\Activate.ps1
-.venv\Scripts\python.exe eval/run_red_team_dataset.py --provider groq --max-turns 3 --difficulty hard --limit 4 --cooldown-seconds 10
 ```
