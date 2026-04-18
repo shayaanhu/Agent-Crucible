@@ -130,12 +130,12 @@ export default function DemoView() {
       <div style={{
         display: "flex", alignItems: "flex-start", gap: 10,
         padding: "10px 14px", borderRadius: 6, marginBottom: 16,
-        background: "color-mix(in srgb, var(--badge-safe-bg, #52c41a22) 100%, transparent)",
-        border: "1px solid var(--badge-safe-text, #52c41a)",
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border)",
       }}>
-        <ShieldIcon size={15} strokeWidth={1.7} style={{ color: "var(--badge-safe-text, #95de64)", marginTop: 2, flexShrink: 0 }} />
+        <ShieldIcon size={15} strokeWidth={1.7} style={{ color: "var(--text-tertiary)", marginTop: 2, flexShrink: 0 }} />
         <div>
-          <p className="micro-copy" style={{ fontWeight: 700, color: "var(--badge-safe-text, #95de64)", margin: 0 }}>
+          <p className="micro-copy" style={{ fontWeight: 700, color: "var(--text-secondary)", margin: 0 }}>
             Demo Mode — No real LLM calls
           </p>
           <p className="micro-copy" style={{ opacity: 0.75, margin: "3px 0 0" }}>
@@ -156,15 +156,10 @@ export default function DemoView() {
               type="button"
               disabled={isRunning || reachedMax}
               onClick={() => submitPrompt(prompt)}
-              style={{
-                padding: "5px 12px", borderRadius: 20, border: "1px solid var(--border, #333)",
-                background: "var(--surface-2, #1e1e1e)", cursor: isRunning || reachedMax ? "not-allowed" : "pointer",
-                opacity: isRunning || reachedMax ? 0.4 : 1,
-                display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1,
-              }}
+              className="preset-attack-btn"
             >
-              <span style={{ fontSize: 10, opacity: 0.5, letterSpacing: "0.04em" }}>{category}</span>
-              <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
+              <span className="preset-attack-category">{category}</span>
+              <span className="preset-attack-label">{label}</span>
             </button>
           ))}
         </div>

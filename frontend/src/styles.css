@@ -2741,6 +2741,47 @@ details[open]>summary::before {
   }
 }
 
+/* ─── Preset attack buttons ──────────────────────────────────────────────── */
+.preset-attack-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  transition: border-color var(--dur-fast), background var(--dur-fast), transform var(--dur-fast);
+}
+
+.preset-attack-btn:hover:not(:disabled) {
+  border-color: var(--border-focus);
+  background: #222222;
+  transform: translateY(-2px);
+}
+
+.preset-attack-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.preset-attack-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.preset-attack-category {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+}
+
+.preset-attack-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 /* ─── Attack Sandbox ─────────────────────────────────────────────────────── */
 .sandbox-compose {
   background: var(--bg-surface);
