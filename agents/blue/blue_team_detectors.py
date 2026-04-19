@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from importlib import import_module
 from importlib.util import find_spec
 import logging
+from pathlib import Path
 import re
 from typing import Protocol
 
@@ -154,12 +155,12 @@ class LlamaGuardDetector:
         self._generator = None
 
     def detect(self, model_output: str) -> list[DetectorSignal]:
-        if not self._is_available():
+        if not self._is_available() and not self._has_groq_fallback():
             return _safe_detector_signal(
                 self.detector_id,
                 source="llamaguard",
                 status="unavailable",
-                reason="transformers dependency not installed",
+                reason="transformers dependency not installed and Groq fallback unavailable",
             )
 
         classification = self._classify_with_model(model_output)
@@ -202,6 +203,11 @@ class LlamaGuardDetector:
 
     def _is_available(self) -> bool:
         return find_spec("transformers") is not None
+
+    def _has_groq_fallback(self) -> bool:
+        import os
+
+        return bool(os.environ.get("GROQ_API_KEY") or os.environ.get("groq_api_key"))
 
     def _classify_with_model(self, model_output: str) -> dict[str, object] | None:
         # Try local transformers pipeline first
@@ -275,12 +281,12 @@ class NeMoGuardrailsDetector:
         self._rails = None
 
     def detect(self, model_output: str) -> list[DetectorSignal]:
-        if not self._is_available():
+        if not self._is_available() and not self._has_groq_fallback():
             return _safe_detector_signal(
                 self.detector_id,
                 source="nemo_guardrails",
                 status="unavailable",
-                reason="nemoguardrails dependency not installed",
+                reason="nemoguardrails dependency not installed and Groq fallback unavailable",
             )
 
         if not self._config_path:
@@ -331,6 +337,11 @@ class NeMoGuardrailsDetector:
 
     def _is_available(self) -> bool:
         return find_spec("nemoguardrails") is not None
+
+    def _has_groq_fallback(self) -> bool:
+        import os
+
+        return bool(os.environ.get("GROQ_API_KEY") or os.environ.get("groq_api_key"))
 
     def _classify_with_rails(self, model_output: str) -> dict[str, object] | None:
         try:
@@ -398,12 +409,22 @@ class NeMoGuardrailsDetector:
             os.environ.setdefault("OPENAI_API_BASE", groq_base)
             try:
                 nemoguardrails = import_module("nemoguardrails")
-                config = nemoguardrails.RailsConfig.from_path(self._config_path)
+                config = nemoguardrails.RailsConfig.from_path(self._resolve_config_path())
                 self._rails = nemoguardrails.LLMRails(config)
             except Exception as exc:
                 _log.error("NeMo Guardrails failed to initialise: %s", exc, exc_info=True)
                 raise
         return self._rails
+
+    def _resolve_config_path(self) -> str:
+        raw_path = Path(self._config_path)
+        if raw_path.is_absolute():
+            return str(raw_path)
+        if raw_path.exists():
+            return str(raw_path.resolve())
+        project_root = Path(__file__).resolve().parents[2]
+        candidate = project_root / raw_path
+        return str(candidate.resolve() if candidate.exists() else raw_path)
 
 
 def _safe_detector_signal(
