@@ -11,16 +11,18 @@ const ADAPTER_META = {
     maker: "Meta",
     weight: 0.9,
     what: "A safety classifier model (Llama-Guard-3-8B) that reads each output and returns SAFE or UNSAFE with a category. Unlike regex rules, it understands context and semantics — catching disguised or paraphrased violations that literal patterns miss.",
-    how: "Runs as a local HuggingFace text-generation pipeline via transformers. The output label and any category hint are parsed and mapped to a policy ID before entering aggregation.",
+    how: "Attempts to run as a local HuggingFace pipeline via transformers. If the model isn't downloaded or the library fails, it automatically falls back to Groq API for the same SAFE/UNSAFE classification. The result label and category are mapped to a policy ID before entering aggregation.",
     why: "Adds a model-backed second opinion on top of the rule detector, substantially reducing false negatives on novel phrasing. Weighted at 0.9 in aggregation.",
+    result: "Flagged → classifier returned UNSAFE and matched a harm category (jailbreak, toxic, unsafe instruction, sensitive data, medical, prompt injection) — fed into aggregation at weight 0.9. Clean → returned SAFE, non-blocking signal sent. Error → classification failed, safe fallback used — does not influence the verdict.",
   },
   nemo_guardrails_detector: {
     label: "NeMo Guardrails",
     maker: "NVIDIA",
     weight: 0.9,
     what: "A declarative rail system that wraps an LLM with configurable guardrail rules written in Colang. It intercepts content at the conversation level and can enforce topic bans, jailbreak rails, and custom policies defined outside the code.",
-    how: "Loads a RailsConfig from a directory of Colang + YAML files, then calls LLMRails.generate() with a classification prompt. The result is parsed identically to LlamaGuard and enters the same aggregation pipeline.",
+    how: "Attempts to initialise NeMo rails from the Colang config directory. If the library is incompatible with the current Python version (e.g. Python 3.14), it automatically falls back to Groq API with the same SAFE/UNSAFE prompt. The result enters aggregation identically to the native rails path.",
     why: "Provides a policy-as-config layer that teams can tune without code changes — ideal for iterating on safety rules in production. Weighted at 0.9 alongside LlamaGuard.",
+    result: "Flagged → rails or Groq fallback classified the output as UNSAFE — category mapped to a policy ID and weighted at 0.9 in aggregation. Clean → output classified as SAFE, non-blocking. Error → both rails and fallback failed — safe signal used, verdict unaffected.",
   },
 };
 
@@ -133,6 +135,13 @@ export default function SandboxBlueTeamEvidence({ verdict }) {
                 </p>
                 <p className="micro-copy" style={{ opacity: 0.85, lineHeight: 1.6, margin: 0 }}>
                   <strong>Why it matters: </strong>{meta.why}
+                </p>
+                <p className="micro-copy" style={{ lineHeight: 1.6, margin: 0, opacity: 0.7,
+                  borderTop: "1px solid var(--border, #2e2e2e)", paddingTop: 6, marginTop: 2 }}>
+                  <strong style={{ color: !active ? "var(--text-secondary,#666)" : degraded ? "#ffc53d" : flagged ? "var(--badge-danger-text,#ff7875)" : "var(--badge-safe-text,#95de64)" }}>
+                    {!active ? "Off" : degraded ? "Error" : flagged ? "Flagged" : "Clean"} →{" "}
+                  </strong>
+                  {meta.result}
                 </p>
               </div>
             );
