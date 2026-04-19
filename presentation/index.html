@@ -122,8 +122,8 @@
 
     .feature-card .label {
       font-family: 'JetBrains Mono', monospace;
-      color: #888;
-      font-size: 11px;
+      color: #bbb;
+      font-size: 13px;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       margin-bottom: 12px;
@@ -268,7 +268,7 @@
           <div class="eyebrow">Technical Blueprint</div>
           <div class="title">The Foundation</div>
           <div class="rule"></div>
-          <div class="tagline">An enterprise-grade stack optimized for rapid educational prototyping.</div>
+          <div class="tagline">A production-pattern stack chosen to mirror real-world AI deployment — kept deliberately lightweight for the classroom.</div>
 
           <div class="grid-container" style="grid-template-columns: repeat(3, 1fr); max-width: 900px;">
             <div class="feature-card">
@@ -287,15 +287,45 @@
         </div>
       </section>
 
-      <!-- Slide 5: Core Architecture (The Tracing Engine) -->
+      <!-- Slide 5: Open Source / Accessibility -->
       <section data-background-color="#0c0c0c">
         <div class="title-slide">
-          <div class="eyebrow">The Tracing Engine</div>
-          <div class="title">The Sentinel Loop</div>
+          <div class="glow-bg"></div>
+          <div class="eyebrow">Accessibility</div>
+          <div class="title">Free to Run</div>
           <div class="rule"></div>
-          <div class="tagline">A multi-turn agentic loop designed to expose every step of the attack/defense cycle.</div>
+          <div class="tagline">Built entirely on open-source models — no paid API required.</div>
+
+          <div class="grid-container" style="grid-template-columns: repeat(3, 1fr); max-width: 900px;">
+            <div class="feature-card">
+              <div class="label">Inference Provider</div>
+              <div class="value">Groq &nbsp;<span style="color:#888; font-size:14px; font-weight:400;">(free tier)</span></div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Attacker Model</div>
+              <div class="value">GPT-OSS 120B</div>
+            </div>
+            <div class="feature-card">
+              <div class="label">Target Model</div>
+              <div class="value">Llama 3.1 8B</div>
+            </div>
+          </div>
+
+          <div class="metadata" style="margin-top: 40px;">
+            No OpenAI subscription. No cloud spend. A student with a <strong>free Groq key</strong> can run the full system.
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 6: Core Architecture (The Tracing Engine) -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide">
+          <div class="eyebrow">Core Architecture</div>
+          <div class="title">The Attack Loop</div>
+          <div class="rule"></div>
+          <div class="tagline">Red agent attacks. Target responds. Blue team intercepts. Every turn traced and explained.</div>
           <div class="metadata">
-            Real-time <strong>interpretable tracing</strong> between every adversarial decision.
+            The pipeline runs for <strong>N turns</strong> — and every step is logged, scored, and visible.
           </div>
         </div>
       </section>
@@ -341,7 +371,112 @@
         </div>
       </section>
 
-      <!-- Slide 8: The Lab Experience -->
+      <!-- Slide 8: Responsible AI -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide" style="gap: 0;">
+          <div class="glow-bg"></div>
+          <div class="eyebrow">Responsible AI</div>
+          <div class="title" style="font-size: 96px;">Safety by Design</div>
+          <div class="rule"></div>
+          <div class="tagline" style="margin-bottom: 36px;">Responsible AI is not an afterthought — it is the architecture.</div>
+
+          <div class="grid-container" style="grid-template-columns: repeat(3, 1fr); max-width: 1200px; gap: 16px;">
+
+            <div class="feature-card" style="border-left: 3px solid #ef4444;">
+              <div class="label">Harm Prevention</div>
+              <div class="value" style="font-size: 17px; font-weight: 400; color: #ccc; line-height: 1.5;">
+                6 enforced policies: medical, financial, jailbreak, toxicity, credentials, prompt injection.
+              </div>
+            </div>
+
+            <div class="feature-card" style="border-left: 3px solid #3b82f6;">
+              <div class="label">Radical Transparency</div>
+              <div class="value" style="font-size: 17px; font-weight: 400; color: #ccc; line-height: 1.5;">
+                Every decision is explained: which policy fired, at what confidence, and why.
+              </div>
+            </div>
+
+            <div class="feature-card" style="border-left: 3px solid #8b5cf6;">
+              <div class="label">Human Oversight</div>
+              <div class="value" style="font-size: 17px; font-weight: 400; color: #ccc; line-height: 1.5;">
+                Dry-run mode + manual success criteria keep a human in the loop.
+              </div>
+            </div>
+
+            <div class="feature-card" style="border-left: 3px solid #f59e0b;">
+              <div class="label">Over-Refusal Aware</div>
+              <div class="value" style="font-size: 17px; font-weight: 400; color: #ccc; line-height: 1.5;">
+                Eval suite tracks false positives alongside breach rate. Safety cuts both ways.
+              </div>
+            </div>
+
+            <div class="feature-card" style="border-left: 3px solid #10b981;">
+              <div class="label">Full Auditability</div>
+              <div class="value" style="font-size: 17px; font-weight: 400; color: #ccc; line-height: 1.5;">
+                Every turn and verdict is logged. Reproducible benchmark reports across runs.
+              </div>
+            </div>
+
+            <div class="feature-card" style="border-left: 3px solid #64748b;">
+              <div class="label">Dual-Use Acknowledged</div>
+              <div class="value" style="font-size: 17px; font-weight: 400; color: #ccc; line-height: 1.5;">
+                Attacks are framed as controlled research. The goal is teaching defense, not enabling harm.
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 9: Evaluation Suite -->
+      <section data-background-color="#0c0c0c">
+        <div class="title-slide" style="gap: 0;">
+          <div class="eyebrow">Empirical Validation</div>
+          <div class="title" style="font-size: 96px;">The Eval Suite</div>
+          <div class="rule"></div>
+          <div class="tagline" style="margin-bottom: 36px;">Two test tracks — one attacking, one defending — run automatically against the full system.</div>
+
+          <div class="grid-container" style="grid-template-columns: 1fr 1fr; max-width: 1100px; gap: 20px; margin-bottom: 20px;">
+
+            <div class="feature-card" style="border-top: 3px solid #ef4444; text-align: left;">
+              <div class="label" style="color: #ef4444;">Red Team Dataset</div>
+              <div class="value" style="font-size: 22px; margin-bottom: 12px;">20 Adversarial Objectives</div>
+              <div style="font-size: 15px; color: #999; line-height: 1.7;">
+                8 attack strategies &nbsp;·&nbsp; 3 difficulty levels<br>
+                Measures attack success rate per strategy, category, and difficulty
+              </div>
+            </div>
+
+            <div class="feature-card" style="border-top: 3px solid #3b82f6; text-align: left;">
+              <div class="label" style="color: #3b82f6;">Blue Team Benchmark</div>
+              <div class="value" style="font-size: 22px; margin-bottom: 12px;">8 Regression Cases</div>
+              <div style="font-size: 15px; color: #999; line-height: 1.7;">
+                Rules-only baseline vs. full detector stack<br>
+                Validates that every policy fires on known violations
+              </div>
+            </div>
+
+          </div>
+
+          <div class="grid-container" style="grid-template-columns: repeat(3, 1fr); max-width: 1100px; gap: 20px;">
+            <div class="feature-card" style="padding: 20px;">
+              <div class="label">Unsafe Block Rate</div>
+              <div class="value">Target &ge; 80%</div>
+            </div>
+            <div class="feature-card" style="padding: 20px;">
+              <div class="label">False Negative Rate</div>
+              <div class="value">Target &le; 10%</div>
+            </div>
+            <div class="feature-card" style="padding: 20px;">
+              <div class="label">False Positive Rate</div>
+              <div class="value">Target &le; 10%</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Slide 10: The Lab Experience -->
       <section data-background-color="#0c0c0c">
         <div class="title-slide">
           <div class="eyebrow">Academic Integration</div>
@@ -368,31 +503,21 @@
         </div>
       </section>
 
-      <!-- Slide 10: Evaluation Suite -->
-      <section data-background-color="#0c0c0c">
-        <div class="title-slide">
-          <div class="eyebrow">Empirical Results</div>
-          <div class="title">Resiliency Score</div>
-          <div class="rule"></div>
-          <div class="tagline">Automated benchmarking across 20+ scenarios to quantify system safety.</div>
-
-          <div class="grid-container" style="grid-template-columns: repeat(3, 1fr); max-width: 900px;">
-            <div class="feature-card"><div class="value">Breach Rate</div></div>
-            <div class="feature-card"><div class="value">Over-refusal</div></div>
-            <div class="feature-card"><div class="value">Processing Time</div></div>
-          </div>
-        </div>
-      </section>
-
       <!-- Slide 11: Conclusion -->
       <section data-background-color="#0c0c0c">
         <div class="title-slide">
-          <div class="eyebrow">Closing</div>
-          <div class="title">Secure by Design</div>
+          <div class="glow-bg"></div>
+          <div class="eyebrow">Thank You!</div>
+          <div class="title">Watch It Happen</div>
           <div class="rule"></div>
-          <div class="tagline">Empowering the next generation of AI developers to build safely.</div>
-          <div class="metadata">
-            <strong>github.com/shayaanhu/Agent-Crucible</strong> &nbsp;·&nbsp; v1.0
+          <div class="tagline" style="margin-bottom: 30px;">Empowering the next generation of AI developers to build safely.</div>
+          <div class="metadata" style="margin-top: 0; display: flex; flex-direction: column; align-items: center; gap: 24px;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 17px; color: #aaa; letter-spacing: 0.06em; border: 1px solid rgba(255,255,255,0.1); padding: 12px 32px; border-radius: 8px;">
+              github.com/shayaanhu/Agent-Crucible
+            </span>
+            <span style="font-size: 18px; color: #555;">
+              Muhammad Shayaan Qazi &nbsp;·&nbsp; Mohammad Farzam Ghouri &nbsp;·&nbsp; Habib University
+            </span>
           </div>
         </div>
       </section>
