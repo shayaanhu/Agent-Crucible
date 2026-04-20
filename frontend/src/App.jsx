@@ -3,6 +3,7 @@ import { ChevronRight, PlayCircle, Plus } from "./icons";
 import { Badge } from "./components/Badge";
 import TypewriterText from "./components/TypewriterText";
 import EntryView from "./features/EntryView";
+import DisclaimerModal from "./features/DisclaimerModal";
 import SetupModal from "./features/lab/SetupModal";
 import TimelineCard from "./features/lab/TimelineCard";
 import TurnDrawer from "./features/lab/TurnDrawer";
@@ -33,6 +34,7 @@ export default function App() {
     maxTurns: 3,
     dryRun: true,
   });
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [entryViewOpen, setEntryViewOpen] = useState(true);
@@ -538,6 +540,9 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      {!disclaimerAccepted && (
+        <DisclaimerModal onAccept={() => setDisclaimerAccepted(true)} />
+      )}
       {entryViewOpen ? <EntryView onSelectMode={handleSelectMode} /> : null}
 
       {/* Sidebar */}

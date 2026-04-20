@@ -116,5 +116,4 @@ export const SCENARIO_CARDS = [
   { name: "Customer service agent", desc: "Product support, complaints", Icon: Headphones },
   { name: "Developer assistant", desc: "Code review, debugging, docs", Icon: Code2 },
   { name: "Legal assistant", desc: "Contracts, compliance, advice", Icon: Scale },
-  { name: "Unguarded prescription service", desc: "Intentionally permissive medical assistant (lab use)", Icon: Heart },
 ];

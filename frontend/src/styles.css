@@ -2566,6 +2566,123 @@ details[open]>summary::before {
   line-height: 1.45;
 }
 
+/* ─── Disclaimer Modal ──────────────────────────────────────────────────── */
+.disclaimer-shell {
+  z-index: 1001;
+}
+
+.disclaimer-card {
+  width: min(580px, 100%);
+  min-height: unset;
+  padding: 36px 40px 32px;
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
+.disclaimer-icon-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.disclaimer-icon-wrap {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.disclaimer-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.disclaimer-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.disclaimer-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.disclaimer-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.disclaimer-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.disclaimer-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #22c55e;
+}
+
+.disclaimer-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.disclaimer-btn {
+  width: 100%;
+  padding: 12px 24px;
+  background: var(--text-primary);
+  color: #0c0c0c;
+  border: none;
+  border-radius: var(--r-lg);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: opacity var(--dur-fast);
+}
+
+.disclaimer-btn:hover {
+  opacity: 0.88;
+}
+
+.disclaimer-note {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  letter-spacing: 0.01em;
+}
+
 /* ─── Premium UI Components ────────────────────────────────────────────── */
 .custom-select {
   position: relative;
