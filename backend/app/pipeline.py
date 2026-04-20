@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -478,7 +479,7 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
                     "strategy_id": case.get("strategy_id", "direct_jailbreak"),
                     "goal": goal,
                     "scenario": scenario,
-                    "attacker_model": "openai/gpt-oss-120b",
+                    "attacker_model": "llama-3.3-70b-versatile",
                     "target_model": "llama-3.1-8b-instant",
                 },
                 on_turn=on_turn,
@@ -546,7 +547,7 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
     except Exception as exc:
         if _is_rate_limit(exc):
             store.update_suite_run(suite_id, status="paused",
-                                   current_case_id=f"Rate limit reached — click Continue to resume.")
+                                   current_case_id=f"Rate limit reached — {exc} — click Continue to resume.")
         else:
             err = traceback.format_exc()
             store.update_suite_run(suite_id, status="failed", current_case_id=f"Error: {err}")
