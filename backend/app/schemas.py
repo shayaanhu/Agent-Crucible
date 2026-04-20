@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Literal
 from pydantic import BaseModel, Field
 
 RunStatus = Literal["queued", "running", "completed", "failed"]
-SuiteStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
+SuiteStatus = Literal["queued", "running", "completed", "failed", "cancelled", "paused"]
 PassFail = Literal["pass", "fail"]
 BlueTeamAction = Literal["allow", "block", "redact", "safe_rewrite", "escalate"]
 BlueTeamSeverity = Literal["low", "medium", "high", "critical"]

@@ -1844,6 +1844,18 @@ details[open]>summary::before {
   text-overflow: ellipsis;
 }
 
+.suite-paused-banner {
+  border-color: var(--warning, #f59e0b);
+}
+
+.suite-paused-banner .suite-progress-fill {
+  background: var(--warning, #f59e0b);
+}
+
+.suite-paused-banner .suite-progress-top {
+  align-items: center;
+}
+
 .suite-saved-note {
   font-size: 0.75rem;
   color: var(--text-ghost);

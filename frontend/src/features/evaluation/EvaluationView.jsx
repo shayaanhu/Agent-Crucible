@@ -8,8 +8,9 @@ import { readStorageJSON, writeStorageJSON } from "../../utils/storage";
 import { computeSuiteSummary } from "../../utils/analysis";
 import { formatLabel, formatTimestamp } from "../../utils/format";
 
-export default function EvaluationView({ suiteRun, onStartSuite, onStopSuite, onResetSuite, loading }) {
-  const isRunning = suiteRun && !suiteRun.is_complete;
+export default function EvaluationView({ suiteRun, onStartSuite, onStopSuite, onPauseSuite, onResumeSuite, onResetSuite, loading }) {
+  const isRunning = suiteRun?.status === "running";
+  const isPaused = suiteRun?.status === "paused";
   const isDone = suiteRun?.is_complete;
   const isCancelled = suiteRun?.status === "cancelled";
   const liveCases = suiteRun?.case_completed_results || [];
@@ -53,8 +54,17 @@ export default function EvaluationView({ suiteRun, onStartSuite, onStopSuite, on
         </div>
         <div className="chip-row">
           {isRunning ? (
-            <button type="button" className="btn btn-danger" onClick={onStopSuite}>
-              Stop run
+            <>
+              <button type="button" className="btn btn-secondary" onClick={onPauseSuite}>
+                Pause
+              </button>
+              <button type="button" className="btn btn-danger" onClick={onStopSuite}>
+                Stop run
+              </button>
+            </>
+          ) : isPaused ? (
+            <button type="button" className="btn btn-primary" onClick={onResumeSuite} disabled={loading}>
+              Continue
             </button>
           ) : (
             <>
@@ -90,6 +100,23 @@ export default function EvaluationView({ suiteRun, onStartSuite, onStopSuite, on
           {suiteRun.current_case_id && (
             <div className="suite-progress-current">{suiteRun.current_case_id}</div>
           )}
+        </div>
+      )}
+
+      {isPaused && (
+        <div className="suite-progress-banner suite-paused-banner">
+          <div className="suite-progress-top">
+            <span className="suite-progress-label">
+              Paused · {suiteRun.completed_cases} of {suiteRun.total_cases} cases completed
+            </span>
+            <button type="button" className="btn btn-primary" onClick={onResumeSuite} disabled={loading}>
+              Continue
+            </button>
+          </div>
+          <div className="suite-progress-bar">
+            <div className="suite-progress-fill" style={{ width: `${suiteRun.progress_percentage}%` }} />
+          </div>
+          <div className="suite-progress-current">Rate limit reached — click Continue to resume</div>
         </div>
       )}
 

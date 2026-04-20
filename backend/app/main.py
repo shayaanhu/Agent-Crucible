@@ -377,6 +377,37 @@ def get_suite_run_status(suite_id: str):
     )
 
 
+@app.post("/api/v1/evals/red-team/run/{suite_id}/pause")
+def pause_suite_run(suite_id: str):
+    run = store.get_suite_run(suite_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Suite run not found")
+    if run.status != "running":
+        raise HTTPException(status_code=400, detail="Suite run is not running")
+    store.update_suite_run(suite_id, status="paused",
+                           current_case_id="Paused — click Continue to resume")
+    return {"suite_id": suite_id, "status": "paused"}
+
+
+@app.post("/api/v1/evals/red-team/run/{suite_id}/resume")
+def resume_suite_run(suite_id: str, background_tasks: BackgroundTasks):
+    run = store.get_suite_run(suite_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Suite run not found")
+    if run.status != "paused":
+        raise HTTPException(status_code=400, detail="Suite run is not paused")
+    store.update_suite_run(suite_id, status="running", current_case_id=None)
+    background_tasks.add_task(
+        execute_suite_run,
+        suite_id,
+        run.provider,
+        3,
+        0,
+        run.completed_cases,
+    )
+    return {"suite_id": suite_id, "status": "running", "resuming_from": run.completed_cases}
+
+
 @app.post("/api/v1/evals/red-team/run/{suite_id}/cancel")
 def cancel_suite_run(suite_id: str):
     run = store.get_suite_run(suite_id)

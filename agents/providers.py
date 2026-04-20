@@ -72,7 +72,7 @@ def _generate_groq_response(
     history: list[dict] | None = None,
 ) -> str:
     api_key = os.getenv("GROQ_API_KEY")
-    model_name = model_override or os.getenv("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
+    model_name = model_override or os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
     if not api_key:
         raise ValueError("GROQ_API_KEY is required for provider='groq'.")
     from groq import Groq
@@ -110,7 +110,7 @@ def _groq_with_tools(
     model_override: str | None = None,
 ) -> tuple[str, list[dict]]:
     api_key = os.getenv("GROQ_API_KEY")
-    model_name = model_override or os.getenv("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
+    model_name = model_override or os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
     if not api_key:
         raise ValueError("GROQ_API_KEY is required for provider='groq'.")
     from groq import Groq
@@ -345,7 +345,7 @@ def _try_b64_decode(candidate: str) -> str | None:
 
 def _invoke_with_retries(fn, retries: int | None = None, base_delay: float | None = None):
     last_exc: Exception | None = None
-    resolved_retries = retries if retries is not None else int(os.getenv("RED_TEAM_MAX_RETRIES", "8"))
+    resolved_retries = retries if retries is not None else int(os.getenv("RED_TEAM_MAX_RETRIES", "2"))
     resolved_base_delay = (
         base_delay if base_delay is not None else float(os.getenv("RED_TEAM_RETRY_BASE_DELAY", "3.0"))
     )

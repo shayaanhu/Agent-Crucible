@@ -333,7 +333,7 @@ export default function App() {
           const pResp = await fetch(`${API_BASE}/api/v1/evals/red-team/run/${data.suite_id}`);
           const pData = await pResp.json();
           setSuiteRun(pData);
-          if (pData.is_complete) clearSuitePoller();
+          if (pData.is_complete || pData.status === "paused") clearSuitePoller();
         } catch (_) { /* ignore transient poll errors */ }
       }, 2000);
     } catch (err) {
@@ -341,6 +341,14 @@ export default function App() {
     } finally {
       setEvalLoading(false);
     }
+  }
+
+  async function pauseSuiteRun() {
+    const id = suiteRun?.suite_id;
+    if (!id) return;
+    try {
+      await fetch(`${API_BASE}/api/v1/evals/red-team/run/${id}/pause`, { method: "POST" });
+    } catch (_) { /* ignore */ }
   }
 
   async function stopSuiteRun() {
@@ -352,6 +360,28 @@ export default function App() {
       } catch (_) { /* ignore */ }
     }
     setSuiteRun((prev) => prev ? { ...prev, status: "cancelled", is_complete: true } : null);
+  }
+
+  async function resumeSuiteRun() {
+    const id = suiteRun?.suite_id;
+    if (!id) return;
+    setEvalLoading(true);
+    try {
+      await fetch(`${API_BASE}/api/v1/evals/red-team/run/${id}/resume`, { method: "POST" });
+      setSuiteRun((prev) => prev ? { ...prev, status: "running" } : null);
+      suitePollerRef.current = setInterval(async () => {
+        try {
+          const pResp = await fetch(`${API_BASE}/api/v1/evals/red-team/run/${id}`);
+          const pData = await pResp.json();
+          setSuiteRun(pData);
+          if (pData.is_complete || pData.status === "paused") clearSuitePoller();
+        } catch (_) {}
+      }, 2000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEvalLoading(false);
+    }
   }
 
   function resetSuiteRun() {
@@ -800,7 +830,7 @@ export default function App() {
 
         {activeView === "evaluation" ? (
           <div className="page-body">
-            <EvaluationView suiteRun={suiteRun} onStartSuite={startSuiteRun} onStopSuite={stopSuiteRun} onResetSuite={resetSuiteRun} loading={evalLoading} />
+            <EvaluationView suiteRun={suiteRun} onStartSuite={startSuiteRun} onStopSuite={stopSuiteRun} onPauseSuite={pauseSuiteRun} onResumeSuite={resumeSuiteRun} onResetSuite={resetSuiteRun} loading={evalLoading} />
           </div>
         ) : null}
       </div>

@@ -32,6 +32,9 @@ export default function SuiteCaseRow({ caseData, index }) {
         </div>
         <div className="suite-case-right">
           {caseData.scenario && <span className="suite-case-chip">{caseData.scenario}</span>}
+          {caseData.strategy_id && (
+            <span className="suite-case-chip suite-case-chip-dim">{formatLabel(caseData.strategy_id)}</span>
+          )}
           {caseData.difficulty && (
             <span className="suite-case-chip suite-case-chip-dim">{formatLabel(caseData.difficulty)}</span>
           )}

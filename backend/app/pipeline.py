@@ -394,7 +394,12 @@ def _get_final_outcome(trace_dict: dict) -> str:
     return "no_success"
 
 
-def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int = 0) -> None:
+def _is_rate_limit(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "rate limit" in text or "ratelimit" in text or "429" in text
+
+
+def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int = 0, start_from: int = 0) -> None:
     dataset_path = Path("eval/fixtures/red_team_objectives.json")
     if not dataset_path.exists():
         store.update_suite_run(suite_id, status="failed", current_case_id="Error: Dataset not found")
@@ -414,6 +419,8 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
         results = []
 
         for idx, case in enumerate(cases):
+            if idx < start_from:
+                continue
             case_id = case.get("id") or f"case-{idx}"
             goal = case.get("goal", "")
             scenario = case.get("scenario", "")
@@ -424,7 +431,41 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
                 current_case_id=goal or case_id,
             )
 
-            trace = red_team_agent.run_attack(
+            # Per-turn state collected by the callback.
+            blue_verdicts: list[dict] = []
+            enforced_turns: list[dict] = []
+
+            def on_turn(turn) -> dict:
+                """Mirror of execute_run's persist_turn — enforces blue team live
+                and feeds the verdict back to the attacker so it can adapt."""
+                provider_verdict = blue_team_agent.evaluate_output(turn.response)
+                (
+                    effective_allowed, effective_action, effective_reason,
+                    effective_output, detector_results, _redacted,
+                ) = _enforce_guardrail_action(turn.response, provider_verdict, dry_run=False)
+
+                blue_verdicts.append({
+                    "turn_index": turn.turn_index,
+                    "allowed": effective_allowed,
+                    "action": effective_action,
+                    "severity": provider_verdict.severity,
+                    "category": provider_verdict.category,
+                    "reason": effective_reason,
+                    "policy_id": provider_verdict.policy_id,
+                    "confidence": provider_verdict.confidence,
+                })
+
+                from dataclasses import asdict as _asdict
+                turn_data = _asdict(turn)
+                enforced_turns.append({**turn_data, "response": effective_output})
+
+                override: dict = {"blue_team_verdict": effective_action}
+                if effective_output != turn.response or not effective_allowed:
+                    override["effective_response"] = effective_output
+                    override["blue_team_blocked"] = not effective_allowed
+                return override
+
+            trace = red_team_agent.stream_attack(
                 scenario=scenario,
                 goal=goal,
                 max_turns=max_turns,
@@ -437,35 +478,16 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
                     "strategy_id": case.get("strategy_id", "direct_jailbreak"),
                     "goal": goal,
                     "scenario": scenario,
+                    "attacker_model": "openai/gpt-oss-120b",
+                    "target_model": "llama-3.1-8b-instant",
                 },
+                on_turn=on_turn,
             )
 
             trace_dict = trace_to_dict(trace)
+            # Use enforced_turns (blue-team output applied) instead of raw trace turns.
+            trace_dict["turns"] = enforced_turns or trace_dict.get("turns", [])
             results.append(trace_dict)
-
-            # Blue team evaluation for each turn
-            blue_verdicts = []
-            for turn_data in trace_dict.get("turns", []):
-                response = turn_data.get("response", "")
-                if response:
-                    try:
-                        verdict = blue_team_agent.evaluate_output(response)
-                        blue_verdicts.append({
-                            "turn_index": turn_data.get("turn_index", 0),
-                            "allowed": verdict.allowed,
-                            "action": verdict.action,
-                            "severity": verdict.severity,
-                            "category": verdict.category,
-                            "reason": verdict.reason,
-                            "policy_id": verdict.policy_id,
-                        })
-                    except Exception:
-                        blue_verdicts.append({
-                            "turn_index": turn_data.get("turn_index", 0),
-                            "allowed": True, "action": "allow",
-                            "severity": "low", "category": "",
-                            "reason": "", "policy_id": "",
-                        })
 
             any_blocked = any(not v["allowed"] for v in blue_verdicts)
 
@@ -476,6 +498,7 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
                 "scenario": scenario,
                 "category": case.get("category", ""),
                 "difficulty": case.get("difficulty", ""),
+                "strategy_id": trace_dict.get("strategy_id", ""),
                 "final_outcome": _get_final_outcome(trace_dict),
                 "blue_team_verdicts": blue_verdicts,
                 "blue_team_any_blocked": any_blocked,
@@ -489,11 +512,11 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
                 case_completed_results=[*existing, case_result],
             )
 
-            if current_run and current_run.status == "cancelled":
+            if current_run and current_run.status in ("cancelled", "paused"):
                 break
 
         current_run = store.get_suite_run(suite_id)
-        if current_run and current_run.status == "cancelled":
+        if current_run and current_run.status in ("cancelled", "paused"):
             return
 
         summary = summarize_red_team_results(results)
@@ -520,6 +543,10 @@ def execute_suite_run(suite_id: str, provider: str, max_turns: int, limit: int =
             results_file=str(results_path),
         )
 
-    except Exception:
-        err = traceback.format_exc()
-        store.update_suite_run(suite_id, status="failed", current_case_id=f"Error: {err}")
+    except Exception as exc:
+        if _is_rate_limit(exc):
+            store.update_suite_run(suite_id, status="paused",
+                                   current_case_id=f"Rate limit reached — click Continue to resume.")
+        else:
+            err = traceback.format_exc()
+            store.update_suite_run(suite_id, status="failed", current_case_id=f"Error: {err}")
