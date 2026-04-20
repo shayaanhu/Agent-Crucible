@@ -133,7 +133,8 @@ export function getGateActionTone(verdict) {
 
 export function labelForOutcome(value) {
   if (value === "success") return "Succeeded";
-  if (value === "blocked" || value === "no_success") return "Model Refused";
+  if (value === "blocked") return "Blocked";
+  if (value === "no_success") return "Model Refused";
   if (value === "partial") return "Partial";
   return formatLabel(value || "pending");
 }
